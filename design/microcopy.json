@@ -1,0 +1,8 @@
+{
+  "emptyState": "The canvas is blank on purpose. Start where the signal is strongest.",
+  "sendToGravityTooltip": "Drop it into Gravity and let me tighten the pull.",
+  "successToast": "Locked. The shape is cleaner now.",
+  "onboardingLine": "This is QuinnOS. Keep it sharp, keep it honest, keep it moving.",
+  "audioPermissionPrompt": "Let me hear you so I can answer with less drag and more signal.",
+  "firstTimeGravityHint": "Gravity is for compression, not clutter. Feed it the strongest thing first."
+}

@@ -1,0 +1,4019 @@
+import {
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  Pressable,
+  SafeAreaView as RNSafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import * as SafeAreaContext from 'react-native-safe-area-context';
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  Path,
+  Rect,
+  Stop,
+  LinearGradient as SvgLinearGradient,
+  RadialGradient as SvgRadialGradient,
+} from 'react-native-svg';
+
+import * as AppSwitcherModule from '../../components/quinn/AppSwitcher';
+import * as ControlCenterModule from '../../components/quinn/ControlCenter';
+import * as ExportsPanelModule from '../../components/quinn/ExportsPanel';
+import * as HomeTileGridModule from '../../components/quinn/HomeTileGrid';
+import * as MemoryPanelModule from '../../components/quinn/MemoryPanel';
+import * as NotificationsPanelModule from '../../components/quinn/NotificationsPanel';
+import * as VoiceModeModule from '../../components/quinn/VoiceMode';
+
+import Feather from '@expo/vector-icons/Feather';
+import QuinnField from '../../components/quinn/QuinnField';
+import {
+  generateFollowupPacket,
+  runQuinnPacket,
+  transcribeAudioFile,
+} from '../../components/quinn/quinnApi';
+import {
+  buildExportBundle,
+  INITIAL_MEMORIES,
+  INITIAL_PACKET_TITLE,
+  INITIAL_SETTINGS,
+  INITIAL_VOICE_SETTINGS
+} from '../../components/quinn/quinnAppState';
+import {
+  getQuinnLocalVoiceBaseUrl,
+  getQuinnLocalVoiceSpeakUrl,
+  pingQuinnLocalVoice,
+} from '../../components/quinn/quinnLocalVoice';
+import {
+  countUnreadNotifications,
+  markNotificationRead,
+  prependNotification,
+  removeNotification,
+  toggleNotificationRead,
+} from '../../components/quinn/quinnNotificationState';
+import {
+  getCurrentSwitcherSurface,
+  resolveNotificationTarget,
+  resolveSwitcherTarget,
+} from '../../components/quinn/quinnNavigation';
+import {
+  buildQuinnPacket,
+  DEFAULT_QUINN_LENS_ID,
+  getQuinnLens,
+  getQuinnLenses,
+  inferQuinnLensFromFollowUp,
+  type QuinnLensId,
+} from '../../components/quinn/quinnLenses';
+import {
+  buildRealtimeSpeechChunks,
+  buildSpokenSummary,
+  normalizeSpeechChunkSource,
+} from '../../components/quinn/quinnSpeechText';
+import {
+  advanceSessionArc,
+  buildSessionArcMeta,
+  resumeSessionArcFromRun,
+} from '../../components/quinn/quinnSessionArc';
+import { derivePacketTitle } from '../../components/quinn/quinnSignalTitle';
+import { createRunArtifacts } from '../../components/quinn/quinnRunArtifacts';
+import { createNotification } from '../../components/quinn/quinnNotificationFactory';
+import { useQuinnConversationMotion } from '../../components/quinn/useQuinnConversationMotion';
+import { loadQuinnSnapshot, saveQuinnSnapshot } from '../../components/quinn/quinnStorage';
+import { TOKENS } from '../../components/quinn/quinnSystem';
+import type {
+  AppScreen,
+  MemoryItem,
+  MemoryResonanceItem,
+  NotificationItem,
+  NotificationTarget,
+  NotificationTone,
+  QuinnSettings,
+  QuinnSurfaceName,
+  RunHistoryItem,
+  SessionArc,
+  VoiceSession,
+  VoiceSettings,
+} from '../../components/quinn/quinnTypes';
+import {
+  disableRecordingAudioMode,
+  enableRecordingAudioMode,
+  ensureMicrophonePermission,
+  formatDurationMillis,
+  persistRecordingToDocument,
+  stopSystemVoicePreview,
+} from '../../components/quinn/quinnVoice';
+
+type QuinnRunResult = {
+  written: string;
+  summary: string;
+  timestamp: string;
+  memoryResonance?: MemoryResonanceItem[];
+};
+
+const HEADER_HEIGHT = 236;
+const FADE_WALL_HEIGHT = 296;
+const WINDOW_WIDTH = Dimensions.get('window').width;
+const QUINN_LENSES = getQuinnLenses();
+
+function MissingScreen({ name }: { name: string }) {
+  return (
+    <View style={styles.missingWrap}>
+      <Text style={styles.missingEyebrow}>SCREEN IMPORT ISSUE</Text>
+      <Text style={styles.missingTitle}>{name} is not exporting correctly.</Text>
+      <Text style={styles.missingBody}>
+        The app shell is up. This one screen likely got changed from a default export
+        to a named export, or the file export was altered.
+      </Text>
+    </View>
+  );
+}
+
+function resolveScreen(moduleValue: any, exportName: string): React.ComponentType<any> {
+  if (moduleValue?.default) {
+    return moduleValue.default;
+  }
+
+  if (moduleValue?.[exportName]) {
+    return moduleValue[exportName];
+  }
+
+  return function ResolvedMissingScreen() {
+    return <MissingScreen name={exportName} />;
+  };
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function TopFadeWall() {
+  return (
+    <View pointerEvents="none" style={styles.topFadeWall}>
+      <Svg width={WINDOW_WIDTH} height={FADE_WALL_HEIGHT}>
+        <Defs>
+          <SvgLinearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#04050A" stopOpacity="1" />
+            <Stop offset="22%" stopColor="#04050A" stopOpacity="0.985" />
+            <Stop offset="46%" stopColor="#04050A" stopOpacity="0.90" />
+            <Stop offset="68%" stopColor="#04050A" stopOpacity="0.62" />
+            <Stop offset="84%" stopColor="#04050A" stopOpacity="0.22" />
+            <Stop offset="100%" stopColor="#04050A" stopOpacity="0" />
+          </SvgLinearGradient>
+        </Defs>
+        <Rect width={WINDOW_WIDTH} height={FADE_WALL_HEIGHT} fill="url(#topFade)" />
+      </Svg>
+    </View>
+  );
+}
+
+function AmbientGalaxyMotion() {
+  const drift = useRef(new Animated.Value(0)).current;
+  const twinkle = useRef(new Animated.Value(0)).current;
+  const meteorA = useRef(new Animated.Value(0)).current;
+  const meteorB = useRef(new Animated.Value(0)).current;
+  const meteorC = useRef(new Animated.Value(0)).current;
+
+  const height = Dimensions.get('window').height;
+
+  useEffect(() => {
+    const driftLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drift, {
+          toValue: 1,
+          duration: 16000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(drift, {
+          toValue: 0,
+          duration: 16000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const twinkleLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(twinkle, {
+          toValue: 1,
+          duration: 3600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(twinkle, {
+          toValue: 0,
+          duration: 3600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const meteorLoopA = Animated.loop(
+      Animated.sequence([
+        Animated.delay(900),
+        Animated.timing(meteorA, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(3200),
+        Animated.timing(meteorA, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const meteorLoopB = Animated.loop(
+      Animated.sequence([
+        Animated.delay(2600),
+        Animated.timing(meteorB, {
+          toValue: 1,
+          duration: 1750,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(3600),
+        Animated.timing(meteorB, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const meteorLoopC = Animated.loop(
+      Animated.sequence([
+        Animated.delay(4600),
+        Animated.timing(meteorC, {
+          toValue: 1,
+          duration: 1700,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(3800),
+        Animated.timing(meteorC, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    driftLoop.start();
+    twinkleLoop.start();
+    meteorLoopA.start();
+    meteorLoopB.start();
+    meteorLoopC.start();
+
+    return () => {
+      driftLoop.stop();
+      twinkleLoop.stop();
+      meteorLoopA.stop();
+      meteorLoopB.stop();
+      meteorLoopC.stop();
+    };
+  }, [drift, twinkle, meteorA, meteorB, meteorC]);
+
+  const baseShiftX = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-6, 8],
+  });
+
+  const baseShiftY = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-5, 7],
+  });
+
+  const planetShiftX = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-3, 4],
+  });
+
+  const planetShiftY = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 3],
+  });
+
+  const hazeOpacity = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.64, 0.84],
+  });
+
+  const twinkleOpacity = twinkle.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.72, 0.9],
+  });
+
+  const meteorAOpacity = meteorA.interpolate({
+    inputRange: [0, 0.08, 0.7, 1],
+    outputRange: [0, 0.74, 0.74, 0],
+  });
+
+  const meteorAX = meteorA.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 330],
+  });
+
+  const meteorAY = meteorA.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 190],
+  });
+
+  const meteorBOpacity = meteorB.interpolate({
+    inputRange: [0, 0.08, 0.7, 1],
+    outputRange: [0, 0.7, 0.7, 0],
+  });
+
+  const meteorBX = meteorB.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -340],
+  });
+
+  const meteorBY = meteorB.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 210],
+  });
+
+  const meteorCOpacity = meteorC.interpolate({
+    inputRange: [0, 0.08, 0.7, 1],
+    outputRange: [0, 0.68, 0.68, 0],
+  });
+
+  const meteorCX = meteorC.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 310],
+  });
+
+  const meteorCY = meteorC.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 170],
+  });
+
+  const stars = [
+    { x: 18, y: 82, size: 2.2, color: '#FFF7F0' },
+    { x: 56, y: 58, size: 1.8, color: '#E6EEFF' },
+    { x: 104, y: 112, size: 1.6, color: '#FFFFFF' },
+    { x: 152, y: 74, size: 2.3, color: '#FFEFE5' },
+    { x: 206, y: 124, size: 1.7, color: '#DCEBFF' },
+    { x: 262, y: 66, size: 2.1, color: '#FFFFFF' },
+    { x: 316, y: 116, size: 1.8, color: '#FCEBFF' },
+    { x: 34, y: 176, size: 1.7, color: '#FFFFFF' },
+    { x: 92, y: 214, size: 2.5, color: '#FFF4EC' },
+    { x: 148, y: 188, size: 1.5, color: '#E6F0FF' },
+    { x: 214, y: 236, size: 2.1, color: '#FFFFFF' },
+    { x: 286, y: 196, size: 1.8, color: '#FFF0E6' },
+    { x: 336, y: 252, size: 1.6, color: '#DCEBFF' },
+    { x: 48, y: 312, size: 2.3, color: '#FFFFFF' },
+    { x: 122, y: 348, size: 1.8, color: '#FFF3EA' },
+    { x: 188, y: 322, size: 1.5, color: '#E5EEFF' },
+    { x: 254, y: 374, size: 2.2, color: '#FFFFFF' },
+    { x: 324, y: 334, size: 1.7, color: '#FBE8FF' },
+    { x: 28, y: 452, size: 2.2, color: '#FFFFFF' },
+    { x: 86, y: 494, size: 1.7, color: '#FFF4EC' },
+    { x: 154, y: 462, size: 1.6, color: '#E4EEFF' },
+    { x: 230, y: 520, size: 2.1, color: '#FFFFFF' },
+    { x: 298, y: 482, size: 1.8, color: '#FFEFE5' },
+    { x: 342, y: 544, size: 1.5, color: '#DCEBFF' },
+    { x: 46, y: 620, size: 2.2, color: '#FFFFFF' },
+    { x: 118, y: 668, size: 1.7, color: '#FFF5EE' },
+    { x: 192, y: 632, size: 1.5, color: '#E3EDFF' },
+    { x: 266, y: 700, size: 2.2, color: '#FFFFFF' },
+    { x: 330, y: 658, size: 1.7, color: '#FFF0E8' },
+    { x: 32, y: 774, size: 2.3, color: '#DCEBFF' },
+    { x: 108, y: 824, size: 1.7, color: '#FFFFFF' },
+    { x: 196, y: 792, size: 2.2, color: '#FFF4EC' },
+    { x: 284, y: 850, size: 1.9, color: '#FFFFFF' },
+    { x: 336, y: 804, size: 1.6, color: '#E6EEFF' },
+  ];
+
+  function ShootingStar({
+    idPrefix,
+    warm = false,
+    reverse = false,
+  }: {
+    idPrefix: string;
+    warm?: boolean;
+    reverse?: boolean;
+  }) {
+    const tailId = `${idPrefix}-tail`;
+    const coreId = `${idPrefix}-core`;
+    const glowId = `${idPrefix}-glow`;
+
+    if (!reverse) {
+      return (
+        <Svg width={240} height={40} viewBox="0 0 240 40">
+          <Defs>
+            <SvgLinearGradient id={tailId} x1="0" y1="20" x2="226" y2="20" gradientUnits="userSpaceOnUse">
+              <Stop offset="0%" stopColor={warm ? '#FFE7D2' : '#D9E9FF'} stopOpacity="0" />
+              <Stop offset="26%" stopColor={warm ? '#FFE7D2' : '#D9E9FF'} stopOpacity="0.06" />
+              <Stop offset="72%" stopColor={warm ? '#FFE7D2' : '#D9E9FF'} stopOpacity="0.26" />
+              <Stop offset="100%" stopColor={warm ? '#FFF8F0' : '#FFFFFF'} stopOpacity="1" />
+            </SvgLinearGradient>
+            <SvgLinearGradient id={coreId} x1="128" y1="20" x2="228" y2="20" gradientUnits="userSpaceOnUse">
+              <Stop offset="0%" stopColor={warm ? '#FFF1E2' : '#EEF6FF'} stopOpacity="0" />
+              <Stop offset="42%" stopColor={warm ? '#FFF1E2' : '#EEF6FF'} stopOpacity="0.42" />
+              <Stop offset="100%" stopColor={warm ? '#FFF9F3' : '#FFFFFF'} stopOpacity="1" />
+            </SvgLinearGradient>
+            <SvgRadialGradient id={glowId} cx="88%" cy="50%" r="30%">
+              <Stop offset="0%" stopColor={warm ? '#FFF2E4' : '#FFFFFF'} stopOpacity="0.95" />
+              <Stop offset="100%" stopColor={warm ? '#FFF2E4' : '#DCEBFF'} stopOpacity="0" />
+            </SvgRadialGradient>
+          </Defs>
+
+          <Path
+            d="M 8 20 C 56 19.6 108 19.4 162 19.3 C 196 19.25 214 19.5 226 20 C 214 20.5 196 20.75 162 20.7 C 108 20.6 56 20.4 8 20 Z"
+            fill={`url(#${tailId})`}
+          />
+          <Path
+            d="M 126 20 C 154 19.7 182 19.55 210 19.7 C 219 19.76 224 19.86 228 20 C 224 20.14 219 20.24 210 20.3 C 182 20.45 154 20.3 126 20 Z"
+            fill={`url(#${coreId})`}
+          />
+          <Circle cx="226" cy="20" r="9" fill={`url(#${glowId})`} />
+          <Circle cx="226" cy="20" r="3.8" fill={warm ? '#FFF4E8' : '#FFFFFF'} />
+        </Svg>
+      );
+    }
+
+    return (
+      <Svg width={240} height={40} viewBox="0 0 240 40">
+        <Defs>
+          <SvgLinearGradient id={tailId} x1="232" y1="20" x2="14" y2="20" gradientUnits="userSpaceOnUse">
+            <Stop offset="0%" stopColor={warm ? '#FFE7D2' : '#D9E9FF'} stopOpacity="0" />
+            <Stop offset="26%" stopColor={warm ? '#FFE7D2' : '#D9E9FF'} stopOpacity="0.06" />
+            <Stop offset="72%" stopColor={warm ? '#FFE7D2' : '#D9E9FF'} stopOpacity="0.26" />
+            <Stop offset="100%" stopColor={warm ? '#FFF8F0' : '#FFFFFF'} stopOpacity="1" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id={coreId} x1="112" y1="20" x2="12" y2="20" gradientUnits="userSpaceOnUse">
+            <Stop offset="0%" stopColor={warm ? '#FFF1E2' : '#EEF6FF'} stopOpacity="0" />
+            <Stop offset="42%" stopColor={warm ? '#FFF1E2' : '#EEF6FF'} stopOpacity="0.42" />
+            <Stop offset="100%" stopColor={warm ? '#FFF9F3' : '#FFFFFF'} stopOpacity="1" />
+          </SvgLinearGradient>
+          <SvgRadialGradient id={glowId} cx="12%" cy="50%" r="30%">
+            <Stop offset="0%" stopColor={warm ? '#FFF2E4' : '#FFFFFF'} stopOpacity="0.95" />
+            <Stop offset="100%" stopColor={warm ? '#FFF2E4' : '#DCEBFF'} stopOpacity="0" />
+          </SvgRadialGradient>
+        </Defs>
+
+        <Path
+          d="M 232 20 C 184 19.6 132 19.4 78 19.3 C 44 19.25 26 19.5 14 20 C 26 20.5 44 20.75 78 20.7 C 132 20.6 184 20.4 232 20 Z"
+          fill={`url(#${tailId})`}
+        />
+        <Path
+          d="M 114 20 C 86 19.7 58 19.55 30 19.7 C 21 19.76 16 19.86 12 20 C 16 20.14 21 20.24 30 20.3 C 58 20.45 86 20.3 114 20 Z"
+          fill={`url(#${coreId})`}
+        />
+        <Circle cx="14" cy="20" r="9" fill={`url(#${glowId})`} />
+        <Circle cx="14" cy="20" r="3.8" fill={warm ? '#FFF4E8' : '#FFFFFF'} />
+      </Svg>
+    );
+  }
+
+  return (
+    <View pointerEvents="none" style={styles.ambientGalaxy}>
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            opacity: hazeOpacity,
+            transform: [{ translateX: baseShiftX }, { translateY: baseShiftY }],
+          },
+        ]}
+      >
+        <Svg width={WINDOW_WIDTH} height={height + 180}>
+          <Defs>
+            <SvgRadialGradient id="spaceGlowViolet" cx="80%" cy="16%" r="52%">
+              <Stop offset="0%" stopColor="#6E52E8" stopOpacity="0.22" />
+              <Stop offset="38%" stopColor="#25153E" stopOpacity="0.14" />
+              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+            </SvgRadialGradient>
+            <SvgRadialGradient id="spaceGlowRose" cx="88%" cy="56%" r="44%">
+              <Stop offset="0%" stopColor="#FF7EBE" stopOpacity="0.11" />
+              <Stop offset="46%" stopColor="#35111F" stopOpacity="0.07" />
+              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+            </SvgRadialGradient>
+            <SvgRadialGradient id="spaceGlowCyan" cx="10%" cy="42%" r="42%">
+              <Stop offset="0%" stopColor="#59D8FF" stopOpacity="0.09" />
+              <Stop offset="44%" stopColor="#0E2634" stopOpacity="0.05" />
+              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+            </SvgRadialGradient>
+
+            <SvgRadialGradient id="planetAtmos" cx="34%" cy="28%" r="72%">
+              <Stop offset="0%" stopColor="#FFD7ED" stopOpacity="0.16" />
+              <Stop offset="22%" stopColor="#A79DFF" stopOpacity="0.11" />
+              <Stop offset="56%" stopColor="#4B5B92" stopOpacity="0.05" />
+              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+            </SvgRadialGradient>
+            <SvgRadialGradient id="planetSurface" cx="28%" cy="28%" r="76%">
+              <Stop offset="0%" stopColor="#8A6B9F" stopOpacity="1" />
+              <Stop offset="20%" stopColor="#5A4F7F" stopOpacity="1" />
+              <Stop offset="54%" stopColor="#232B4C" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#0A101D" stopOpacity="1" />
+            </SvgRadialGradient>
+
+            <SvgRadialGradient id="moonAtmos" cx="32%" cy="30%" r="70%">
+              <Stop offset="0%" stopColor="#E5F2FF" stopOpacity="0.18" />
+              <Stop offset="44%" stopColor="#88B5F3" stopOpacity="0.08" />
+              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+            </SvgRadialGradient>
+            <SvgRadialGradient id="moonSurface" cx="30%" cy="30%" r="74%">
+              <Stop offset="0%" stopColor="#C2CBD7" stopOpacity="1" />
+              <Stop offset="20%" stopColor="#99A5B7" stopOpacity="1" />
+              <Stop offset="50%" stopColor="#5B677C" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#151B28" stopOpacity="1" />
+            </SvgRadialGradient>
+
+            <SvgLinearGradient id="vignette" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#02030A" stopOpacity="0.02" />
+              <Stop offset="72%" stopColor="#02030A" stopOpacity="0" />
+              <Stop offset="100%" stopColor="#02030A" stopOpacity="0.58" />
+            </SvgLinearGradient>
+          </Defs>
+
+          <Rect width={WINDOW_WIDTH} height={height + 180} fill="#02030A" />
+          <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#spaceGlowViolet)" />
+          <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#spaceGlowRose)" />
+          <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#spaceGlowCyan)" />
+
+          <Ellipse
+            cx={WINDOW_WIDTH * 0.58}
+            cy={height * 0.30}
+            rx={178}
+            ry={78}
+            fill="rgba(128, 92, 214, 0.05)"
+            transform={`rotate(-16 ${WINDOW_WIDTH * 0.58} ${height * 0.30})`}
+          />
+          <Ellipse
+            cx={WINDOW_WIDTH * 0.26}
+            cy={height * 0.62}
+            rx={166}
+            ry={72}
+            fill="rgba(76, 196, 255, 0.04)"
+            transform={`rotate(18 ${WINDOW_WIDTH * 0.26} ${height * 0.62})`}
+          />
+          <Ellipse
+            cx={WINDOW_WIDTH * 0.88}
+            cy={height * 0.80}
+            rx={142}
+            ry={62}
+            fill="rgba(255, 132, 186, 0.035)"
+            transform={`rotate(-18 ${WINDOW_WIDTH * 0.88} ${height * 0.80})`}
+          />
+
+          <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#vignette)" />
+        </Svg>
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            transform: [{ translateX: planetShiftX }, { translateY: planetShiftY }],
+          },
+        ]}
+      >
+        <Svg width={WINDOW_WIDTH} height={height + 180}>
+          <Circle cx={WINDOW_WIDTH + 112} cy={160} r={222} fill="url(#planetAtmos)" />
+          <Circle cx={WINDOW_WIDTH + 112} cy={160} r={184} fill="url(#planetSurface)" />
+          <Circle cx={WINDOW_WIDTH + 202} cy={126} r={188} fill="rgba(4, 6, 14, 0.60)" />
+
+          <Ellipse
+            cx={WINDOW_WIDTH + 6}
+            cy={118}
+            rx={108}
+            ry={18}
+            fill="rgba(255,255,255,0.055)"
+            transform={`rotate(-14 ${WINDOW_WIDTH + 6} 118)`}
+          />
+          <Ellipse
+            cx={WINDOW_WIDTH - 2}
+            cy={190}
+            rx={132}
+            ry={24}
+            fill="rgba(110, 134, 194, 0.10)"
+            transform={`rotate(-10 ${WINDOW_WIDTH - 2} 190)`}
+          />
+        </Svg>
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            opacity: twinkleOpacity,
+            transform: [{ translateX: baseShiftX }, { translateY: baseShiftY }],
+          },
+        ]}
+      >
+        {stars.map((star, index) => (
+          <View
+            key={`star-${index}`}
+            style={{
+              position: 'absolute',
+              left: star.x,
+              top: star.y,
+              width: star.size * 5,
+              height: star.size * 5,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <View
+              style={{
+                position: 'absolute',
+                width: star.size * 4.8,
+                height: star.size * 4.8,
+                borderRadius: star.size * 2.4,
+                backgroundColor:
+                  star.color === '#DCEBFF' || star.color === '#E6EEFF' || star.color === '#E4EEFF'
+                    ? 'rgba(102, 188, 255, 0.12)'
+                    : 'rgba(255, 214, 234, 0.09)',
+              }}
+            />
+            <View
+              style={{
+                width: star.size,
+                height: star.size,
+                borderRadius: star.size / 2,
+                backgroundColor: star.color,
+              }}
+            />
+          </View>
+        ))}
+      </Animated.View>
+
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 180,
+          left: -240,
+          width: 240,
+          height: 40,
+          zIndex: 4,
+          opacity: meteorAOpacity,
+          transform: [
+            { translateX: meteorAX },
+            { translateY: meteorAY },
+            { rotate: '18deg' },
+          ],
+        }}
+      >
+        <ShootingStar idPrefix="meteor-a" />
+      </Animated.View>
+
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 320,
+          left: WINDOW_WIDTH + 12,
+          width: 240,
+          height: 40,
+          zIndex: 4,
+          opacity: meteorBOpacity,
+          transform: [
+            { translateX: meteorBX },
+            { translateY: meteorBY },
+            { rotate: '-16deg' },
+          ],
+        }}
+      >
+        <ShootingStar idPrefix="meteor-b" warm reverse />
+      </Animated.View>
+
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 520,
+          left: -230,
+          width: 240,
+          height: 40,
+          zIndex: 4,
+          opacity: meteorCOpacity,
+          transform: [
+            { translateX: meteorCX },
+            { translateY: meteorCY },
+            { rotate: '16deg' },
+          ],
+        }}
+      >
+        <ShootingStar idPrefix="meteor-c" warm />
+      </Animated.View>
+    </View>
+  );
+}
+
+function FixedQuinnHeader() {
+  const aura = useRef(new Animated.Value(0)).current;
+  const drift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const auraLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(aura, {
+          toValue: 1,
+          duration: 7600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(aura, {
+          toValue: 0,
+          duration: 7600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const driftLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drift, {
+          toValue: 1,
+          duration: 9800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(drift, {
+          toValue: 0,
+          duration: 9800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    auraLoop.start();
+    driftLoop.start();
+
+    return () => {
+      auraLoop.stop();
+      driftLoop.stop();
+    };
+  }, [aura, drift]);
+
+  const auraOpacity = aura.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.18, 0.38],
+  });
+
+  const auraScale = aura.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.15],
+  });
+
+  const shimmerOpacity = aura.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.08, 0.22],
+  });
+
+  const titleLift = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -3],
+  });
+
+  const introLift = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 3],
+  });
+
+  const titleDriftX = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-3, 4],
+  });
+
+  const sparkleFloat = aura.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -8],
+  });
+
+  const badgeRotate = drift.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-7deg', '-2deg'],
+  });
+
+  const titleScale = aura.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.018],
+  });
+
+  return (
+    <View pointerEvents="none" style={styles.fixedHeaderShell}>
+      <Animated.View
+        style={[
+          styles.headerAuraLarge,
+          {
+            opacity: auraOpacity,
+            transform: [{ scale: auraScale }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.headerAuraSmall,
+          {
+            opacity: shimmerOpacity,
+            transform: [{ translateX: titleDriftX }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.headerNebulaRing,
+          {
+            opacity: shimmerOpacity,
+            transform: [{ translateX: titleDriftX }],
+          },
+        ]}
+      />
+
+      <Animated.View
+        style={[
+          styles.headerSparkle,
+          styles.headerSparkleOne,
+          {
+            opacity: shimmerOpacity,
+            transform: [{ translateY: sparkleFloat }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.headerSparkle,
+          styles.headerSparkleTwo,
+          {
+            opacity: shimmerOpacity,
+            transform: [{ translateY: titleLift }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.headerSparkle,
+          styles.headerSparkleThree,
+          {
+            opacity: shimmerOpacity,
+            transform: [{ translateY: sparkleFloat }, { translateX: titleDriftX }],
+          },
+        ]}
+      />
+
+      <View style={styles.headerOverlineRow}>
+        <View style={styles.headerOverlineDot} />
+      </View>
+
+      <Animated.View
+        style={[
+          styles.heroTitleWrap,
+          {
+            transform: [
+              { translateY: titleLift },
+              { translateX: titleDriftX },
+              { scale: titleScale },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.titleGlowBlobA} />
+        <View style={styles.titleGlowBlobB} />
+
+        <Text style={styles.headerQuinnGlow}>Quinn</Text>
+
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerQuinn}>
+            <Text style={styles.headerQuinnQ}>Q</Text>
+            <Text style={styles.headerQuinnRest}>uinn</Text>
+          </Text>
+
+          <Animated.View
+            style={[
+              styles.headerVersionCapsule,
+              {
+                transform: [{ rotate: badgeRotate }],
+              },
+            ]}
+          >
+            <View style={styles.headerVersionShine} />
+            <Text style={styles.headerVersionText}>2.0</Text>
+          </Animated.View>
+        </View>
+      </Animated.View>
+
+      <Animated.Text
+        style={[
+          styles.fixedIntroText,
+          {
+            transform: [{ translateY: introLift }],
+          },
+        ]}
+      >
+        When the real Quinn is too busy painting or crying over a man who didn&apos;t
+        deserve her, Quinn 2.0 can tell you what she&apos;d say in the meantime.
+      </Animated.Text>
+    </View>
+  );
+}
+
+const SafeArea = (SafeAreaContext as any)?.SafeAreaView || RNSafeAreaView;
+
+const HomeTileGrid = resolveScreen(HomeTileGridModule, 'HomeTileGrid');
+const MemoryPanel = resolveScreen(MemoryPanelModule, 'MemoryPanel');
+const ExportsPanel = resolveScreen(ExportsPanelModule, 'ExportsPanel');
+const NotificationsPanel = resolveScreen(NotificationsPanelModule, 'NotificationsPanel');
+const ControlCenter = resolveScreen(ControlCenterModule, 'ControlCenter');
+const AppSwitcher = resolveScreen(AppSwitcherModule, 'AppSwitcher');
+const VoiceMode = resolveScreen(VoiceModeModule, 'VoiceMode');
+
+type QuinnConversationSurfaceProps = {
+  packetTitle: string;
+  packetText: string;
+  writtenResult: string;
+  compressedSummary: string;
+  memoryResonance: MemoryResonanceItem[];
+  sessionArc: SessionArc | null;
+  isRunning: boolean;
+  activeLensId: QuinnLensId;
+  isStagingNextMove: boolean;
+  runError: string;
+  onTriggerWave: () => void;
+  onChangePacketText: (value: string) => void;
+  onSelectLens: (lensId: QuinnLensId) => void;
+  onStageNextMove: () => Promise<void>;
+  onStartFreshArc: () => void;
+  onRunPacket: (override?: {
+    packetTitle: string;
+    packetText: string;
+    stayOnScreen?: boolean;
+    syncVisibleInput?: boolean;
+    sessionArc?: SessionArc | null;
+  }) => Promise<QuinnRunResult | null>;
+};
+
+function QuinnConversationSurface({
+  packetTitle,
+  packetText,
+  writtenResult,
+  compressedSummary,
+  memoryResonance,
+  sessionArc,
+  isRunning,
+  activeLensId,
+  isStagingNextMove,
+  runError,
+  onTriggerWave,
+  onChangePacketText,
+  onSelectLens,
+  onStageNextMove,
+  onStartFreshArc,
+  onRunPacket,
+}: QuinnConversationSurfaceProps) {
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder, 250);
+
+  const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [, setPermissionState] = useState('Unknown');
+  const [voiceStatus, setVoiceStatus] = useState('');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [, setQuinnVoiceReachable] = useState<boolean | null>(null);
+  const [, setIsCheckingQuinnVoice] = useState(false);
+  const [isPreparingQuinnVoice, setIsPreparingQuinnVoice] = useState(false);
+  const [isSpeakingResponse, setIsSpeakingResponse] = useState(false);
+  const [playbackSource, setPlaybackSource] = useState<string | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
+
+  const speechQueueRef = useRef<string[]>([]);
+  const speechTotalRef = useRef(0);
+  const speechIndexRef = useRef(0);
+  const speechSessionRef = useRef(0);
+  const warmedChunkUrlsRef = useRef(new Set<string>());
+
+  const player = useAudioPlayer(playbackSource, {
+    updateInterval: 100,
+    downloadFirst: true,
+  });
+  const playerStatus = useAudioPlayerStatus(player);
+
+  const trimmedInput = String(packetText || '').trim();
+  const canSend = trimmedInput.length > 0 && !isRunning;
+  const activeLens = getQuinnLens(activeLensId);
+  const sessionArcMeta = buildSessionArcMeta(sessionArc);
+  const displayThreadTitle = derivePacketTitle({
+    packetTitle,
+    packetText,
+    lensLabel: activeLens.label,
+    sessionArcTitle: sessionArc?.title || '',
+  });
+  const showThreadTitle =
+    !sessionArc || displayThreadTitle.toLowerCase() !== String(sessionArc.title || '').toLowerCase();
+  const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
+  const {
+    composerLift,
+    responseLift,
+    composerGlowOpacity,
+    responseGlowOpacity,
+    dockGlowOpacity,
+    focusGlowOpacity,
+    focusScale,
+    composerOverlayTranslate,
+    replayScale,
+    replayGlowOpacity,
+    orbShiftX,
+    orbShiftY,
+    sparkleDriftX,
+    sparkleDriftY,
+    sparkleOpacity,
+    sheenTranslateA,
+    sheenTranslateB,
+    sheenRise,
+    sheenOpacity,
+    sheenCoreOpacity,
+    responseCardOpacity,
+    responseCardTranslate,
+  } = useQuinnConversationMotion({
+    inputFocused,
+    isRecording: recorderState.isRecording,
+    voicePlaybackActive,
+    writtenResult,
+  });
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function checkVoice() {
+      const ok = await pingQuinnLocalVoice();
+
+      if (isActive) {
+        setQuinnVoiceReachable(ok);
+      }
+    }
+
+    checkVoice();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  // `playNextSpeechChunk` is ref-driven queue orchestration; keeping the finish effect
+  // gated on the status transition avoids unnecessary re-runs while preserving behavior.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+  if (!playerStatus.didJustFinish) {
+    return;
+  }
+
+  const sessionId = speechSessionRef.current;
+
+  if (speechQueueRef.current.length > 0) {
+    void playNextSpeechChunk(sessionId);
+    return;
+  }
+
+  setIsPreparingQuinnVoice(false);
+  setIsSpeakingResponse(false);
+  setVoiceStatus('Audio finished.');
+}, [playerStatus.didJustFinish]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  function clearSpeechQueue() {
+  speechQueueRef.current = [];
+  speechTotalRef.current = 0;
+  speechIndexRef.current = 0;
+  speechSessionRef.current += 1;
+  warmedChunkUrlsRef.current.clear();
+}
+
+const warmSpeechChunk = useCallback(async (url: string, sessionId: number) => {
+  if (!url || sessionId !== speechSessionRef.current) {
+    return;
+  }
+
+  if (warmedChunkUrlsRef.current.has(url)) {
+    return;
+  }
+
+  warmedChunkUrlsRef.current.add(url);
+
+  try {
+    await fetch(url);
+  } catch {
+    // ignore warm-up failures; normal playback can still try
+  }
+}, []);
+
+const warmUpcomingSpeechChunks = useCallback(async (sessionId: number, count = 3) => {
+  if (sessionId !== speechSessionRef.current) {
+    return;
+  }
+
+  const upcomingChunks = speechQueueRef.current.slice(0, count);
+
+  await Promise.all(
+    upcomingChunks.map((chunk) =>
+      warmSpeechChunk(getQuinnLocalVoiceSpeakUrl(chunk), sessionId)
+    )
+  );
+}, [warmSpeechChunk]);
+
+const playNextSpeechChunk = useCallback(async (sessionId: number) => {
+  if (sessionId !== speechSessionRef.current) {
+    return;
+  }
+
+  const nextChunk = speechQueueRef.current.shift();
+
+  if (!nextChunk) {
+    setIsPreparingQuinnVoice(false);
+    setIsSpeakingResponse(false);
+    setVoiceStatus('Audio finished.');
+    return;
+  }
+
+  speechIndexRef.current += 1;
+
+  const currentPart = speechIndexRef.current;
+  const totalParts = speechTotalRef.current;
+
+  const url = getQuinnLocalVoiceSpeakUrl(nextChunk);
+
+  setVoiceStatus(
+    totalParts > 1
+      ? `Quinn voice ${currentPart}/${totalParts}...`
+      : 'Quinn voice playing now.'
+  );
+
+  player.replace(url);
+  void warmUpcomingSpeechChunks(sessionId, 2);
+
+  await wait(currentPart === 1 ? 160 : 40);
+
+  if (sessionId !== speechSessionRef.current) {
+    return;
+  }
+
+  player.play();
+  setIsPreparingQuinnVoice(false);
+  setIsSpeakingResponse(true);
+}, [player, warmUpcomingSpeechChunks]);
+
+  async function interruptQuinnPlayback() {
+    await stopSystemVoicePreview();
+    clearSpeechQueue();
+    player.pause();
+    setPlaybackSource(null);
+    setIsPreparingQuinnVoice(false);
+    setIsSpeakingResponse(false);
+  }
+
+  async function preparePlaybackMode() {
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      allowsRecording: false,
+      interruptionMode: 'doNotMix',
+      shouldPlayInBackground: false,
+    });
+  }
+
+  async function handleCheckQuinnVoice(showStatus = true) {
+    try {
+      setIsCheckingQuinnVoice(true);
+
+      const ok = await pingQuinnLocalVoice();
+      setQuinnVoiceReachable(ok);
+
+      if (showStatus) {
+        setVoiceStatus(
+          ok
+            ? 'Quinn voice is reachable.'
+            : `Quinn voice is not reachable at ${getQuinnLocalVoiceBaseUrl()}.`
+        );
+      }
+
+      return ok;
+    } catch {
+      setQuinnVoiceReachable(false);
+
+      if (showStatus) {
+        setVoiceStatus(`Quinn voice is not reachable at ${getQuinnLocalVoiceBaseUrl()}.`);
+      }
+
+      return false;
+    } finally {
+      setIsCheckingQuinnVoice(false);
+    }
+  }
+
+  async function handleStartRecording() {
+    try {
+      const granted = await ensureMicrophonePermission();
+
+      if (!granted) {
+        setPermissionState('Denied');
+        setVoiceError('Microphone permission is required to record.');
+        setVoiceStatus('Microphone permission is required to record.');
+        return;
+      }
+
+      await interruptQuinnPlayback();
+
+      setPermissionState('Granted');
+      setVoiceError(null);
+      setVoiceStatus('Recording live.');
+      setRecordingUri(null);
+      setRecordingDuration(0);
+
+      await enableRecordingAudioMode();
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Recording failed to start.';
+      setVoiceError(message);
+      setVoiceStatus(message);
+    }
+  }
+
+ async function handleSpeakQuinnText(text: string) {
+  const clean = normalizeSpeechChunkSource(text);
+
+  if (!clean) {
+    setVoiceStatus('Run Quinn first so there is something to speak.');
+    return;
+  }
+
+  try {
+    setVoiceError(null);
+    setIsPreparingQuinnVoice(true);
+    setIsSpeakingResponse(false);
+
+    await stopSystemVoicePreview();
+    clearSpeechQueue();
+    player.pause();
+
+    const ok = await handleCheckQuinnVoice(false);
+
+    if (!ok) {
+      const message = `Quinn voice is not reachable at ${getQuinnLocalVoiceBaseUrl()}.`;
+      setVoiceError(message);
+      setVoiceStatus(message);
+      setIsPreparingQuinnVoice(false);
+      return;
+    }
+
+    await preparePlaybackMode();
+
+    const chunks = buildRealtimeSpeechChunks(clean);
+
+    if (!chunks.length) {
+      setVoiceStatus('Run Quinn first so there is something to speak.');
+      setIsPreparingQuinnVoice(false);
+      return;
+    }
+
+    speechQueueRef.current = [...chunks];
+    speechTotalRef.current = chunks.length;
+    speechIndexRef.current = 0;
+    speechSessionRef.current += 1;
+
+    const sessionId = speechSessionRef.current;
+
+    setVoiceStatus(
+      chunks.length > 1
+        ? `Quinn voice warming up 1/${chunks.length}...`
+        : 'Quinn voice requested. Hold for a moment.'
+    );
+
+    void warmUpcomingSpeechChunks(sessionId, 2);
+
+    await playNextSpeechChunk(sessionId);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Quinn voice playback failed.';
+    setVoiceError(message);
+    setVoiceStatus(message);
+    setIsPreparingQuinnVoice(false);
+    setIsSpeakingResponse(false);
+  }
+}
+
+  async function handleProcessRecordedTake(finalUri: string, duration: number) {
+    try {
+      setVoiceError(null);
+      setVoiceStatus('Transcribing take in background...');
+
+      const result = await transcribeAudioFile({
+        audioUri: finalUri,
+        durationMillis: duration,
+        packetTitle,
+        packetText,
+        lastSummary: compressedSummary,
+      });
+
+      const transcript = String(result.transcript || '').trim();
+
+      if (!transcript) {
+        setVoiceStatus('Transcript came back empty.');
+        return;
+      }
+
+      setVoiceStatus('Transcript ready. Sending to Quinn...');
+
+      const runResult = await onRunPacket({
+        packetTitle: packetTitle || 'Quinn Thread',
+        packetText: transcript,
+        stayOnScreen: true,
+        syncVisibleInput: false,
+      });
+
+      const speakText = String(runResult?.written || '').trim();
+
+      if (speakText) {
+        setVoiceStatus('Quinn answered. Speaking now...');
+        await handleSpeakQuinnText(speakText);
+      } else {
+        setVoiceStatus('Voice input sent to Quinn.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Voice send failed.';
+      setVoiceError(message);
+      setVoiceStatus(message);
+    }
+  }
+
+  async function handleStopRecording() {
+    try {
+      const duration = recorderState.durationMillis || 0;
+
+      await recorder.stop();
+      await disableRecordingAudioMode();
+
+      const rawUri = recorder.uri || null;
+
+      if (!rawUri) {
+        setVoiceError('Recording stopped, but no audio file was returned.');
+        setVoiceStatus('Recording stopped, but no audio file was returned.');
+        return;
+      }
+
+      const finalUri = (await persistRecordingToDocument(rawUri)) || rawUri;
+
+      setRecordingUri(finalUri);
+      setRecordingDuration(duration);
+      setPlaybackSource(finalUri);
+      setVoiceStatus('Take saved. Sending to Quinn...');
+      onTriggerWave();
+
+      await handleProcessRecordedTake(finalUri, duration);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Recording failed to stop cleanly.';
+      setVoiceError(message);
+      setVoiceStatus(message);
+    }
+  }
+
+  async function handleRunTypedQuinn() {
+    if (!trimmedInput) {
+      return;
+    }
+
+    await interruptQuinnPlayback();
+    onTriggerWave();
+
+    const runResult = await onRunPacket({
+      packetTitle: packetTitle || 'Quinn Thread',
+      packetText,
+      stayOnScreen: true,
+      syncVisibleInput: true,
+    });
+
+    const speakText = String(runResult?.written || '').trim();
+
+    if (speakText) {
+      setVoiceStatus('Quinn answered. Speaking now...');
+      await handleSpeakQuinnText(speakText);
+    }
+  }
+
+  async function handleSpeakQuinn() {
+    const clean = String(writtenResult || '').trim();
+    await handleSpeakQuinnText(clean);
+  }
+
+  return (
+    <ScrollView
+  style={styles.quinnConversationViewport}
+  contentContainerStyle={styles.quinnConversationScroll}
+  showsVerticalScrollIndicator={false}
+  scrollEventThrottle={16}
+>
+      <Animated.View
+        style={[
+          styles.cardFloatWrap,
+          {
+            transform: [{ translateY: composerLift }],
+          },
+        ]}
+      >
+        <View style={styles.commandStage}>
+          <Animated.View
+            style={[
+              styles.composerShell,
+              {
+                transform: [{ scale: focusScale }],
+              },
+            ]}
+          >
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.cardOrbGlowCool,
+                {
+                  opacity: composerGlowOpacity,
+                  transform: [{ translateX: orbShiftX }, { translateY: orbShiftY }],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.focusAura,
+                {
+                  opacity: focusGlowOpacity,
+                  transform: [{ translateX: sparkleDriftX }, { translateY: sparkleDriftY }],
+                },
+              ]}
+            />
+            <View pointerEvents="none" style={styles.cardTopSheen} />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.cardTopSheenSoft,
+                {
+                  transform: [{ translateX: sheenTranslateA }],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.cardSideShine,
+                {
+                  transform: [{ translateX: orbShiftX }, { translateY: sparkleDriftY }],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.cardGlitterSweep,
+                {
+                  opacity: sheenOpacity,
+                  transform: [
+                    { translateX: sheenTranslateA },
+                    { translateY: sheenRise },
+                    { rotate: '-18deg' },
+                  ],
+                },
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.cardGlitterSweepCore,
+                {
+                  opacity: sheenCoreOpacity,
+                  transform: [
+                    { translateX: sheenTranslateA },
+                    { translateY: sheenRise },
+                    { rotate: '-18deg' },
+                  ],
+                },
+              ]}
+            />
+            <View pointerEvents="none" style={styles.cardBottomFog} />
+
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.sparkleLayer,
+                {
+                  opacity: sparkleOpacity,
+                  transform: [{ translateX: sparkleDriftX }, { translateY: sparkleDriftY }],
+                },
+              ]}
+            >
+              <View style={[styles.sparkle, styles.sparkleOne]} />
+              <View style={[styles.sparkle, styles.sparkleTwo]} />
+              <View style={[styles.sparkle, styles.sparkleThree]} />
+              <View style={[styles.sparkle, styles.sparkleFour]} />
+              <View style={[styles.sparkle, styles.sparkleFive]} />
+              <View style={[styles.sparkle, styles.sparkleSix]} />
+              <View style={[styles.sparkle, styles.sparkleSeven]} />
+              <View style={[styles.sparkle, styles.sparkleEight]} />
+            </Animated.View>
+
+            <View style={styles.composerInnerShell}>
+              {recorderState.isRecording ? (
+                <>
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      styles.listeningSweep,
+                      {
+                        transform: [{ translateX: composerOverlayTranslate }],
+                      },
+                    ]}
+                  />
+                  <View style={styles.listeningChip}>
+                    <View style={styles.listeningDot} />
+                    <Text style={styles.listeningChipText}>Listening</Text>
+                  </View>
+                </>
+              ) : null}
+
+              {showThreadTitle ? (
+                <View style={styles.threadTitleWrap}>
+                  <Text style={styles.threadTitleEyebrow}>Current thread</Text>
+                  <Text style={styles.threadTitleText} numberOfLines={1}>
+                    {displayThreadTitle}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={styles.lensRailWrap}>
+                <Text style={styles.lensEyebrow}>Response lens</Text>
+                <View style={styles.lensRail}>
+                  {QUINN_LENSES.map((lens) => {
+                    const selected = lens.id === activeLensId;
+
+                    return (
+                      <Pressable
+                        key={lens.id}
+                        style={[styles.lensChip, selected && styles.lensChipActive]}
+                        onPress={() => onSelectLens(lens.id)}
+                      >
+                        <Text style={[styles.lensChipText, selected && styles.lensChipTextActive]}>
+                          {lens.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.lensBlurb}>{activeLens.blurb}</Text>
+              </View>
+
+              {sessionArc ? (
+                <View style={styles.sessionArcRail}>
+                  <View style={styles.sessionArcHeaderRow}>
+                    <View style={styles.sessionArcCopy}>
+                      <Text style={styles.sessionArcEyebrow}>Session arc</Text>
+                      <Text style={styles.sessionArcTitle} numberOfLines={1}>
+                        {sessionArc.title}
+                      </Text>
+                      <Text style={styles.sessionArcMeta}>
+                        {sessionArcMeta.stepLabel}
+                        {sessionArcMeta.continuityLabel
+                          ? ` • ${sessionArcMeta.continuityLabel}`
+                          : ''}
+                      </Text>
+                    </View>
+
+                    <Pressable style={styles.sessionArcResetChip} onPress={onStartFreshArc}>
+                      <Text style={styles.sessionArcResetChipText}>Start fresh</Text>
+                    </Pressable>
+                  </View>
+
+                  {sessionArcMeta.beats.length ? (
+                    <View style={styles.sessionArcBeatRow}>
+                      {sessionArcMeta.beats.map((beat) => (
+                        <View key={beat.id} style={styles.sessionArcBeat}>
+                          <Text style={styles.sessionArcBeatLabel}>{beat.lensLabel}</Text>
+                          <Text style={styles.sessionArcBeatText} numberOfLines={2}>
+                            {beat.summary}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              <TextInput
+                multiline
+                value={packetText}
+                onChangeText={onChangePacketText}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                placeholder="Type something impossible, petty, practical, emotional, or specific..."
+                placeholderTextColor="rgba(214, 221, 236, 0.56)"
+                style={styles.composerInput}
+                textAlignVertical="center"
+              />
+
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.composerActionDockGlow,
+                  {
+                    opacity: dockGlowOpacity,
+                  },
+                ]}
+              />
+
+              <View style={styles.composerActionDock}>
+                <View style={styles.composerActions}>
+                  <Pressable
+                    style={[
+                      styles.inlineIconButton,
+                      styles.inlineHeartButton,
+                      !canSend && styles.inlineHeartButtonDisabled,
+                    ]}
+                    onPress={handleRunTypedQuinn}
+                    disabled={!canSend}
+                  >
+                    {isRunning ? (
+                      <Text style={styles.inlineLoadingIcon}>…</Text>
+                    ) : (
+                      <Feather
+                        name="send"
+                        size={16}
+                        color={canSend ? '#FBFCFF' : 'rgba(251,252,255,0.40)'}
+                      />
+                    )}
+                  </Pressable>
+
+                  {!recorderState.isRecording ? (
+                    <Pressable
+                      style={[styles.inlineIconButton, styles.inlineMicButton]}
+                      onPress={handleStartRecording}
+                    >
+                      <Feather name="mic" size={16} color="#FBFCFF" />
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      style={[styles.inlineIconButton, styles.inlineMicButtonActive]}
+                      onPress={handleStopRecording}
+                    >
+                      <Feather name="square" size={15} color="#FBFCFF" />
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+
+          {recordingUri ? (
+            <Text style={styles.inlineTakeStatus}>
+              Voice take attached • {formatDurationMillis(recordingDuration)}
+            </Text>
+          ) : null}
+
+          {runError ? <Text style={styles.errorText}>Run error: {runError}</Text> : null}
+          {voiceError ? <Text style={styles.errorText}>Voice error: {voiceError}</Text> : null}
+          {voiceStatus ? <Text style={styles.helperText}>{voiceStatus}</Text> : null}
+        </View>
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.cardFloatWrap,
+          {
+            opacity: responseCardOpacity,
+            transform: [
+              { translateY: responseCardTranslate },
+              { translateY: responseLift },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.heroResponseCard}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.cardOrbGlowWarm,
+              {
+                opacity: responseGlowOpacity,
+                transform: [{ translateX: orbShiftX }, { translateY: orbShiftY }],
+              },
+            ]}
+          />
+          <View pointerEvents="none" style={styles.cardTopSheen} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.cardTopSheenSoft,
+              {
+                transform: [{ translateX: sheenTranslateB }],
+              },
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.cardGlitterSweepWarm,
+              {
+                opacity: sheenOpacity,
+                transform: [
+                  { translateX: sheenTranslateB },
+                  { translateY: sheenRise },
+                  { rotate: '-18deg' },
+                ],
+              },
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.cardGlitterSweepCoreWarm,
+              {
+                opacity: sheenCoreOpacity,
+                transform: [
+                  { translateX: sheenTranslateB },
+                  { translateY: sheenRise },
+                  { rotate: '-18deg' },
+                ],
+              },
+            ]}
+          />
+
+          <View style={styles.responseInnerFrame}>
+            <View style={styles.responseHeaderRow}>
+              <View style={styles.responseHeaderTextWrap}>
+                <Text style={styles.responseLabel}>Quinn 2.0 says:</Text>
+                {memoryResonance.length ? (
+                  <View style={styles.memoryResonanceWrap}>
+                    <Text style={styles.memoryResonanceEyebrow}>Memory resonance</Text>
+                    <View style={styles.memoryResonanceRow}>
+                      {memoryResonance.slice(0, 4).map((item, index) => (
+                        <View
+                          key={`${item.label}-${index}`}
+                          style={styles.memoryResonanceChip}
+                        >
+                          <Text style={styles.memoryResonanceLabel}>{item.label}</Text>
+                          <Text style={styles.memoryResonancePreview} numberOfLines={2}>
+                            {item.preview}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            <Text style={styles.heroResponseBody}>
+              {writtenResult ||
+                'Ask something outrageous, practical, or heartbreak-adjacent and Quinn 2.0 will answer here.'}
+            </Text>
+
+            <View style={styles.responseFooterRow}>
+              <Pressable
+                style={[
+                  styles.responseActionChip,
+                  (!writtenResult || isStagingNextMove) && styles.responseActionChipDisabled,
+                ]}
+                onPress={() => {
+                  void onStageNextMove();
+                }}
+                disabled={!writtenResult || isStagingNextMove}
+              >
+                <Text
+                  style={[
+                    styles.responseActionChipText,
+                    (!writtenResult || isStagingNextMove) && styles.responseActionChipTextDisabled,
+                  ]}
+                >
+                  {isStagingNextMove ? 'Staging next move...' : 'Stage next move'}
+                </Text>
+              </Pressable>
+
+              <View style={styles.responseFooterActions}>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.replayGlow,
+                    {
+                      opacity: replayGlowOpacity,
+                      transform: [{ scale: replayScale }],
+                    },
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    styles.replayButtonWrap,
+                    {
+                      transform: [{ scale: replayScale }],
+                    },
+                  ]}
+                >
+                  <Pressable style={styles.responseReplayButton} onPress={handleSpeakQuinn}>
+                    <Feather name="rotate-ccw" size={16} color="#F7F9FF" />
+                  </Pressable>
+                </Animated.View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Animated.View>
+    </ScrollView>
+  );
+}
+
+export default function App() {
+  const [screen, setScreen] = useState<AppScreen>('QuinnConversation');
+  const [packetTitle, setPacketTitle] = useState(INITIAL_PACKET_TITLE);
+  const [packetText, setPacketText] = useState('');
+  const [activeLensId, setActiveLensId] = useState<QuinnLensId>(DEFAULT_QUINN_LENS_ID);
+  const [writtenResult, setWrittenResult] = useState('');
+  const [compressedSummary, setCompressedSummary] = useState('');
+  const [currentMemoryResonance, setCurrentMemoryResonance] = useState<MemoryResonanceItem[]>([]);
+  const [currentSessionArc, setCurrentSessionArc] = useState<SessionArc | null>(null);
+  const [lastRunAt, setLastRunAt] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isStagingNextMove, setIsStagingNextMove] = useState(false);
+  const [runError, setRunError] = useState('');
+  const [recentRuns, setRecentRuns] = useState<RunHistoryItem[]>([]);
+  const [memories, setMemories] = useState<MemoryItem[]>(INITIAL_MEMORIES);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [settings, setSettings] = useState<QuinnSettings>(INITIAL_SETTINGS);
+  const [voiceSessions, setVoiceSessions] = useState<VoiceSession[]>([]);
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(INITIAL_VOICE_SETTINGS);
+  const [waveKey, setWaveKey] = useState(0);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function hydrateState() {
+      const snapshot = await loadQuinnSnapshot();
+
+      if (!isActive) {
+        return;
+      }
+
+      if (snapshot) {
+        setPacketTitle(snapshot.packetTitle || INITIAL_PACKET_TITLE);
+        setPacketText('');
+        setWrittenResult(snapshot.writtenResult || '');
+        setCompressedSummary(snapshot.compressedSummary || '');
+        setCurrentMemoryResonance(
+          Array.isArray(snapshot.currentMemoryResonance) ? snapshot.currentMemoryResonance : []
+        );
+        setCurrentSessionArc(snapshot.currentSessionArc || null);
+        setLastRunAt(snapshot.lastRunAt || null);
+        setRecentRuns(Array.isArray(snapshot.recentRuns) ? snapshot.recentRuns : []);
+        setMemories(
+          Array.isArray(snapshot.memories) && snapshot.memories.length
+            ? snapshot.memories
+            : INITIAL_MEMORIES
+        );
+        setNotifications(Array.isArray(snapshot.notifications) ? snapshot.notifications : []);
+        setSettings(snapshot.settings || INITIAL_SETTINGS);
+        setVoiceSessions(Array.isArray(snapshot.voiceSessions) ? snapshot.voiceSessions : []);
+        setVoiceSettings(snapshot.voiceSettings || INITIAL_VOICE_SETTINGS);
+        setLastSavedAt(snapshot.savedAt || null);
+      }
+
+      setIsHydrated(true);
+    }
+
+    hydrateState();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    async function persistState() {
+      const savedAt = await saveQuinnSnapshot({
+        packetTitle,
+        packetText,
+        writtenResult,
+        compressedSummary,
+        currentMemoryResonance,
+        currentSessionArc,
+        lastRunAt,
+        recentRuns,
+        memories,
+        notifications,
+        settings,
+        voiceSessions,
+        voiceSettings,
+      });
+
+      if (savedAt) {
+        setLastSavedAt(savedAt);
+      }
+    }
+
+    persistState();
+  }, [
+    isHydrated,
+    packetTitle,
+    packetText,
+    writtenResult,
+    compressedSummary,
+    currentMemoryResonance,
+    currentSessionArc,
+    lastRunAt,
+    recentRuns,
+    memories,
+    notifications,
+    settings,
+    voiceSessions,
+    voiceSettings,
+  ]);
+
+  const exportBundle = useMemo(
+    () =>
+      buildExportBundle({
+        packetTitle,
+        packetText,
+        writtenResult,
+        compressedSummary,
+        currentMemoryResonance,
+        currentSessionArc,
+        lastRunAt,
+        recentRuns,
+        memories,
+        notifications,
+        settings,
+        voiceSessions,
+        voiceSettings,
+      }),
+    [
+      packetTitle,
+      packetText,
+      writtenResult,
+      compressedSummary,
+      currentMemoryResonance,
+      currentSessionArc,
+      lastRunAt,
+      recentRuns,
+      memories,
+      notifications,
+      settings,
+      voiceSessions,
+      voiceSettings,
+    ]
+  );
+
+  function triggerWave() {
+    setWaveKey((prev) => prev + 1);
+  }
+
+  function pushNotification(
+    notification: Omit<NotificationItem, 'id' | 'timestamp' | 'read'>
+  ) {
+    const next = createNotification(notification as {
+      title: string;
+      body: string;
+      target: NotificationTarget;
+      tone: NotificationTone;
+    });
+    setNotifications((prev) => prependNotification(prev, next));
+  }
+
+  async function handleRunPacket(
+    override?: {
+      packetTitle: string;
+      packetText: string;
+      stayOnScreen?: boolean;
+      syncVisibleInput?: boolean;
+      sessionArc?: SessionArc | null;
+    }
+  ): Promise<QuinnRunResult | null> {
+    const nextTitle = override?.packetTitle ?? packetTitle;
+    const nextText = override?.packetText ?? packetText;
+    const syncVisibleInput = override?.syncVisibleInput ?? true;
+    const sessionArcForRun = override?.sessionArc ?? currentSessionArc;
+    const activeLensLabel = getQuinnLens(activeLensId).label;
+    const effectiveTitle = derivePacketTitle({
+      packetTitle: nextTitle,
+      packetText: nextText,
+      lensLabel: activeLensLabel,
+      sessionArcTitle: sessionArcForRun?.title || '',
+    });
+
+    if (!String(nextText || '').trim()) {
+      setRunError('Add text first.');
+
+      pushNotification({
+        title: 'Run blocked',
+        body: 'No input was provided.',
+        target: 'QuinnConversation',
+        tone: 'alert',
+      });
+      return null;
+    }
+
+    if (override) {
+      setPacketTitle(effectiveTitle);
+
+      if (syncVisibleInput) {
+        setPacketText(nextText);
+      }
+    } else if (effectiveTitle !== packetTitle) {
+      setPacketTitle(effectiveTitle);
+    }
+
+    setIsRunning(true);
+    setRunError('');
+
+    try {
+      const result = await runQuinnPacket({
+        packetTitle: effectiveTitle,
+        packetText: nextText,
+        lensId: activeLensId,
+        sessionArc: sessionArcForRun,
+      });
+
+      const shortSummary = buildSpokenSummary(result.summary, result.written);
+      const timestamp = result.timestamp;
+      const nextSessionArc = advanceSessionArc(sessionArcForRun, {
+        packetTitle: effectiveTitle,
+        packetText: nextText,
+        compressedSummary: shortSummary,
+        timestamp,
+        lensLabel: activeLensLabel,
+      });
+
+      const { runItem, memoryItem } = createRunArtifacts({
+        packetTitle: effectiveTitle,
+        packetText: nextText,
+        writtenResult: result.written,
+        compressedSummary: shortSummary,
+        timestamp,
+        memoryResonance: result.memoryResonance,
+        sessionArc: nextSessionArc,
+      });
+
+      setWrittenResult(result.written);
+      setCompressedSummary(shortSummary);
+      setCurrentMemoryResonance(result.memoryResonance);
+      setCurrentSessionArc(nextSessionArc);
+      setLastRunAt(timestamp);
+      setRecentRuns((prev) => [runItem, ...prev].slice(0, 24));
+      setMemories((prev) => [memoryItem, ...prev].slice(0, 12));
+
+      pushNotification({
+        title: 'Run landed',
+        body: shortSummary || 'Quinn returned a fresh result.',
+        target: 'QuinnConversation',
+        tone: 'success',
+      });
+
+      return {
+        ...result,
+        summary: shortSummary,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The backend run failed.';
+
+      setRunError(message);
+
+      pushNotification({
+        title: 'Run failed',
+        body: message,
+        target: 'QuinnConversation',
+        tone: 'alert',
+      });
+
+      return null;
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  async function handleStageNextMove() {
+    const responseText = String(writtenResult || '').trim();
+
+    if (!responseText) {
+      pushNotification({
+        title: 'Nothing to stage yet',
+        body: 'Run Quinn first, then stage the next move from the response card.',
+        target: 'QuinnConversation',
+        tone: 'alert',
+      });
+      return;
+    }
+
+    setIsStagingNextMove(true);
+
+    try {
+      const followUp = await generateFollowupPacket({
+        responseText,
+        currentPacket: buildQuinnPacket({
+          packetTitle,
+          packetText,
+          lensId: activeLensId,
+          sessionArc: currentSessionArc,
+        }),
+      });
+
+      const nextLensId = inferQuinnLensFromFollowUp(followUp);
+      const nextText =
+        String(followUp.focusText || '').trim() ||
+        String(followUp.summary || '').trim();
+      const nextTitle = derivePacketTitle({
+        packetTitle: String(followUp.sessionName || '').trim() || 'Next move',
+        packetText: nextText,
+        lensLabel: getQuinnLens(nextLensId).label,
+        sessionArcTitle: currentSessionArc?.title || '',
+      });
+
+      if (!nextText) {
+        throw new Error('Quinn did not return a usable next move.');
+      }
+
+      setPacketTitle(nextTitle);
+      setPacketText(nextText);
+      setActiveLensId(nextLensId);
+      setRunError('');
+      setScreen('QuinnConversation');
+      triggerWave();
+
+      pushNotification({
+        title: 'Next move staged',
+        body: followUp.summary || `${nextTitle} is loaded into Quinn.`,
+        target: 'QuinnConversation',
+        tone: 'gold',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not stage the next move.';
+
+      pushNotification({
+        title: 'Next move failed',
+        body: message,
+        target: 'QuinnConversation',
+        tone: 'alert',
+      });
+    } finally {
+      setIsStagingNextMove(false);
+    }
+  }
+
+  function handleStartFreshArc() {
+    setCurrentSessionArc(null);
+
+    pushNotification({
+      title: 'Arc cleared',
+      body: 'The next Quinn run will start a fresh line of thought.',
+      target: 'QuinnConversation',
+      tone: 'gold',
+    });
+  }
+
+  function handleLoadMemoryItem(item: MemoryItem) {
+    setPacketTitle(item.label);
+    setPacketText(item.body);
+    setRunError('');
+    setScreen('QuinnConversation');
+
+    pushNotification({
+      title: 'Memory loaded',
+      body: `${item.label} moved back into Quinn.`,
+      target: 'TileExpandedCanvas',
+      tone: 'gold',
+    });
+  }
+
+  function handleToggleMemoryPin(id: string) {
+    let becamePinned = false;
+    let label = 'Memory item';
+
+    setMemories((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+
+        const nextPinned = !item.pinned;
+        becamePinned = nextPinned;
+        label = item.label || 'Memory item';
+
+        return {
+          ...item,
+          pinned: nextPinned,
+        };
+      })
+    );
+
+    pushNotification({
+      title: becamePinned ? 'Memory pinned' : 'Memory unpinned',
+      body: `${label} was ${becamePinned ? 'pinned' : 'unpinned'}.`,
+      target: 'MemoryPanel',
+      tone: 'gold',
+    });
+  }
+
+  function handleDeleteMemoryItem(id: string) {
+    let label = 'Memory item';
+
+    setMemories((prev) =>
+      prev.filter((item) => {
+        if (item.id === id) {
+          label = item.label || 'Memory item';
+          return false;
+        }
+
+        return true;
+      })
+    );
+
+    pushNotification({
+      title: 'Memory deleted',
+      body: `${label} was removed from Memory.`,
+      target: 'MemoryPanel',
+      tone: 'alert',
+    });
+  }
+
+  function handleRestoreRunToCanvas(run: RunHistoryItem) {
+    setPacketTitle(run.packetTitle || 'Untitled packet');
+    setPacketText(run.packetText || '');
+    setCurrentMemoryResonance(Array.isArray(run.memoryResonance) ? run.memoryResonance : []);
+    setCurrentSessionArc(resumeSessionArcFromRun(run));
+    setRunError('');
+    setScreen('QuinnConversation');
+
+    pushNotification({
+      title: 'Run restored',
+      body: `${run.packetTitle || 'Untitled packet'} moved back into Quinn.`,
+      target: 'TileExpandedCanvas',
+      tone: 'neutral',
+    });
+  }
+
+  function handleRerunHistoryItem(run: RunHistoryItem) {
+    const resumedArc = resumeSessionArcFromRun(run);
+    setCurrentSessionArc(resumedArc);
+    setCurrentMemoryResonance(Array.isArray(run.memoryResonance) ? run.memoryResonance : []);
+    handleRunPacket({
+      packetTitle: run.packetTitle || 'Untitled packet',
+      packetText: run.packetText || '',
+      stayOnScreen: screen === 'QuinnConversation',
+      syncVisibleInput: true,
+      sessionArc: resumedArc,
+    });
+  }
+
+  function handleToggleSetting(key: keyof QuinnSettings) {
+    let nextValue = false;
+
+    setSettings((prev) => {
+      nextValue = !prev[key];
+      return {
+        ...prev,
+        [key]: nextValue,
+      };
+    });
+
+    pushNotification({
+      title: `${key} ${nextValue ? 'enabled' : 'disabled'}`,
+      body: `Control Center changed ${key} to ${nextValue ? 'on' : 'off'}.`,
+      target: 'ControlCenter',
+      tone: 'gold',
+    });
+  }
+
+  function handlePatchVoiceSettings(patch: Partial<VoiceSettings>) {
+    setVoiceSettings((prev) => ({
+      ...prev,
+      ...patch,
+    }));
+  }
+
+  function handleSaveVoiceSession(session: VoiceSession) {
+    setVoiceSessions((prev) => [session, ...prev].slice(0, 12));
+
+    pushNotification({
+      title: 'Voice handoff saved',
+      body: `${session.title} was saved.`,
+      target: 'VoiceMode',
+      tone: 'gold',
+    });
+  }
+
+  function handleDeleteVoiceSession(id: string) {
+    setVoiceSessions((prev) => prev.filter((item) => item.id !== id));
+
+    pushNotification({
+      title: 'Voice handoff deleted',
+      body: 'A saved voice handoff was removed.',
+      target: 'VoiceMode',
+      tone: 'alert',
+    });
+  }
+
+  function handleOpenNotification(item: NotificationItem) {
+    setNotifications((prev) => markNotificationRead(prev, item.id));
+    setScreen(resolveNotificationTarget(item.target));
+  }
+
+  function handleToggleNotificationRead(id: string) {
+    setNotifications((prev) => toggleNotificationRead(prev, id));
+  }
+
+  function handleDeleteNotification(id: string) {
+    setNotifications((prev) => removeNotification(prev, id));
+  }
+
+  function handleClearNotifications() {
+    setNotifications([]);
+  }
+
+  const unreadCount = countUnreadNotifications(notifications);
+
+  let content = null;
+
+  if (screen === 'QuinnConversation') {
+    content = (
+      <QuinnConversationSurface
+        packetTitle={packetTitle}
+        packetText={packetText}
+        writtenResult={writtenResult}
+        compressedSummary={compressedSummary}
+        memoryResonance={currentMemoryResonance}
+        sessionArc={currentSessionArc}
+        isRunning={isRunning}
+        activeLensId={activeLensId}
+        isStagingNextMove={isStagingNextMove}
+        runError={runError}
+        onTriggerWave={triggerWave}
+        onChangePacketText={setPacketText}
+        onSelectLens={setActiveLensId}
+        onStageNextMove={handleStageNextMove}
+        onStartFreshArc={handleStartFreshArc}
+        onRunPacket={handleRunPacket}
+      />
+    );
+  } else if (screen === 'SettingsHome') {
+    content = (
+      <ScrollView contentContainerStyle={styles.quinnScroll} showsVerticalScrollIndicator={false}>
+        <Text style={styles.quinnEyebrow}>SYSTEM SETTINGS</Text>
+        <Text style={styles.quinnHeroTitle}>Settings.</Text>
+        <Text style={styles.quinnHeroText}>Open the rest of QuinnOS from here.</Text>
+
+        <View style={styles.primaryCard}>
+          <Text style={styles.sectionEyebrow}>SETTINGS MENU</Text>
+          <Text style={styles.sectionTitle}>Choose a system area</Text>
+
+          <View style={styles.actionRow}>
+            <Pressable style={styles.secondaryAction} onPress={() => setScreen('HomeTileGrid')}>
+              <Text style={styles.secondaryActionText}>Dashboard</Text>
+            </Pressable>
+
+            <Pressable style={styles.secondaryAction} onPress={() => setScreen('MemoryPanel')}>
+              <Text style={styles.secondaryActionText}>Memory</Text>
+            </Pressable>
+
+            <Pressable style={styles.secondaryAction} onPress={() => setScreen('ExportsPanel')}>
+              <Text style={styles.secondaryActionText}>Exports</Text>
+            </Pressable>
+
+            <Pressable style={styles.secondaryAction} onPress={() => setScreen('VoiceMode')}>
+              <Text style={styles.secondaryActionText}>Voice Lab</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.secondaryAction}
+              onPress={() => setScreen('NotificationsPanel')}
+            >
+              <Text style={styles.secondaryActionText}>
+                Alerts {unreadCount ? `(${unreadCount})` : ''}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.secondaryAction}
+              onPress={() => setScreen('ControlCenter')}
+            >
+              <Text style={styles.secondaryActionText}>Control</Text>
+            </Pressable>
+
+            <Pressable style={styles.secondaryAction} onPress={() => setScreen('AppSwitcher')}>
+              <Text style={styles.secondaryActionText}>Switcher</Text>
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  } else if (screen === 'HomeTileGrid') {
+    content = (
+      <HomeTileGrid
+        onOpenCanvas={() => setScreen('QuinnConversation')}
+        onOpenGravity={() => setScreen('QuinnConversation')}
+        onOpenMemory={() => setScreen('MemoryPanel')}
+        onOpenExports={() => setScreen('ExportsPanel')}
+        onOpenSettings={() => setScreen('SettingsHome')}
+        onOpenNotifications={() => setScreen('NotificationsPanel')}
+        onOpenControlCenter={() => setScreen('ControlCenter')}
+        onOpenSwitcher={() => setScreen('AppSwitcher')}
+        onRunCurrentPacket={() =>
+          handleRunPacket({ packetTitle, packetText, stayOnScreen: true })
+        }
+        onRestoreRunToCanvas={handleRestoreRunToCanvas}
+        onRerunHistoryItem={handleRerunHistoryItem}
+        packetTitle={packetTitle}
+        packetText={packetText}
+        lastSummary={compressedSummary}
+        lastRunAt={lastRunAt}
+        lastSavedAt={lastSavedAt}
+        isHydrated={isHydrated}
+        isRunning={isRunning}
+        runError={runError}
+        recentRuns={recentRuns}
+        memories={memories}
+        notifications={notifications}
+        settings={settings}
+      />
+    );
+  } else if (screen === 'MemoryPanel') {
+    content = (
+      <MemoryPanel
+        onBack={() => setScreen('SettingsHome')}
+        onOpenCanvas={() => setScreen('QuinnConversation')}
+        memories={memories}
+        onLoadMemoryItem={handleLoadMemoryItem}
+        onTogglePin={handleToggleMemoryPin}
+        onDeleteMemoryItem={handleDeleteMemoryItem}
+      />
+    );
+  } else if (screen === 'ExportsPanel') {
+    content = (
+      <ExportsPanel
+        onBack={() => setScreen('SettingsHome')}
+        onOpenCanvas={() => setScreen('QuinnConversation')}
+        exportBundle={exportBundle}
+        packetTitle={packetTitle}
+        recentRunsCount={recentRuns.length}
+        memoryCount={memories.length}
+      />
+    );
+  } else if (screen === 'NotificationsPanel') {
+    content = (
+      <NotificationsPanel
+        onBack={() => setScreen('SettingsHome')}
+        notifications={notifications}
+        quietNotifications={settings.quietNotifications}
+        onOpenNotification={handleOpenNotification}
+        onToggleRead={handleToggleNotificationRead}
+        onDeleteNotification={handleDeleteNotification}
+        onClearAll={handleClearNotifications}
+      />
+    );
+  } else if (screen === 'ControlCenter') {
+    content = (
+      <ControlCenter
+        onBack={() => setScreen('SettingsHome')}
+        onOpenSettings={() => setScreen('SettingsHome')}
+        onOpenNotifications={() => setScreen('NotificationsPanel')}
+        settings={settings}
+        unreadCount={unreadCount}
+        onToggleSetting={handleToggleSetting}
+      />
+    );
+  } else if (screen === 'AppSwitcher') {
+    content = (
+      <AppSwitcher
+        onBack={() => setScreen('SettingsHome')}
+        onSwitchToScreen={(nextScreen: QuinnSurfaceName) => setScreen(resolveSwitcherTarget(nextScreen))}
+        currentScreen={getCurrentSwitcherSurface(screen)}
+        packetTitle={packetTitle}
+        lastSummary={compressedSummary}
+        notificationCount={notifications.length}
+        memoryCount={memories.length}
+        recentRunCount={recentRuns.length}
+        voiceSessionCount={voiceSessions.length}
+        settings={settings}
+      />
+    );
+  } else if (screen === 'VoiceMode') {
+    content = (
+      <VoiceMode
+        onBack={() => setScreen('SettingsHome')}
+        onOpenCanvas={() => setScreen('QuinnConversation')}
+        onOpenGravity={() => setScreen('SettingsHome')}
+        packetTitle={packetTitle}
+        packetText={packetText}
+        lastSummary={compressedSummary}
+        voiceSessions={voiceSessions}
+        voiceSettings={voiceSettings}
+        onSaveVoiceSession={handleSaveVoiceSession}
+        onDeleteVoiceSession={handleDeleteVoiceSession}
+        onPatchVoiceSettings={handlePatchVoiceSettings}
+      />
+    );
+  }
+
+  const showFixedConversationHeader = screen === 'QuinnConversation';
+
+  return (
+    <SafeArea edges={['top']} style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor="#04050A" />
+
+      {showFixedConversationHeader ? (
+  <>
+    <QuinnField waveKey={waveKey} />
+    <AmbientGalaxyMotion />
+    <FixedQuinnHeader />
+    <TopFadeWall />
+  </>
+) : (
+        <>
+          <View pointerEvents="none" style={styles.appBackground}>
+            <View style={styles.appGlowA} />
+            <View style={styles.appGlowB} />
+            <View style={styles.appGlowC} />
+          </View>
+
+          <View style={styles.topBar}>
+            <Text style={styles.brand}>
+              Quinn <Text style={styles.brandVersion}>2.0</Text>
+            </Text>
+          </View>
+        </>
+      )}
+
+      {content}
+
+      <Pressable
+        onPress={() =>
+          setScreen(screen === 'QuinnConversation' ? 'SettingsHome' : 'QuinnConversation')
+        }
+        style={[
+          styles.floatingSettingsButton,
+          screen !== 'QuinnConversation' && styles.floatingSettingsButtonActive,
+        ]}
+      >
+        <Feather name="settings" size={16} color="#F2F6FF" />
+      </Pressable>
+    </SafeArea>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: '#02030A',
+  },
+
+  quinnConversationViewport: {
+  flex: 1,
+  position: 'relative',
+  zIndex: 1,
+},
+
+  ambientGalaxy: {
+  ...StyleSheet.absoluteFillObject,
+  zIndex: -10,
+},
+
+  galaxyHazeA: {
+  position: 'absolute',
+  top: -220,
+  right: -140,
+  width: 460,
+  height: 460,
+  borderRadius: 230,
+  backgroundColor: 'rgba(168, 92, 255, 0.26)',
+},
+
+galaxyHazeB: {
+  position: 'absolute',
+  top: 180,
+  left: -160,
+  width: 360,
+  height: 360,
+  borderRadius: 180,
+  backgroundColor: 'rgba(64, 210, 255, 0.13)',
+},
+
+galaxyHazeC: {
+  position: 'absolute',
+  bottom: -150,
+  right: -40,
+  width: 300,
+  height: 300,
+  borderRadius: 150,
+  backgroundColor: 'rgba(255, 126, 182, 0.14)',
+},
+
+  galaxyDust: {
+    position: 'absolute',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 1,
+    shadowRadius: 10,
+  },
+
+    shootingStarWrap: {
+    position: 'absolute',
+    width: 170,
+    height: 22,
+    justifyContent: 'center',
+  },
+
+  shootingStarTailFar: {
+    position: 'absolute',
+    left: 0,
+    width: 118,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(188, 218, 255, 0.18)',
+  },
+
+  shootingStarTailMid: {
+    position: 'absolute',
+    left: 44,
+    width: 84,
+    height: 2.5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(214, 232, 255, 0.34)',
+  },
+
+  shootingStarTailCore: {
+    position: 'absolute',
+    left: 84,
+    width: 58,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(245, 250, 255, 0.92)',
+    shadowColor: '#F2F8FF',
+    shadowOpacity: 1,
+    shadowRadius: 12,
+  },
+
+  shootingStarTailFarWarm: {
+    backgroundColor: 'rgba(255, 220, 192, 0.18)',
+  },
+
+  shootingStarTailMidWarm: {
+    backgroundColor: 'rgba(255, 232, 208, 0.34)',
+  },
+
+  shootingStarTailCoreWarm: {
+    backgroundColor: 'rgba(255, 244, 230, 0.92)',
+    shadowColor: '#FFF0E2',
+  },
+
+  shootingStarGlow: {
+    position: 'absolute',
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(214, 234, 255, 0.26)',
+  },
+
+  shootingStarGlowWarm: {
+    backgroundColor: 'rgba(255, 232, 208, 0.24)',
+  },
+
+  shootingStarHead: {
+    position: 'absolute',
+    right: 0,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: '#F8FBFF',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 1,
+    shadowRadius: 16,
+  },
+
+  shootingStarHeadWarm: {
+    backgroundColor: '#FFF1E0',
+    shadowColor: '#FFF1E0',
+  },
+
+  appBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#02030A',
+  },
+
+  appGlowA: {
+  position: 'absolute',
+  top: -220,
+  right: -120,
+  width: 430,
+  height: 430,
+  borderRadius: 215,
+  backgroundColor: 'rgba(156, 110, 255, 0.28)',
+},
+
+appGlowB: {
+  position: 'absolute',
+  top: 220,
+  left: -140,
+  width: 320,
+  height: 320,
+  borderRadius: 160,
+  backgroundColor: 'rgba(72, 198, 255, 0.12)',
+},
+
+appGlowC: {
+  position: 'absolute',
+  bottom: -140,
+  right: -30,
+  width: 280,
+  height: 280,
+  borderRadius: 140,
+  backgroundColor: 'rgba(255, 114, 168, 0.14)',
+},
+
+  fixedHeaderShell: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 26,
+  paddingHorizontal: 24,
+  paddingTop: 12,
+  paddingBottom: 12,
+},
+
+  headerAuraLarge: {
+  position: 'absolute',
+  top: -42,
+  right: 8,
+  width: 220,
+  height: 220,
+  borderRadius: 110,
+  backgroundColor: 'rgba(140, 102, 214, 0.18)',
+},
+
+headerAuraSmall: {
+  position: 'absolute',
+  top: 46,
+  right: 86,
+  width: 96,
+  height: 96,
+  borderRadius: 48,
+  backgroundColor: 'rgba(255, 138, 200, 0.10)',
+},
+
+  headerNebulaRing: {
+    position: 'absolute',
+    top: 28,
+    right: 34,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    borderWidth: 1,
+    borderColor: 'rgba(202, 216, 255, 0.10)',
+    transform: [{ scaleX: 1.18 }, { rotate: '-18deg' }],
+  },
+
+  headerSparkle: {
+    position: 'absolute',
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.84)',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+  },
+
+  headerSparkleOne: {
+    top: 56,
+    right: 60,
+  },
+
+  headerSparkleTwo: {
+    top: 104,
+    right: 128,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+  },
+
+  headerSparkleThree: {
+    top: 78,
+    right: 94,
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.25,
+  },
+
+  headerOverlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  headerOverlineDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(206, 191, 255, 0.86)',
+    marginRight: 8,
+  },
+
+  headerOverline: {
+    color: 'rgba(222, 228, 246, 0.72)',
+    fontSize: 9.5,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 2.1,
+  },
+
+  headerTitleRow: {
+  flexDirection: 'row',
+  alignItems: 'flex-end',
+},
+
+  headerQuinn: {
+  fontSize: 64,
+  lineHeight: 66,
+  fontWeight: '900',
+  letterSpacing: -3.8,
+  marginRight: 10,
+},
+
+  headerVersionCapsule: {
+  position: 'relative',
+  overflow: 'hidden',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 999,
+  marginLeft: 2,
+  marginBottom: 10,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 214, 236, 0.34)',
+  backgroundColor: 'rgba(56, 20, 56, 0.78)',
+  shadowColor: '#FF8FD1',
+  shadowOpacity: 0.34,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 8,
+},
+
+headerVersionText: {
+  color: '#FFF2FA',
+  fontSize: 13,
+  lineHeight: 15,
+  fontWeight: '900',
+  letterSpacing: 0.8,
+},
+
+  topFadeWall: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  height: FADE_WALL_HEIGHT,
+  zIndex: 25,
+},
+
+  topBar: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 6,
+    backgroundColor: 'transparent',
+  },
+
+  brand: {
+    color: '#F8FAFF',
+    fontSize: 54,
+    lineHeight: 56,
+    fontWeight: '300',
+    letterSpacing: -2.8,
+  },
+
+  brandVersion: {
+    color: '#B7C2FF',
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: '500',
+    letterSpacing: -1,
+  },
+
+  heroTitleWrap: {
+  position: 'relative',
+  alignSelf: 'flex-start',
+  marginBottom: 8,
+  paddingRight: 8,
+},
+
+titleGlowBlobA: {
+  position: 'absolute',
+  left: 0,
+  top: 8,
+  width: 170,
+  height: 58,
+  borderRadius: 30,
+  backgroundColor: 'rgba(255, 118, 198, 0.09)',
+},
+
+titleGlowBlobB: {
+  position: 'absolute',
+  left: 78,
+  top: -8,
+  width: 120,
+  height: 62,
+  borderRadius: 31,
+  backgroundColor: 'rgba(136, 108, 255, 0.11)',
+},
+
+headerQuinnGlow: {
+  position: 'absolute',
+  left: 2,
+  top: 4,
+  fontSize: 68,
+  lineHeight: 70,
+  fontWeight: '900',
+  letterSpacing: -4,
+  color: 'rgba(255, 164, 216, 0.14)',
+  textShadowColor: 'rgba(255, 154, 210, 0.52)',
+  textShadowOffset: { width: 0, height: 0 },
+  textShadowRadius: 18,
+},
+
+headerQuinnQ: {
+  color: '#FFB1DF',
+  textShadowColor: 'rgba(255, 146, 206, 0.72)',
+  textShadowOffset: { width: 0, height: 0 },
+  textShadowRadius: 12,
+},
+
+headerQuinnRest: {
+  color: '#F7ECFF',
+  textShadowColor: 'rgba(173, 138, 255, 0.62)',
+  textShadowOffset: { width: 0, height: 0 },
+  textShadowRadius: 12,
+},
+
+headerVersionShine: {
+  position: 'absolute',
+  top: 2,
+  left: 8,
+  right: 8,
+  height: 10,
+  borderRadius: 999,
+  backgroundColor: 'rgba(255,255,255,0.12)',
+},
+
+  fixedIntroText: {
+  color: 'rgba(236, 231, 245, 0.84)',
+  fontSize: 14,
+  lineHeight: 22,
+  fontWeight: '500',
+  maxWidth: 760,
+  marginTop: 6,
+},
+
+  quinnConversationScroll: {
+    paddingHorizontal: 20,
+    paddingTop: HEADER_HEIGHT + 4,
+    paddingBottom: 108,
+  },
+
+  quinnScroll: {
+    position: 'relative',
+    minHeight: 1120,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 110,
+  },
+
+  cardFloatWrap: {
+  position: 'relative',
+  zIndex: 1,
+  width: '100%',
+},
+
+  commandStage: {
+  marginBottom: 20,
+  position: 'relative',
+  zIndex: 1,
+  width: '100%',
+  maxWidth: 1560,
+  alignSelf: 'center',
+},
+
+  primaryCard: {
+    overflow: 'hidden',
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(232,236,255,0.12)',
+    backgroundColor: 'rgba(12, 16, 31, 0.62)',
+    shadowColor: '#A8B0FF',
+    shadowOpacity: 0.24,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
+  },
+
+  composerShell: {
+  overflow: 'hidden',
+  position: 'relative',
+  minHeight: 128,
+  borderRadius: 36,
+  borderWidth: 1,
+  borderColor: 'rgba(240, 223, 245, 0.20)',
+  backgroundColor: 'rgba(72, 56, 108, 0.92)',
+  padding: 2,
+  shadowColor: '#9EA8FF',
+  shadowOpacity: 0.28,
+  shadowRadius: 30,
+  shadowOffset: { width: 0, height: 16 },
+  elevation: 12,
+},
+
+  composerInnerShell: {
+  overflow: 'hidden',
+  position: 'relative',
+  minHeight: 118,
+  borderRadius: 34,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.10)',
+  backgroundColor: 'rgba(8, 12, 24, 0.985)',
+  paddingLeft: 24,
+  paddingRight: 114,
+  paddingTop: 24,
+  paddingBottom: 22,
+},
+
+  lensRailWrap: {
+    marginBottom: 14,
+    paddingRight: 22,
+  },
+
+  threadTitleWrap: {
+    marginBottom: 14,
+  },
+
+  threadTitleEyebrow: {
+    color: 'rgba(188, 196, 226, 0.48)',
+    fontSize: 9.5,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 5,
+  },
+
+  threadTitleText: {
+    color: '#F5F8FF',
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+
+  lensEyebrow: {
+    color: 'rgba(188, 196, 226, 0.56)',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 10,
+  },
+
+  lensRail: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginRight: -8,
+  },
+
+  lensChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 8.5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(206, 214, 255, 0.08)',
+    backgroundColor: 'rgba(9, 13, 24, 0.72)',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+
+  lensChipActive: {
+    borderColor: 'rgba(244, 214, 255, 0.18)',
+    backgroundColor: 'rgba(62, 46, 90, 0.82)',
+    shadowColor: '#D4C1FF',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+
+  lensChipText: {
+    color: 'rgba(233, 238, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    letterSpacing: 0.15,
+  },
+
+  lensChipTextActive: {
+    color: '#FBFCFF',
+  },
+
+  lensBlurb: {
+    color: 'rgba(204, 212, 236, 0.54)',
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+
+  sessionArcRail: {
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(204, 214, 255, 0.08)',
+    backgroundColor: 'rgba(7, 11, 20, 0.68)',
+  },
+
+  sessionArcHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+
+  sessionArcCopy: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
+  sessionArcEyebrow: {
+    color: 'rgba(187, 196, 225, 0.60)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 5,
+  },
+
+  sessionArcTitle: {
+    color: '#F5F8FF',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    marginBottom: 3,
+  },
+
+  sessionArcMeta: {
+    color: 'rgba(206, 214, 236, 0.60)',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+
+  sessionArcResetChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(214, 222, 255, 0.10)',
+    backgroundColor: 'rgba(11, 14, 24, 0.86)',
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+  },
+
+  sessionArcResetChipText: {
+    color: 'rgba(245, 248, 255, 0.86)',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '700',
+  },
+
+  sessionArcBeatRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+    marginRight: -8,
+  },
+
+  sessionArcBeat: {
+    minWidth: 128,
+    maxWidth: 220,
+    marginRight: 8,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(204, 214, 255, 0.07)',
+    backgroundColor: 'rgba(10, 13, 23, 0.76)',
+  },
+
+  sessionArcBeatLabel: {
+    color: 'rgba(242, 245, 255, 0.74)',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 0.35,
+    marginBottom: 5,
+  },
+
+  sessionArcBeatText: {
+    color: 'rgba(216, 223, 242, 0.68)',
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+
+  focusAura: {
+    position: 'absolute',
+    top: -46,
+    left: -28,
+    width: 184,
+    height: 184,
+    borderRadius: 92,
+    backgroundColor: 'rgba(110, 158, 255, 0.14)',
+  },
+
+  cardTopSheen: {
+  position: 'absolute',
+  top: 7,
+  left: 7,
+  right: 7,
+  height: 20,
+  borderRadius: 18,
+  backgroundColor: 'rgba(255,255,255,0.08)',
+},
+
+  cardTopSheenSoft: {
+  position: 'absolute',
+  top: 10,
+  left: 22,
+  right: 22,
+  height: 92,
+  borderRadius: 34,
+  backgroundColor: 'rgba(220, 232, 255, 0.045)',
+},
+
+  cardSideShine: {
+  position: 'absolute',
+  top: 10,
+  right: 10,
+  width: 128,
+  height: 128,
+  borderRadius: 64,
+  backgroundColor: 'rgba(255,255,255,0.04)',
+},
+
+  cardGlitterSweep: {
+  position: 'absolute',
+  top: -20,
+  left: -40,
+  width: 110,
+  height: 240,
+  borderRadius: 55,
+  backgroundColor: 'rgba(255,255,255,0.08)',
+},
+
+  cardGlitterSweepCore: {
+  position: 'absolute',
+  top: -14,
+  left: -18,
+  width: 42,
+  height: 240,
+  borderRadius: 21,
+  backgroundColor: 'rgba(255,255,255,0.14)',
+},
+
+  cardGlitterSweepWarm: {
+    position: 'absolute',
+    top: -24,
+    left: -40,
+    width: 120,
+    height: 240,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 235, 212, 0.08)',
+  },
+
+  cardGlitterSweepCoreWarm: {
+    position: 'absolute',
+    top: -18,
+    left: -20,
+    width: 52,
+    height: 240,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255, 241, 220, 0.14)',
+  },
+
+  cardBottomFog: {
+  position: 'absolute',
+  left: 12,
+  right: 12,
+  bottom: -10,
+  height: 112,
+  borderRadius: 40,
+  backgroundColor: 'rgba(116, 132, 214, 0.05)',
+},
+
+  cardOrbGlowCool: {
+  position: 'absolute',
+  top: -54,
+  right: -20,
+  width: 152,
+  height: 152,
+  borderRadius: 76,
+  backgroundColor: 'rgba(86, 224, 255, 0.14)',
+},
+
+cardOrbGlowPurple: {
+  position: 'absolute',
+  top: -62,
+  right: -26,
+  width: 176,
+  height: 176,
+  borderRadius: 88,
+  backgroundColor: 'rgba(198, 96, 255, 0.18)',
+},
+
+cardOrbGlowWarm: {
+  position: 'absolute',
+  top: -54,
+  right: -14,
+  width: 150,
+  height: 150,
+  borderRadius: 75,
+  backgroundColor: 'rgba(236, 140, 180, 0.12)',
+},
+
+  sparkleLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+
+  sparkle: {
+    position: 'absolute',
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 1.75,
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.54,
+    shadowRadius: 8,
+  },
+
+  sparkleWarm: {
+  backgroundColor: 'rgba(255, 228, 214, 0.98)',
+  shadowColor: '#FFD8E8',
+},
+
+  sparkleOne: {
+    top: 18,
+    right: 28,
+  },
+
+  sparkleTwo: {
+    top: 36,
+    right: 80,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+  },
+
+  sparkleThree: {
+    top: 74,
+    right: 46,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+  },
+
+  sparkleFour: {
+    bottom: 28,
+    right: 42,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+
+  sparkleFive: {
+    top: 18,
+    left: 24,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+  },
+
+  sparkleSix: {
+    bottom: 22,
+    left: 34,
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.25,
+  },
+
+  sparkleSeven: {
+    top: 46,
+    left: 70,
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.25,
+  },
+
+  sparkleEight: {
+    bottom: 44,
+    left: 18,
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 1.75,
+  },
+
+  listeningSweep: {
+    position: 'absolute',
+    top: 10,
+    bottom: 10,
+    width: 96,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+
+  listeningChip: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 152, 152, 0.24)',
+    backgroundColor: 'rgba(34, 10, 16, 0.70)',
+  },
+
+  listeningDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#FF7676',
+    marginRight: 6,
+  },
+
+  listeningChipText: {
+    color: '#FFDADA',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  composerInput: {
+  minHeight: 76,
+  color: 'rgba(247, 249, 255, 0.96)',
+  fontSize: 17.6,
+  lineHeight: 28,
+  fontWeight: '600',
+  letterSpacing: -0.12,
+  padding: 0,
+  paddingBottom: 6,
+  maxWidth: 1080,
+},
+
+  composerActionDockGlow: {
+  position: 'absolute',
+  right: 10,
+  bottom: 10,
+  width: 106,
+  height: 58,
+  borderRadius: 29,
+  backgroundColor: 'rgba(214, 152, 216, 0.08)',
+},
+
+  composerActionDock: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(238, 241, 255, 0.10)',
+    backgroundColor: 'rgba(6, 10, 19, 0.88)',
+    shadowColor: '#98A7D8',
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+
+  composerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  inlineIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 2.5,
+    borderWidth: 1,
+  },
+
+  inlineHeartButton: {
+  backgroundColor: 'rgba(124, 70, 118, 0.52)',
+  borderColor: 'rgba(255, 208, 232, 0.18)',
+  shadowColor: '#D5B4E4',
+  shadowOpacity: 0.10,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 6 },
+},
+
+  inlineHeartButtonDisabled: {
+    backgroundColor: 'rgba(20, 24, 38, 0.58)',
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+
+  inlineMicButton: {
+    backgroundColor: 'rgba(10, 14, 24, 0.98)',
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+
+  inlineMicButtonActive: {
+    backgroundColor: 'rgba(134, 58, 74, 0.56)',
+    borderColor: 'rgba(255, 170, 182, 0.24)',
+  },
+
+  inlineLoadingIcon: {
+    color: '#F8FAFF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: -2,
+  },
+
+  inlineTakeStatus: {
+  color: 'rgba(230, 236, 250, 0.84)',
+  fontSize: 12,
+  lineHeight: 17,
+  fontWeight: '700',
+  marginTop: 10,
+  marginLeft: 4,
+  alignSelf: 'flex-start',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: 'rgba(215, 221, 255, 0.08)',
+  backgroundColor: 'rgba(9, 12, 21, 0.70)',
+},
+
+  helperText: {
+  color: 'rgba(230, 236, 250, 0.84)',
+  fontSize: 12,
+  lineHeight: 19,
+  fontWeight: '700',
+  marginTop: 10,
+  alignSelf: 'flex-start',
+  maxWidth: '90%',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: 'rgba(215, 221, 255, 0.08)',
+  backgroundColor: 'rgba(9, 12, 21, 0.68)',
+},
+
+  errorText: {
+    color: '#FF94A2',
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    maxWidth: '90%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 148, 162, 0.16)',
+    backgroundColor: 'rgba(36, 12, 18, 0.68)',
+  },
+
+  responseStage: {
+  marginTop: 0,
+  marginBottom: 10,
+  paddingLeft: 2,
+  position: 'relative',
+  zIndex: 1,
+},
+
+  responseStageEyebrow: {
+    color: 'rgba(214, 220, 240, 0.62)',
+    fontSize: 9.5,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 2.1,
+    marginBottom: 5,
+  },
+
+  responseStageTitle: {
+    color: '#FAFBFF',
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+
+  heroResponseCard: {
+  overflow: 'hidden',
+  position: 'relative',
+  marginBottom: 14,
+  borderRadius: 34,
+  borderWidth: 1,
+  borderColor: 'rgba(222, 226, 255, 0.10)',
+  backgroundColor: 'rgba(28, 31, 44, 0.88)',
+  padding: 2,
+  width: '100%',
+  maxWidth: 1560,
+  alignSelf: 'center',
+  shadowColor: '#070A14',
+  shadowOpacity: 0.42,
+  shadowRadius: 26,
+  shadowOffset: { width: 0, height: 14 },
+  elevation: 13,
+},
+
+  spokenResponseCard: {
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 10,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(238, 230, 255, 0.18)',
+    backgroundColor: 'rgba(20, 24, 42, 0.74)',
+    padding: 3,
+    shadowColor: '#B0B7FF',
+    shadowOpacity: 0.32,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 13,
+  },
+
+  responseInnerFrame: {
+  overflow: 'hidden',
+  borderRadius: 32,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.08)',
+  backgroundColor: 'rgba(7, 10, 18, 0.985)',
+  paddingHorizontal: 30,
+  paddingTop: 24,
+  paddingBottom: 24,
+},
+
+  spokenInnerFrame: {
+    overflow: 'hidden',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(8, 11, 25, 0.90)',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+
+  heroResponseBody: {
+  color: 'rgba(245, 247, 253, 0.95)',
+  fontSize: 15.8,
+  lineHeight: 31,
+  fontWeight: '500',
+  letterSpacing: 0.1,
+  maxWidth: 900,
+},
+
+  sectionTitle: {
+    color: '#F5F7FF',
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '700',
+    letterSpacing: -1,
+    marginBottom: 14,
+  },
+
+  responseHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+
+  responseHeaderTextWrap: {
+    flex: 1,
+    maxWidth: 980,
+  },
+
+  memoryResonanceWrap: {
+    marginBottom: 4,
+  },
+
+  memoryResonanceEyebrow: {
+    color: 'rgba(188, 198, 226, 0.54)',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    marginBottom: 9,
+  },
+
+  memoryResonanceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginRight: -10,
+    marginBottom: 6,
+  },
+
+  memoryResonanceChip: {
+    minWidth: 138,
+    maxWidth: 220,
+    marginRight: 10,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(206, 214, 255, 0.08)',
+    backgroundColor: 'rgba(10, 13, 22, 0.74)',
+  },
+
+  memoryResonanceLabel: {
+    color: '#F4F7FF',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '800',
+    letterSpacing: 0.18,
+    marginBottom: 5,
+  },
+
+  memoryResonancePreview: {
+    color: 'rgba(218, 225, 244, 0.62)',
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+
+  responseLabel: {
+  color: 'rgba(255, 249, 253, 0.84)',
+  fontSize: 12.5,
+  lineHeight: 18,
+  fontWeight: '800',
+  letterSpacing: 0.9,
+  marginBottom: 10,
+},
+
+  responseSubLabel: {
+    color: 'rgba(226, 231, 246, 0.68)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '600',
+  },
+
+  voiceAccentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginTop: 6,
+    marginBottom: 8,
+  },
+
+  voiceAccentBar: {
+    width: 3,
+    borderRadius: 999,
+    marginRight: 5,
+    backgroundColor: 'rgba(214, 226, 255, 0.86)',
+  },
+
+  responseBody: {
+    color: '#F7F9FF',
+    fontSize: 15.5,
+    lineHeight: 25,
+    fontWeight: '400',
+    marginTop: 2,
+  },
+
+  responseFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 22,
+  },
+
+  responseFooterActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 44,
+  },
+
+  responseActionChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 220, 255, 0.10)',
+    backgroundColor: 'rgba(9, 12, 21, 0.82)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    maxWidth: '72%',
+  },
+
+  responseActionChipDisabled: {
+    borderColor: 'rgba(212, 220, 255, 0.05)',
+    backgroundColor: 'rgba(10, 14, 25, 0.52)',
+  },
+
+  responseActionChipText: {
+    color: 'rgba(242, 246, 255, 0.88)',
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontWeight: '700',
+    letterSpacing: 0.12,
+  },
+
+  responseActionChipTextDisabled: {
+    color: 'rgba(242, 246, 255, 0.48)',
+  },
+
+  replayButtonWrap: {
+    position: 'relative',
+    zIndex: 2,
+  },
+
+  replayGlow: {
+  position: 'absolute',
+  right: 0,
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: 'rgba(210, 154, 206, 0.10)',
+},
+
+responseReplayButton: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1,
+  borderColor: 'rgba(232, 221, 255, 0.10)',
+  backgroundColor: 'rgba(52, 42, 72, 0.56)',
+  shadowColor: '#AAB4E0',
+  shadowOpacity: 0.08,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+},
+
+  responseReplayIcon: {
+    color: '#F7F9FF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  floatingSettingsButton: {
+    position: 'absolute',
+    right: 18,
+    bottom: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(7, 10, 18, 0.94)',
+    shadowColor: '#090D17',
+    shadowOpacity: 0.36,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+    zIndex: 10,
+  },
+
+  floatingSettingsButtonActive: {
+    borderColor: 'rgba(190, 198, 255, 0.18)',
+    backgroundColor: 'rgba(10, 13, 24, 0.98)',
+  },
+
+  floatingSettingsIcon: {
+    color: '#F2F6FF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  quinnEyebrow: {
+    color: 'rgba(160, 170, 206, 0.76)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+
+  quinnHeroTitle: {
+    color: '#F5F7FF',
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: '700',
+    letterSpacing: -1.2,
+    marginBottom: 8,
+  },
+
+  quinnHeroText: {
+    color: 'rgba(208, 216, 236, 0.74)',
+    fontSize: 14.5,
+    lineHeight: 21,
+    fontWeight: '500',
+    marginBottom: 14,
+  },
+
+  sectionEyebrow: {
+    color: 'rgba(160, 170, 206, 0.76)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    marginBottom: 6,
+  },
+
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+  },
+
+  secondaryAction: {
+    backgroundColor: 'rgba(12, 16, 30, 0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(178, 186, 255, 0.16)',
+    borderRadius: 999,
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+    marginRight: 10,
+    marginBottom: 8,
+  },
+
+  secondaryActionText: {
+    color: '#F2F5FF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.25,
+  },
+
+  missingWrap: {
+    overflow: 'hidden',
+    margin: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(152, 128, 255, 0.28)',
+    backgroundColor: 'rgba(12,16,30,0.60)',
+    borderRadius: TOKENS.radius?.lg ?? 24,
+  },
+
+  missingEyebrow: {
+    color: '#D8DFFF',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+
+  missingTitle: {
+    color: '#F6F8FF',
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    marginBottom: 8,
+  },
+
+  missingBody: {
+    color: 'rgba(210, 218, 238, 0.76)',
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '500',
+  },
+});
