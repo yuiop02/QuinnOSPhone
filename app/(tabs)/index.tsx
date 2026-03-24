@@ -42,6 +42,7 @@ import * as VoiceModeModule from '../../components/quinn/VoiceMode';
 
 import Feather from '@expo/vector-icons/Feather';
 import QuinnField from '../../components/quinn/QuinnField';
+import QuinnSurfaceShell from '../../components/quinn/QuinnSurfaceShell';
 import {
   generateFollowupPacket,
   runQuinnPacket,
@@ -95,6 +96,7 @@ import { createNotification } from '../../components/quinn/quinnNotificationFact
 import { useQuinnConversationMotion } from '../../components/quinn/useQuinnConversationMotion';
 import { loadQuinnSnapshot, saveQuinnSnapshot } from '../../components/quinn/quinnStorage';
 import { TOKENS } from '../../components/quinn/quinnSystem';
+import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
 import type {
   AppScreen,
   MemoryItem,
@@ -1002,11 +1004,15 @@ function QuinnConversationSurface({
   const [playbackSource, setPlaybackSource] = useState<string | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
 
-  const speechQueueRef = useRef<string[]>([]);
-  const speechTotalRef = useRef(0);
-  const speechIndexRef = useRef(0);
+  const speechChunksRef = useRef<string[]>([]);
+  const speechActiveChunkIndexRef = useRef(-1);
   const speechSessionRef = useRef(0);
   const warmedChunkUrlsRef = useRef(new Set<string>());
+  const speechAdvanceInFlightRef = useRef(false);
+  const awaitingSpeechFinishRef = useRef(false);
+  const awaitingSpeechFinishSessionRef = useRef(0);
+  const awaitingSpeechFinishChunkIndexRef = useRef(-1);
+  const speechPlaybackStartedAtRef = useRef(0);
 
   const player = useAudioPlayer(playbackSource, {
     updateInterval: 100,
@@ -1075,107 +1081,188 @@ function QuinnConversationSurface({
     };
   }, []);
 
-  // `playNextSpeechChunk` is ref-driven queue orchestration; keeping the finish effect
-  // gated on the status transition avoids unnecessary re-runs while preserving behavior.
+  // Speech playback is index-driven so finish handling never depends on destructive
+  // queue mutation during active playback.
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-  if (!playerStatus.didJustFinish) {
-    return;
-  }
+    if (!playerStatus.didJustFinish) {
+      return;
+    }
 
-  const sessionId = speechSessionRef.current;
+    if (!awaitingSpeechFinishRef.current) {
+      return;
+    }
 
-  if (speechQueueRef.current.length > 0) {
-    void playNextSpeechChunk(sessionId);
-    return;
-  }
+    const armedSessionId = awaitingSpeechFinishSessionRef.current;
+    const armedChunkIndex = awaitingSpeechFinishChunkIndexRef.current;
 
-  setIsPreparingQuinnVoice(false);
-  setIsSpeakingResponse(false);
-  setVoiceStatus('Audio finished.');
-}, [playerStatus.didJustFinish]);
-  /* eslint-enable react-hooks/exhaustive-deps */
+    if (
+      armedSessionId !== speechSessionRef.current ||
+      armedChunkIndex < 0 ||
+      armedChunkIndex !== speechActiveChunkIndexRef.current
+    ) {
+      return;
+    }
 
-  function clearSpeechQueue() {
-  speechQueueRef.current = [];
-  speechTotalRef.current = 0;
-  speechIndexRef.current = 0;
-  speechSessionRef.current += 1;
-  warmedChunkUrlsRef.current.clear();
-}
+    const elapsedSinceChunkStart = Date.now() - speechPlaybackStartedAtRef.current;
 
-const warmSpeechChunk = useCallback(async (url: string, sessionId: number) => {
-  if (!url || sessionId !== speechSessionRef.current) {
-    return;
-  }
+    if (elapsedSinceChunkStart < 300) {
+      return;
+    }
 
-  if (warmedChunkUrlsRef.current.has(url)) {
-    return;
-  }
+    const duration = Number(playerStatus.duration || 0);
+    const currentTime = Number(playerStatus.currentTime || 0);
+    const currentChunkReachedEnd =
+      duration > 0.25 &&
+      currentTime >= Math.max(0, duration - 0.18);
 
-  warmedChunkUrlsRef.current.add(url);
+    if (!currentChunkReachedEnd) {
+      return;
+    }
 
-  try {
-    await fetch(url);
-  } catch {
-    // ignore warm-up failures; normal playback can still try
-  }
-}, []);
+    awaitingSpeechFinishRef.current = false;
+    awaitingSpeechFinishSessionRef.current = 0;
+    awaitingSpeechFinishChunkIndexRef.current = -1;
+    speechPlaybackStartedAtRef.current = 0;
 
-const warmUpcomingSpeechChunks = useCallback(async (sessionId: number, count = 3) => {
-  if (sessionId !== speechSessionRef.current) {
-    return;
-  }
+    const sessionId = armedSessionId;
+    const nextIndex = armedChunkIndex + 1;
 
-  const upcomingChunks = speechQueueRef.current.slice(0, count);
+    if (nextIndex < speechChunksRef.current.length) {
+      void playSpeechChunkAtIndex(sessionId, nextIndex);
+      return;
+    }
 
-  await Promise.all(
-    upcomingChunks.map((chunk) =>
-      warmSpeechChunk(getQuinnLocalVoiceSpeakUrl(chunk), sessionId)
-    )
-  );
-}, [warmSpeechChunk]);
-
-const playNextSpeechChunk = useCallback(async (sessionId: number) => {
-  if (sessionId !== speechSessionRef.current) {
-    return;
-  }
-
-  const nextChunk = speechQueueRef.current.shift();
-
-  if (!nextChunk) {
+    speechActiveChunkIndexRef.current = -1;
     setIsPreparingQuinnVoice(false);
     setIsSpeakingResponse(false);
     setVoiceStatus('Audio finished.');
-    return;
+  }, [playerStatus.didJustFinish]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  function clearSpeechQueue() {
+    speechChunksRef.current = [];
+    speechActiveChunkIndexRef.current = -1;
+    speechSessionRef.current += 1;
+    speechAdvanceInFlightRef.current = false;
+    awaitingSpeechFinishRef.current = false;
+    awaitingSpeechFinishSessionRef.current = 0;
+    awaitingSpeechFinishChunkIndexRef.current = -1;
+    speechPlaybackStartedAtRef.current = 0;
+    warmedChunkUrlsRef.current.clear();
   }
 
-  speechIndexRef.current += 1;
+  const warmSpeechChunk = useCallback(async (url: string, sessionId: number) => {
+    if (!url || sessionId !== speechSessionRef.current) {
+      return;
+    }
 
-  const currentPart = speechIndexRef.current;
-  const totalParts = speechTotalRef.current;
+    if (warmedChunkUrlsRef.current.has(url)) {
+      return;
+    }
 
-  const url = getQuinnLocalVoiceSpeakUrl(nextChunk);
+    warmedChunkUrlsRef.current.add(url);
 
-  setVoiceStatus(
-    totalParts > 1
-      ? `Quinn voice ${currentPart}/${totalParts}...`
-      : 'Quinn voice playing now.'
+    try {
+      await fetch(url);
+    } catch {
+      // ignore warm-up failures; normal playback can still try
+    }
+  }, []);
+
+  const warmUpcomingSpeechChunks = useCallback(
+    async (sessionId: number, count = 3, fromIndex?: number) => {
+      if (sessionId !== speechSessionRef.current) {
+        return;
+      }
+
+      const startIndex =
+        typeof fromIndex === 'number'
+          ? Math.max(0, fromIndex)
+          : Math.max(0, speechActiveChunkIndexRef.current + 1);
+
+      const upcomingChunks = speechChunksRef.current.slice(startIndex, startIndex + count);
+
+      await Promise.all(
+        upcomingChunks.map((chunk) =>
+          warmSpeechChunk(getQuinnLocalVoiceSpeakUrl(chunk), sessionId)
+        )
+      );
+    },
+    [warmSpeechChunk]
   );
 
-  player.replace(url);
-  void warmUpcomingSpeechChunks(sessionId, 2);
+  const playSpeechChunkAtIndex = useCallback(
+    async (sessionId: number, chunkIndex: number) => {
+      if (sessionId !== speechSessionRef.current || speechAdvanceInFlightRef.current) {
+        return;
+      }
 
-  await wait(currentPart === 1 ? 160 : 40);
+      speechAdvanceInFlightRef.current = true;
 
-  if (sessionId !== speechSessionRef.current) {
-    return;
-  }
+      try {
+        if (sessionId !== speechSessionRef.current) {
+          return;
+        }
 
-  player.play();
-  setIsPreparingQuinnVoice(false);
-  setIsSpeakingResponse(true);
-}, [player, warmUpcomingSpeechChunks]);
+        const chunks = speechChunksRef.current;
+        const nextChunk = chunks[chunkIndex];
+
+        if (!nextChunk) {
+          speechActiveChunkIndexRef.current = -1;
+          awaitingSpeechFinishRef.current = false;
+          awaitingSpeechFinishSessionRef.current = 0;
+          awaitingSpeechFinishChunkIndexRef.current = -1;
+          speechPlaybackStartedAtRef.current = 0;
+          setIsPreparingQuinnVoice(false);
+          setIsSpeakingResponse(false);
+          setVoiceStatus('Audio finished.');
+          return;
+        }
+
+        const currentPart = chunkIndex + 1;
+        const totalParts = chunks.length;
+        const url = getQuinnLocalVoiceSpeakUrl(nextChunk);
+
+        setVoiceStatus(
+          totalParts > 1
+            ? `Quinn voice ${currentPart}/${totalParts}...`
+            : 'Quinn voice playing now.'
+        );
+
+        // Ignore any stale finish signal while we are swapping the player source.
+        awaitingSpeechFinishRef.current = false;
+        awaitingSpeechFinishSessionRef.current = 0;
+        awaitingSpeechFinishChunkIndexRef.current = -1;
+        speechPlaybackStartedAtRef.current = 0;
+
+        player.replace(url);
+        void warmUpcomingSpeechChunks(sessionId, 2, chunkIndex + 1);
+
+        await wait(currentPart === 1 ? 160 : 40);
+
+        if (sessionId !== speechSessionRef.current) {
+          return;
+        }
+
+        if (speechChunksRef.current[chunkIndex] !== nextChunk) {
+          return;
+        }
+
+        speechActiveChunkIndexRef.current = chunkIndex;
+        player.play();
+        awaitingSpeechFinishSessionRef.current = sessionId;
+        awaitingSpeechFinishChunkIndexRef.current = chunkIndex;
+        speechPlaybackStartedAtRef.current = Date.now();
+        awaitingSpeechFinishRef.current = true;
+        setIsPreparingQuinnVoice(false);
+        setIsSpeakingResponse(true);
+      } finally {
+        speechAdvanceInFlightRef.current = false;
+      }
+    },
+    [player, warmUpcomingSpeechChunks]
+  );
 
   async function interruptQuinnPlayback() {
     await stopSystemVoicePreview();
@@ -1290,9 +1377,8 @@ const playNextSpeechChunk = useCallback(async (sessionId: number) => {
       return;
     }
 
-    speechQueueRef.current = [...chunks];
-    speechTotalRef.current = chunks.length;
-    speechIndexRef.current = 0;
+    speechChunksRef.current = [...chunks];
+    speechActiveChunkIndexRef.current = -1;
     speechSessionRef.current += 1;
 
     const sessionId = speechSessionRef.current;
@@ -1303,9 +1389,7 @@ const playNextSpeechChunk = useCallback(async (sessionId: number) => {
         : 'Quinn voice requested. Hold for a moment.'
     );
 
-    void warmUpcomingSpeechChunks(sessionId, 2);
-
-    await playNextSpeechChunk(sessionId);
+    await playSpeechChunkAtIndex(sessionId, 0);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Quinn voice playback failed.';
@@ -2378,52 +2462,76 @@ export default function App() {
     );
   } else if (screen === 'SettingsHome') {
     content = (
-      <ScrollView contentContainerStyle={styles.quinnScroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.quinnEyebrow}>SYSTEM SETTINGS</Text>
-        <Text style={styles.quinnHeroTitle}>Settings.</Text>
-        <Text style={styles.quinnHeroText}>Open the rest of QuinnOS from here.</Text>
+      <ScrollView contentContainerStyle={styles.systemScroll} showsVerticalScrollIndicator={false}>
+        <QuinnSurfaceShell
+          eyebrow="SYSTEM LAYER"
+          title="Everything around the conversation, kept precise."
+          description="Quinn 2.0 stays at the center. This layer is where memory, voice, exports, signals, and control stay organized without turning the app into a cluttered dashboard."
+          onBack={() => setScreen('QuinnConversation')}
+          backLabel="Back to Quinn"
+          actions={[
+            { label: `${recentRuns.length} runs`, tone: 'secondary' },
+            { label: `${memories.length} memory items`, tone: 'ghost' },
+            { label: unreadCount ? `${unreadCount} active alerts` : 'Signals quiet', tone: 'primary' },
+          ]}
+        />
 
-        <View style={styles.primaryCard}>
-          <Text style={styles.sectionEyebrow}>SETTINGS MENU</Text>
-          <Text style={styles.sectionTitle}>Choose a system area</Text>
+        <View style={styles.systemHubGrid}>
+          <Pressable style={styles.systemHubCard} onPress={() => setScreen('HomeTileGrid')}>
+            <Text style={styles.systemHubEyebrow}>SYSTEM DECK</Text>
+            <Text style={styles.systemHubTitle}>Surface index</Text>
+            <Text style={styles.systemHubBody}>
+              See the current signal, restore recent runs, and open the right layer fast.
+            </Text>
+          </Pressable>
 
-          <View style={styles.actionRow}>
-            <Pressable style={styles.secondaryAction} onPress={() => setScreen('HomeTileGrid')}>
-              <Text style={styles.secondaryActionText}>Dashboard</Text>
-            </Pressable>
+          <Pressable style={styles.systemHubCard} onPress={() => setScreen('MemoryPanel')}>
+            <Text style={styles.systemHubEyebrow}>MEMORY</Text>
+            <Text style={styles.systemHubTitle}>Deck</Text>
+            <Text style={styles.systemHubBody}>
+              {memories.length} kept items ready for Quinn when they genuinely matter.
+            </Text>
+          </Pressable>
 
-            <Pressable style={styles.secondaryAction} onPress={() => setScreen('MemoryPanel')}>
-              <Text style={styles.secondaryActionText}>Memory</Text>
-            </Pressable>
+          <Pressable style={styles.systemHubCard} onPress={() => setScreen('VoiceMode')}>
+            <Text style={styles.systemHubEyebrow}>VOICE</Text>
+            <Text style={styles.systemHubTitle}>Studio</Text>
+            <Text style={styles.systemHubBody}>
+              Build spoken handoffs, check the live route, and save audio sessions.
+            </Text>
+          </Pressable>
 
-            <Pressable style={styles.secondaryAction} onPress={() => setScreen('ExportsPanel')}>
-              <Text style={styles.secondaryActionText}>Exports</Text>
-            </Pressable>
+          <Pressable style={styles.systemHubCard} onPress={() => setScreen('ExportsPanel')}>
+            <Text style={styles.systemHubEyebrow}>EXPORTS</Text>
+            <Text style={styles.systemHubTitle}>Studio</Text>
+            <Text style={styles.systemHubBody}>
+              Pull clean JSON, Markdown, or plain-text bundles from the current Quinn state.
+            </Text>
+          </Pressable>
 
-            <Pressable style={styles.secondaryAction} onPress={() => setScreen('VoiceMode')}>
-              <Text style={styles.secondaryActionText}>Voice Lab</Text>
-            </Pressable>
+          <Pressable style={styles.systemHubCard} onPress={() => setScreen('NotificationsPanel')}>
+            <Text style={styles.systemHubEyebrow}>SIGNALS</Text>
+            <Text style={styles.systemHubTitle}>Stack</Text>
+            <Text style={styles.systemHubBody}>
+              {unreadCount} unread items waiting across runs, memory, and system changes.
+            </Text>
+          </Pressable>
 
-            <Pressable
-              style={styles.secondaryAction}
-              onPress={() => setScreen('NotificationsPanel')}
-            >
-              <Text style={styles.secondaryActionText}>
-                Alerts {unreadCount ? `(${unreadCount})` : ''}
-              </Text>
-            </Pressable>
+          <Pressable style={styles.systemHubCard} onPress={() => setScreen('ControlCenter')}>
+            <Text style={styles.systemHubEyebrow}>CONTROL</Text>
+            <Text style={styles.systemHubTitle}>Center</Text>
+            <Text style={styles.systemHubBody}>
+              Focus {settings.focusMode ? 'on' : 'off'} • motion {settings.reduceMotion ? 'reduced' : 'live'} • alerts {settings.quietNotifications ? 'quiet' : 'live'}.
+            </Text>
+          </Pressable>
 
-            <Pressable
-              style={styles.secondaryAction}
-              onPress={() => setScreen('ControlCenter')}
-            >
-              <Text style={styles.secondaryActionText}>Control</Text>
-            </Pressable>
-
-            <Pressable style={styles.secondaryAction} onPress={() => setScreen('AppSwitcher')}>
-              <Text style={styles.secondaryActionText}>Switcher</Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.systemHubCardWide} onPress={() => setScreen('AppSwitcher')}>
+            <Text style={styles.systemHubEyebrow}>QUICK JUMP</Text>
+            <Text style={styles.systemHubTitle}>Surface switcher</Text>
+            <Text style={styles.systemHubBody}>
+              Move between QuinnOS layers instantly when you already know where you need to land.
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     );
@@ -2548,7 +2656,7 @@ export default function App() {
     <FixedQuinnHeader />
     <TopFadeWall />
   </>
-) : (
+      ) : (
         <>
           <View pointerEvents="none" style={styles.appBackground}>
             <View style={styles.appGlowA} />
@@ -2557,9 +2665,13 @@ export default function App() {
           </View>
 
           <View style={styles.topBar}>
-            <Text style={styles.brand}>
-              Quinn <Text style={styles.brandVersion}>2.0</Text>
-            </Text>
+            <View style={styles.systemBrandChip}>
+              <Text style={styles.systemBrandOverline}>QUINNOS SYSTEM</Text>
+              <Text style={styles.brand}>
+                Quinn <Text style={styles.brandVersion}>2.0</Text>
+              </Text>
+              <Text style={styles.systemBrandSubcopy}>Memory. Voice. Export. Control.</Text>
+            </View>
           </View>
         </>
       )}
@@ -2718,27 +2830,27 @@ galaxyHazeC: {
 
   appBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#02030A',
+    backgroundColor: '#04060F',
   },
 
   appGlowA: {
   position: 'absolute',
-  top: -220,
+  top: -190,
   right: -120,
-  width: 430,
-  height: 430,
-  borderRadius: 215,
-  backgroundColor: 'rgba(156, 110, 255, 0.28)',
+  width: 420,
+  height: 420,
+  borderRadius: 210,
+  backgroundColor: 'rgba(122, 102, 194, 0.18)',
 },
 
 appGlowB: {
   position: 'absolute',
-  top: 220,
-  left: -140,
-  width: 320,
-  height: 320,
-  borderRadius: 160,
-  backgroundColor: 'rgba(72, 198, 255, 0.12)',
+  top: 240,
+  left: -120,
+  width: 300,
+  height: 300,
+  borderRadius: 150,
+  backgroundColor: 'rgba(85, 149, 255, 0.08)',
 },
 
 appGlowC: {
@@ -2748,7 +2860,7 @@ appGlowC: {
   width: 280,
   height: 280,
   borderRadius: 140,
-  backgroundColor: 'rgba(255, 114, 168, 0.14)',
+  backgroundColor: 'rgba(255, 178, 141, 0.08)',
 },
 
   fixedHeaderShell: {
@@ -2898,25 +3010,52 @@ headerVersionText: {
 
   topBar: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 6,
+    paddingTop: 14,
+    paddingBottom: 10,
     backgroundColor: 'transparent',
+  },
+
+  systemBrandChip: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: 'rgba(7, 10, 18, 0.82)',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+
+  systemBrandOverline: {
+    color: SURFACE_THEME.eyebrow,
+    fontSize: 9.5,
+    lineHeight: 12,
+    fontWeight: '900',
+    letterSpacing: 1.9,
+    marginBottom: 6,
   },
 
   brand: {
     color: '#F8FAFF',
-    fontSize: 54,
-    lineHeight: 56,
-    fontWeight: '300',
-    letterSpacing: -2.8,
+    fontSize: 38,
+    lineHeight: 40,
+    fontWeight: '700',
+    letterSpacing: -2.2,
   },
 
   brandVersion: {
-    color: '#B7C2FF',
-    fontSize: 32,
-    lineHeight: 36,
-    fontWeight: '500',
-    letterSpacing: -1,
+    color: '#CEC1FF',
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+
+  systemBrandSubcopy: {
+    color: SURFACE_THEME.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+    marginTop: 6,
   },
 
   heroTitleWrap: {
@@ -3005,6 +3144,65 @@ headerVersionShine: {
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 110,
+  },
+
+  systemScroll: {
+    position: 'relative',
+    minHeight: 1120,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 110,
+  },
+
+  systemHubGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+
+  systemHubCard: {
+    width: '47.5%',
+    backgroundColor: SURFACE_THEME.panelAlt,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 26,
+    padding: 16,
+    marginBottom: 12,
+  },
+
+  systemHubCardWide: {
+    width: '100%',
+    backgroundColor: SURFACE_THEME.panel,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderStrong,
+    borderRadius: 28,
+    padding: 18,
+    marginBottom: 12,
+  },
+
+  systemHubEyebrow: {
+    color: SURFACE_THEME.eyebrow,
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '900',
+    letterSpacing: 1.25,
+    marginBottom: 8,
+  },
+
+  systemHubTitle: {
+    color: SURFACE_THEME.text,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '900',
+    letterSpacing: -0.7,
+    marginBottom: 6,
+  },
+
+  systemHubBody: {
+    color: SURFACE_THEME.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '500',
   },
 
   cardFloatWrap: {
