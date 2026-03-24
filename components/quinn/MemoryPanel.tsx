@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -6,8 +6,9 @@ import {
     Text,
     View,
 } from 'react-native';
+import QuinnSurfaceShell from './QuinnSurfaceShell';
 import SectionCard from './SectionCard';
-import { TOKENS } from './quinnSystem';
+import { SURFACE_THEME } from './quinnSurfaceTheme';
 import { MemoryItem } from './quinnTypes';
 
 type MemoryPanelProps = {
@@ -29,11 +30,11 @@ function formatTimestamp(value: string) {
 
 function formatSource(source: MemoryItem['source']) {
   if (source === 'run-summary') {
-    return 'From Gravity';
+    return 'From Quinn reply';
   }
 
   if (source === 'packet') {
-    return 'From Canvas';
+    return 'From live thread';
   }
 
   return 'Starter memory';
@@ -47,43 +48,47 @@ export default function MemoryPanel({
   onTogglePin,
   onDeleteMemoryItem,
 }: MemoryPanelProps) {
-  const safeMemories = Array.isArray(memories) ? memories : [];
+  const { orderedMemories, pinnedCount } = useMemo(() => {
+    const safeMemories = Array.isArray(memories) ? memories : [];
+    const nextOrderedMemories = [...safeMemories].sort((a, b) => {
+      const pinDelta = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
 
-  const orderedMemories = [...safeMemories].sort((a, b) => {
-    const pinDelta = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
+      if (pinDelta !== 0) {
+        return pinDelta;
+      }
 
-    if (pinDelta !== 0) {
-      return pinDelta;
-    }
+      return String(b.timestamp || '').localeCompare(String(a.timestamp || ''));
+    });
 
-    return String(b.timestamp || '').localeCompare(String(a.timestamp || ''));
-  });
-
-  const pinnedCount = orderedMemories.filter((item) => item.pinned).length;
+    return {
+      orderedMemories: nextOrderedMemories,
+      pinnedCount: nextOrderedMemories.filter((item) => item.pinned).length,
+    };
+  }, [memories]);
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.eyebrow}>MEMORY PANEL</Text>
-        <Pressable onPress={onBack} style={styles.ghostButton}>
-          <Text style={styles.ghostButtonText}>Back</Text>
-        </Pressable>
-      </View>
+      <QuinnSurfaceShell
+        eyebrow="MEMORY DECK"
+        title="Memory, kept on purpose."
+        description="This is where Quinn keeps useful shapes. Not everything. Just the parts worth carrying forward when the next run actually needs them."
+        onBack={onBack}
+        actions={[
+          { label: `${orderedMemories.length} kept`, tone: 'secondary' },
+          { label: `${pinnedCount} pinned`, tone: 'ghost' },
+          { label: 'Open Quinn', tone: 'primary', onPress: onOpenCanvas },
+        ]}
+      />
 
-      <Text style={styles.heroTitle}>Memory, kept on purpose.</Text>
-      <Text style={styles.heroText}>
-        This is where Quinn keeps useful shapes. Not everything. Just the parts worth carrying forward.
-      </Text>
-
-      <SectionCard eyebrow="STATUS" title={`${orderedMemories.length} memory items`}>
+      <SectionCard eyebrow="STATUS" title={`${orderedMemories.length} kept memory item${orderedMemories.length === 1 ? '' : 's'}`}>
         <Text style={styles.bodyLine}>Pinned: {pinnedCount}</Text>
         <Text style={styles.bodyLine}>
-          Load any item back into Canvas, pin the ones that matter, and delete the weak ones.
+          Load a memory back into Quinn when the current thread needs it. Pin the ones that should stay close and delete the weak ones.
         </Text>
 
         <View style={styles.quickRow}>
           <Pressable style={styles.quickPill} onPress={onOpenCanvas}>
-            <Text style={styles.quickPillText}>Open Canvas</Text>
+            <Text style={styles.quickPillText}>Open Quinn</Text>
           </Pressable>
         </View>
       </SectionCard>
@@ -114,7 +119,7 @@ export default function MemoryPanel({
                 style={styles.primaryButton}
                 onPress={() => onLoadMemoryItem(item)}
               >
-                <Text style={styles.primaryButtonText}>Load into Canvas</Text>
+                <Text style={styles.primaryButtonText}>Load into Quinn</Text>
               </Pressable>
 
               <Pressable
@@ -136,9 +141,9 @@ export default function MemoryPanel({
           </View>
         ))
       ) : (
-        <SectionCard eyebrow="EMPTY" title="Nothing saved yet">
+        <SectionCard eyebrow="EMPTY" title="Nothing worth keeping yet">
           <Text style={styles.bodyLine}>
-            Run a packet through Gravity and the strongest compressed shape will land here.
+            Run Quinn from the homepage. When a reply creates a strong reusable shape, it lands here and can be loaded back into the composer.
           </Text>
         </SectionCard>
       )}
@@ -148,56 +153,8 @@ export default function MemoryPanel({
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: TOKENS.spacing?.lg ?? 18,
-    paddingBottom: 30,
-  },
-
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  eyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  heroTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '900',
-    letterSpacing: -1.1,
-    marginBottom: 10,
-  },
-
-  heroText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '600',
-    marginBottom: 14,
-  },
-
-  ghostButton: {
-    borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: TOKENS.radius?.pill ?? 999,
-    marginTop: 10,
-  },
-
-  ghostButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 12,
-    fontWeight: '800',
+    paddingHorizontal: 18,
+    paddingBottom: 36,
   },
 
   quickRow: {
@@ -208,9 +165,9 @@ const styles = StyleSheet.create({
 
   quickPill: {
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    backgroundColor: 'transparent',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 10,
@@ -218,16 +175,16 @@ const styles = StyleSheet.create({
   },
 
   quickPillText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 12,
     fontWeight: '800',
   },
 
   memoryCard: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panelAlt,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.lg ?? 24,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 24,
     padding: 16,
     marginBottom: 12,
   },
@@ -241,7 +198,7 @@ const styles = StyleSheet.create({
 
   memoryLabel: {
     flex: 1,
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '900',
@@ -250,23 +207,23 @@ const styles = StyleSheet.create({
   },
 
   pinBadge: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.goldSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
 
   pinBadgeText: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 11,
+    color: SURFACE_THEME.gold,
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.8,
   },
 
   memoryMeta: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
@@ -274,10 +231,10 @@ const styles = StyleSheet.create({
   },
 
   memoryBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.text,
     fontSize: 15,
     lineHeight: 22,
-    fontWeight: '600',
+    fontWeight: '500',
   },
 
   rowWrap: {
@@ -287,8 +244,10 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: TOKENS.color?.ink ?? '#111111',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    backgroundColor: SURFACE_THEME.goldSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -296,17 +255,17 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonText: {
-    color: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    color: SURFACE_THEME.gold,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
 
   secondaryButton: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -314,16 +273,16 @@ const styles = StyleSheet.create({
   },
 
   secondaryButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 13,
     fontWeight: '900',
   },
 
   deleteButton: {
-    backgroundColor: 'rgba(139,30,45,0.10)',
+    backgroundColor: SURFACE_THEME.danger,
     borderWidth: 1,
-    borderColor: TOKENS.color?.nodeC ?? '#8B1E2D',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: 'rgba(233, 116, 142, 0.3)',
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -331,13 +290,13 @@ const styles = StyleSheet.create({
   },
 
   deleteButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: '#FFD6E1',
     fontSize: 13,
     fontWeight: '900',
   },
 
   bodyLine: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',

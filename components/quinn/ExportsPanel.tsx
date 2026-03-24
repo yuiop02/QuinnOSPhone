@@ -8,8 +8,9 @@ import {
     Text,
     View,
 } from 'react-native';
+import QuinnSurfaceShell from './QuinnSurfaceShell';
 import SectionCard from './SectionCard';
-import { TOKENS } from './quinnSystem';
+import { SURFACE_THEME } from './quinnSurfaceTheme';
 import { ExportBundle } from './quinnTypes';
 
 type ExportsPanelProps = {
@@ -90,17 +91,17 @@ export default function ExportsPanel({
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.eyebrow}>EXPORTS PANEL</Text>
-        <Pressable onPress={onBack} style={styles.ghostButton}>
-          <Text style={styles.ghostButtonText}>Back</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.heroTitle}>Exports, cleaned up.</Text>
-      <Text style={styles.heroText}>
-        These are live bundle previews from the current QuinnOS state. Copy or share whichever format is strongest for the moment.
-      </Text>
+      <QuinnSurfaceShell
+        eyebrow="EXPORT STUDIO"
+        title="Exports, ready to travel."
+        description="These live bundle previews keep the current QuinnOS state intact. Choose the cleanest format for sharing, saving, or handing the work off."
+        onBack={onBack}
+        actions={[
+          { label: `${recentRunsCount} runs in bundle`, tone: 'secondary' },
+          { label: `${memoryCount} memory items`, tone: 'ghost' },
+          { label: `Format: ${activeLabel}`, tone: 'primary' },
+        ]}
+      />
 
       <SectionCard eyebrow="SNAPSHOT" title={packetTitle.trim() || 'Untitled packet'}>
         <Text style={styles.bodyLine}>Generated: {formatTimestamp(exportBundle.generatedAt)}</Text>
@@ -109,12 +110,15 @@ export default function ExportsPanel({
 
         <View style={styles.quickRow}>
           <Pressable style={styles.quickPill} onPress={onOpenCanvas}>
-            <Text style={styles.quickPillText}>Open Canvas</Text>
+            <Text style={styles.quickPillText}>Open Quinn</Text>
           </Pressable>
         </View>
       </SectionCard>
 
-      <SectionCard eyebrow="FORMAT" title="Choose export shape">
+      <SectionCard eyebrow="FORMAT" title="Choose a format">
+        <Text style={styles.bodyLine}>
+          Markdown reads best, plain text stays lean, and JSON keeps the full structure.
+        </Text>
         <View style={styles.modeRow}>
           <Pressable
             style={[styles.modePill, mode === 'json' && styles.modePillActive]}
@@ -155,7 +159,7 @@ export default function ExportsPanel({
         ) : null}
       </SectionCard>
 
-      <SectionCard eyebrow={activeLabel.toUpperCase()} title="Live preview">
+      <SectionCard eyebrow={activeLabel.toUpperCase()} title="Preview before you send it">
         <View style={styles.previewBox}>
           <Text style={styles.previewText}>{activeContent}</Text>
         </View>
@@ -166,56 +170,8 @@ export default function ExportsPanel({
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: TOKENS.spacing?.lg ?? 18,
-    paddingBottom: 30,
-  },
-
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  eyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  heroTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '900',
-    letterSpacing: -1.1,
-    marginBottom: 10,
-  },
-
-  heroText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '600',
-    marginBottom: 14,
-  },
-
-  ghostButton: {
-    borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: TOKENS.radius?.pill ?? 999,
-    marginTop: 10,
-  },
-
-  ghostButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 12,
-    fontWeight: '800',
+    paddingHorizontal: 18,
+    paddingBottom: 36,
   },
 
   quickRow: {
@@ -226,9 +182,9 @@ const styles = StyleSheet.create({
 
   quickPill: {
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    backgroundColor: 'transparent',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 10,
@@ -236,7 +192,7 @@ const styles = StyleSheet.create({
   },
 
   quickPillText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 12,
     fontWeight: '800',
   },
@@ -249,9 +205,9 @@ const styles = StyleSheet.create({
 
   modePill: {
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    backgroundColor: 'transparent',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 10,
@@ -259,12 +215,12 @@ const styles = StyleSheet.create({
   },
 
   modePillActive: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
+    backgroundColor: SURFACE_THEME.plumSoft,
+    borderColor: SURFACE_THEME.borderStrong,
   },
 
   modePillText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.3,
@@ -277,8 +233,10 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: TOKENS.color?.ink ?? '#111111',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    backgroundColor: SURFACE_THEME.goldSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -286,17 +244,17 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonText: {
-    color: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    color: SURFACE_THEME.gold,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
 
   secondaryButton: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -304,46 +262,46 @@ const styles = StyleSheet.create({
   },
 
   secondaryButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 13,
     fontWeight: '900',
   },
 
   statusBand: {
     marginTop: 10,
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.md ?? 18,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 10,
     alignSelf: 'flex-start',
   },
 
   statusBandText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.textMuted,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '900',
   },
 
   previewBox: {
-    backgroundColor: '#FFFDF8',
+    backgroundColor: SURFACE_THEME.panelInset,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
+    borderColor: SURFACE_THEME.border,
     borderRadius: 18,
     padding: 14,
   },
 
   previewText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
   },
 
   bodyLine: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',

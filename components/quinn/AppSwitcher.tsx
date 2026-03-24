@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -6,13 +6,14 @@ import {
     Text,
     View,
 } from 'react-native';
-import { TOKENS } from './quinnSystem';
-import { QuinnSettings, QuinnSurfaceName } from './quinnTypes';
+import QuinnSurfaceShell from './QuinnSurfaceShell';
+import { SURFACE_THEME } from './quinnSurfaceTheme';
+import { AppScreen, QuinnSettings } from './quinnTypes';
 
 type AppSwitcherProps = {
   onBack: () => void;
-  onSwitchToScreen: (screen: QuinnSurfaceName) => void;
-  currentScreen: QuinnSurfaceName;
+  onSwitchToScreen: (screen: AppScreen) => void;
+  currentScreen: AppScreen;
   packetTitle: string;
   lastSummary: string;
   notificationCount: number;
@@ -34,77 +35,92 @@ export default function AppSwitcher({
   voiceSessionCount,
   settings,
 }: AppSwitcherProps) {
-  const cards: {
-    key: QuinnSurfaceName;
-    eyebrow: string;
-    title: string;
-    body: string;
-  }[] = [
+  const cards = useMemo<
     {
-      key: 'HomeTileGrid',
-      eyebrow: 'HOME',
-      title: 'Surface',
-      body: `Current packet: ${String(packetTitle || '').trim() || 'Untitled packet'}`,
-    },
-    {
-      key: 'TileExpandedCanvas',
-      eyebrow: 'CANVAS',
-      title: 'Write',
-      body: 'Shape the packet before it moves.',
-    },
-    {
-      key: 'GravityMicro',
-      eyebrow: 'GRAVITY',
-      title: 'Run',
-      body: lastSummary || 'Run Quinn to create a fresh compression.',
-    },
-    {
-      key: 'VoiceMode',
-      eyebrow: 'VOICE',
-      title: 'Speak',
-      body: `${voiceSessionCount} saved voice handoffs are ready.`,
-    },
-    {
-      key: 'MemoryPanel',
-      eyebrow: 'MEMORY',
-      title: 'Keep',
-      body: `${memoryCount} memory items are available.`,
-    },
-    {
-      key: 'ExportsPanel',
-      eyebrow: 'EXPORTS',
-      title: 'Share',
-      body: 'Copy or share the current shape.',
-    },
-    {
-      key: 'NotificationsPanel',
-      eyebrow: 'ALERTS',
-      title: 'Notify',
-      body: `${notificationCount} notifications in the stack.`,
-    },
-    {
-      key: 'ControlCenter',
-      eyebrow: 'CONTROL',
-      title: 'Tune',
-      body: `Focus ${settings.focusMode ? 'on' : 'off'} • Motion ${
-        settings.reduceMotion ? 'reduced' : 'live'
-      }`,
-    },
-  ];
+      key: AppScreen;
+      eyebrow: string;
+      title: string;
+      body: string;
+    }[]
+  >(
+    () => [
+      {
+        key: 'QuinnConversation',
+        eyebrow: 'QUINN',
+        title: 'Homepage',
+        body: `Live thread: ${String(packetTitle || '').trim() || 'Current signal'}`,
+      },
+      {
+        key: 'HomeTileGrid',
+        eyebrow: 'SYSTEM',
+        title: 'System deck',
+        body:
+          lastSummary ||
+          'See the live thread, recent runs, memory, alerts, and control at a glance.',
+      },
+      {
+        key: 'VoiceMode',
+        eyebrow: 'VOICE',
+        title: 'Voice studio',
+        body: `${voiceSessionCount} saved voice handoff${
+          voiceSessionCount === 1 ? '' : 's'
+        } ready for recording, transcription, or preview.`,
+      },
+      {
+        key: 'MemoryPanel',
+        eyebrow: 'MEMORY',
+        title: 'Memory deck',
+        body: `${memoryCount} kept memory item${
+          memoryCount === 1 ? '' : 's'
+        } ready to load back into Quinn.`,
+      },
+      {
+        key: 'ExportsPanel',
+        eyebrow: 'EXPORTS',
+        title: 'Export studio',
+        body: 'Copy or share the current shape.',
+      },
+      {
+        key: 'NotificationsPanel',
+        eyebrow: 'SIGNALS',
+        title: 'Alerts',
+        body: notificationCount
+          ? `${notificationCount} live alert${notificationCount === 1 ? '' : 's'} in the stack.`
+          : 'Runs, memory actions, and system signals land here.',
+      },
+      {
+        key: 'ControlCenter',
+        eyebrow: 'CONTROL',
+        title: 'Control center',
+        body: `Focus ${settings.focusMode ? 'on' : 'off'} • Motion ${
+          settings.reduceMotion ? 'reduced' : 'live'
+        }`,
+      },
+    ],
+    [
+      lastSummary,
+      memoryCount,
+      notificationCount,
+      packetTitle,
+      settings.focusMode,
+      settings.reduceMotion,
+      voiceSessionCount,
+    ]
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.eyebrow}>APP SWITCHER</Text>
-        <Pressable onPress={onBack} style={styles.ghostButton}>
-          <Text style={styles.ghostButtonText}>Back</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.heroTitle}>Move across the system.</Text>
-      <Text style={styles.heroText}>
-        This is the fast surface for jumping between QuinnOS layers.
-      </Text>
+      <QuinnSurfaceShell
+        eyebrow="SURFACE INDEX"
+        title="Move across QuinnOS without losing the thread."
+        description="The homepage stays central. This index is the fast, quiet way to step into memory, voice, exports, alerts, or control when the moment needs more than the main conversation surface."
+        onBack={onBack}
+        actions={[
+          { label: `${recentRunCount} runs`, tone: 'secondary' },
+          { label: `${memoryCount} memory items`, tone: 'ghost' },
+          { label: notificationCount ? `${notificationCount} live signals` : 'Signals quiet', tone: 'primary' },
+        ]}
+      />
 
       <View style={styles.grid}>
         {cards.map((card) => (
@@ -124,8 +140,9 @@ export default function AppSwitcher({
       </View>
 
       <View style={styles.statusCard}>
-        <Text style={styles.statusEyebrow}>SYSTEM SNAPSHOT</Text>
-        <Text style={styles.statusTitle}>Right now</Text>
+        <Text style={styles.statusEyebrow}>LIVE SNAPSHOT</Text>
+        <Text style={styles.statusTitle}>What is live now</Text>
+        <Text style={styles.statusBody}>Homepage signal: {String(packetTitle || '').trim() || 'Current signal'}</Text>
         <Text style={styles.statusBody}>Runs: {recentRunCount}</Text>
         <Text style={styles.statusBody}>Memory: {memoryCount}</Text>
         <Text style={styles.statusBody}>Alerts: {notificationCount}</Text>
@@ -137,56 +154,8 @@ export default function AppSwitcher({
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: TOKENS.spacing?.lg ?? 18,
-    paddingBottom: 30,
-  },
-
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  eyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  heroTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '900',
-    letterSpacing: -1.1,
-    marginBottom: 10,
-  },
-
-  heroText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '600',
-    marginBottom: 14,
-  },
-
-  ghostButton: {
-    borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: TOKENS.radius?.pill ?? 999,
-    marginTop: 10,
-  },
-
-  ghostButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 12,
-    fontWeight: '800',
+    paddingHorizontal: 18,
+    paddingBottom: 36,
   },
 
   grid: {
@@ -198,21 +167,21 @@ const styles = StyleSheet.create({
 
   card: {
     width: '47.5%',
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panelAlt,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.lg ?? 24,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 24,
     padding: 14,
     marginBottom: 12,
   },
 
   cardActive: {
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    borderColor: SURFACE_THEME.borderStrong,
+    backgroundColor: SURFACE_THEME.plumSoft,
   },
 
   cardEyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
@@ -221,7 +190,7 @@ const styles = StyleSheet.create({
   },
 
   cardTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 18,
     lineHeight: 23,
     fontWeight: '900',
@@ -229,22 +198,22 @@ const styles = StyleSheet.create({
   },
 
   cardBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '500',
   },
 
   statusCard: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panel,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.xl ?? 30,
-    padding: 16,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 30,
+    padding: 18,
   },
 
   statusEyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
@@ -253,7 +222,7 @@ const styles = StyleSheet.create({
   },
 
   statusTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '900',
@@ -261,7 +230,7 @@ const styles = StyleSheet.create({
   },
 
   statusBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
