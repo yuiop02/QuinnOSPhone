@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -8,12 +8,15 @@ import {
 } from 'react-native';
 import GoldRule from './GoldRule';
 import PaintMaskTile from './PaintMaskTile';
-import { TOKENS } from './quinnSystem';
+import QuinnSurfaceShell from './QuinnSurfaceShell';
+import { SURFACE_THEME } from './quinnSurfaceTheme';
 import {
+    MemoryResonanceItem,
     MemoryItem,
     NotificationItem,
     QuinnSettings,
     RunHistoryItem,
+    SessionArc,
 } from './quinnTypes';
 
 type HomeTileGridProps = {
@@ -28,6 +31,7 @@ type HomeTileGridProps = {
   onRunCurrentPacket: () => void;
   onRestoreRunToCanvas: (run: RunHistoryItem) => void;
   onRerunHistoryItem: (run: RunHistoryItem) => void;
+  canRunCurrentPacket: boolean;
   packetTitle: string;
   packetText: string;
   lastSummary: string;
@@ -40,6 +44,10 @@ type HomeTileGridProps = {
   memories: MemoryItem[];
   notifications: NotificationItem[];
   settings: QuinnSettings;
+  activeLensLabel: string;
+  currentSessionArc: SessionArc | null;
+  currentMemoryResonance: MemoryResonanceItem[];
+  writtenResult: string;
 };
 
 function formatStamp(value: string | null, prefix: string) {
@@ -56,11 +64,11 @@ function formatStamp(value: string | null, prefix: string) {
 
 function formatMemorySource(source: MemoryItem['source']) {
   if (source === 'run-summary') {
-    return 'From Gravity';
+    return 'From Quinn reply';
   }
 
   if (source === 'packet') {
-    return 'From Canvas';
+    return 'From live thread';
   }
 
   return 'Starter memory';
@@ -78,6 +86,7 @@ export default function HomeTileGrid({
   onRunCurrentPacket,
   onRestoreRunToCanvas,
   onRerunHistoryItem,
+  canRunCurrentPacket,
   packetTitle,
   packetText,
   lastSummary,
@@ -90,34 +99,77 @@ export default function HomeTileGrid({
   memories,
   notifications,
   settings,
+  activeLensLabel,
+  currentSessionArc,
+  currentMemoryResonance,
+  writtenResult,
 }: HomeTileGridProps) {
-  const safeRecentRuns = Array.isArray(recentRuns) ? recentRuns : [];
-  const safeMemories = Array.isArray(memories) ? memories : [];
-  const safeNotifications = Array.isArray(notifications) ? notifications : [];
   const safePacketTitle = String(packetTitle || '').trim() || 'Untitled packet';
   const cleanPacket = String(packetText || '').trim();
+  const {
+    latestRun,
+    latestMemory,
+    latestNotification,
+    memoryCount,
+    pinnedCount,
+    unreadCount,
+    recentRunCount,
+    visibleRecentRuns,
+  } = useMemo(
+    () => {
+      const safeRecentRuns = Array.isArray(recentRuns) ? recentRuns : [];
+      const safeMemories = Array.isArray(memories) ? memories : [];
+      const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
-  const latestRun = safeRecentRuns[0];
-  const latestMemory = safeMemories[0];
-  const latestNotification = safeNotifications[0];
-  const pinnedCount = safeMemories.filter((item) => item.pinned).length;
-  const unreadCount = safeNotifications.filter((item) => !item.read).length;
+      return {
+        latestRun: safeRecentRuns[0],
+        latestMemory: safeMemories[0],
+        latestNotification: safeNotifications[0],
+        memoryCount: safeMemories.length,
+        pinnedCount: safeMemories.filter((item) => item.pinned).length,
+        unreadCount: safeNotifications.filter((item) => !item.read).length,
+        recentRunCount: safeRecentRuns.length,
+        visibleRecentRuns: safeRecentRuns.slice(0, 3),
+      };
+    },
+    [recentRuns, memories, notifications]
+  );
 
   const signalPreview =
     cleanPacket || 'The surface is waiting. Start with the strongest signal.';
   const compressionPreview =
-    runError || lastSummary || 'Nothing compressed yet. Run Quinn from Home or Gravity.';
+    runError || lastSummary || 'No Quinn reply yet. Run Quinn from the homepage.';
   const storageMeta = isHydrated
     ? formatStamp(lastSavedAt, 'Saved on device')
     : 'Loading saved state...';
+  const threadTitle = currentSessionArc?.title || 'Fresh thread';
+  const threadMeta = [
+    `${activeLensLabel} lens`,
+    currentSessionArc ? `Step ${currentSessionArc.stepCount}` : 'Fresh start',
+    String(writtenResult || '').trim() ? 'Latest reply live' : 'Waiting for first reply',
+  ].join(' • ');
+  const threadBody = String(writtenResult || '').trim()
+    ? currentMemoryResonance.length
+      ? `${currentMemoryResonance.length} memory signal${
+          currentMemoryResonance.length === 1 ? '' : 's'
+        } helped shape the latest reply. Use Stage next move on the homepage if this thought should keep carrying forward.`
+      : 'The latest reply is live. Follow up on the homepage or start fresh to open a new topic.'
+    : 'Run Quinn once and this rail will show the current lens, whether the thought is carrying forward, and how memory shaped the answer.';
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <Text style={styles.eyebrow}>QUINNOS SURFACE</Text>
-      <Text style={styles.heroTitle}>Now we get to the fun stuff.</Text>
-      <Text style={styles.heroText}>
-        This is the authored home surface: signal, pull, memory, alerts, and launch.
-      </Text>
+      <QuinnSurfaceShell
+        eyebrow="SYSTEM DECK"
+        title="Everything around Quinn, without losing the thread."
+        description="The homepage stays live. This deck keeps memory, alerts, exports, and system state within reach without turning QuinnOS into a dashboard."
+        onBack={onOpenCanvas}
+        backLabel="Back to Quinn"
+        actions={[
+          { label: safePacketTitle, tone: 'secondary' },
+          { label: `${recentRunCount} runs`, tone: 'ghost' },
+          { label: unreadCount ? `${unreadCount} fresh alerts` : 'Alerts quiet', tone: 'primary' },
+        ]}
+      />
 
       <View style={styles.systemDock}>
         <Pressable style={styles.systemPill} onPress={onOpenSettings}>
@@ -140,12 +192,12 @@ export default function HomeTileGrid({
       <View style={styles.heroPanel}>
         <View style={styles.heroPanelTop}>
           <View style={styles.heroPanelCopy}>
-            <Text style={styles.heroPanelEyebrow}>CURRENT SIGNAL</Text>
+              <Text style={styles.heroPanelEyebrow}>READY TO RUN</Text>
             <Text style={styles.heroPanelTitle} numberOfLines={1}>
               {safePacketTitle}
             </Text>
             <Text style={styles.heroPanelMeta}>
-              {cleanPacket ? `${cleanPacket.length} characters ready.` : 'Packet is blank.'}
+                {cleanPacket ? `${cleanPacket.length} characters ready.` : 'Nothing staged yet.'}
             </Text>
           </View>
 
@@ -157,32 +209,48 @@ export default function HomeTileGrid({
         </View>
 
         <View style={styles.heroButtonRow}>
-          <Pressable style={styles.primaryButton} onPress={onRunCurrentPacket}>
-            <Text style={styles.primaryButtonText}>
+          <Pressable
+            style={[styles.primaryButton, !canRunCurrentPacket && styles.primaryButtonDisabled]}
+            onPress={onRunCurrentPacket}
+            disabled={!canRunCurrentPacket}
+          >
+            <Text
+              style={[
+                styles.primaryButtonText,
+                !canRunCurrentPacket && styles.primaryButtonTextDisabled,
+              ]}
+            >
               {isRunning ? 'Running Quinn...' : 'Run Quinn'}
             </Text>
           </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={onOpenCanvas}>
-            <Text style={styles.secondaryButtonText}>Open Canvas</Text>
+            <Text style={styles.secondaryButtonText}>Open Quinn</Text>
           </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={onOpenGravity}>
-            <Text style={styles.secondaryButtonText}>Open Gravity</Text>
+            <Text style={styles.secondaryButtonText}>Open Voice</Text>
           </Pressable>
+        </View>
+
+        <View style={styles.threadBand}>
+          <Text style={styles.threadBandEyebrow}>LIVE THREAD</Text>
+          <Text style={styles.threadBandTitle}>{threadTitle}</Text>
+          <Text style={styles.threadBandMeta}>{threadMeta}</Text>
+          <Text style={styles.threadBandBody}>{threadBody}</Text>
         </View>
       </View>
 
       <View style={styles.metricRow}>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>RUNS</Text>
-          <Text style={styles.metricValue}>{safeRecentRuns.length}</Text>
+          <Text style={styles.metricValue}>{recentRunCount}</Text>
           <Text style={styles.metricMeta}>{formatStamp(lastRunAt, 'Last run')}</Text>
         </View>
 
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>MEMORY</Text>
-          <Text style={styles.metricValue}>{safeMemories.length}</Text>
+          <Text style={styles.metricValue}>{memoryCount}</Text>
           <Text style={styles.metricMeta}>{pinnedCount} pinned</Text>
         </View>
 
@@ -199,7 +267,7 @@ export default function HomeTileGrid({
 
       <View style={styles.featureGrid}>
         <View style={[styles.featureCard, styles.featureCardWide]}>
-          <Text style={styles.featureEyebrow}>SIGNAL FIELD</Text>
+            <Text style={styles.featureEyebrow}>COMPOSER</Text>
           <Text style={styles.featureTitle}>Current packet</Text>
           <Text style={styles.featureMeta}>
             {cleanPacket ? `${cleanPacket.length} characters ready.` : 'Nothing written yet.'}
@@ -210,9 +278,9 @@ export default function HomeTileGrid({
         </View>
 
         <View style={styles.featureCard}>
-          <Text style={styles.featureEyebrow}>GRAVITY CHAMBER</Text>
+          <Text style={styles.featureEyebrow}>LATEST RESPONSE</Text>
           <Text style={styles.featureTitle}>
-            {isRunning ? 'Running now' : runError ? 'Needs attention' : 'Compression'}
+            {isRunning ? 'Running now' : runError ? 'Needs attention' : 'Quinn reply'}
           </Text>
           <Text style={styles.featureMeta}>
             {runError ? 'Run needs attention.' : formatStamp(lastRunAt, 'Last run')}
@@ -223,7 +291,7 @@ export default function HomeTileGrid({
         </View>
 
         <View style={styles.featureCard}>
-          <Text style={styles.featureEyebrow}>NOTIFICATION STACK</Text>
+            <Text style={styles.featureEyebrow}>ALERT STACK</Text>
           <Text style={styles.featureTitle}>
             {latestNotification ? latestNotification.title : 'No fresh alerts'}
           </Text>
@@ -242,7 +310,7 @@ export default function HomeTileGrid({
         </View>
 
         <View style={styles.featureCard}>
-          <Text style={styles.featureEyebrow}>CONTROL STATE</Text>
+            <Text style={styles.featureEyebrow}>SYSTEM STATE</Text>
           <Text style={styles.featureTitle}>
             {settings.focusMode ? 'Focus mode on' : 'Focus mode off'}
           </Text>
@@ -269,7 +337,7 @@ export default function HomeTileGrid({
         <Text style={styles.runDeckTitle}>Restore or rerun</Text>
 
         {latestRun ? (
-          safeRecentRuns.slice(0, 3).map((run) => (
+          visibleRecentRuns.map((run) => (
             <View key={run.id} style={styles.runRow}>
               <View style={styles.runRowCopy}>
                 <Text style={styles.runRowTitle} numberOfLines={1}>
@@ -299,7 +367,7 @@ export default function HomeTileGrid({
             </View>
           ))
         ) : (
-          <Text style={styles.emptyText}>No run history yet. First run lands here.</Text>
+          <Text style={styles.emptyText}>No runs yet. The next Quinn reply will land here.</Text>
         )}
       </View>
 
@@ -318,26 +386,26 @@ export default function HomeTileGrid({
             </Text>
           </View>
         ) : (
-          <Text style={styles.emptyText}>Memory is still waiting for the first strong shape.</Text>
+          <Text style={styles.emptyText}>Run Quinn once and the strongest kept memory will land here.</Text>
         )}
       </View>
 
       <View style={styles.launchHeader}>
         <Text style={styles.launchEyebrow}>LAUNCH DECK</Text>
-        <Text style={styles.launchTitle}>Open the system</Text>
+        <Text style={styles.launchTitle}>Open a QuinnOS layer</Text>
       </View>
 
       <View style={styles.tileGrid}>
         <PaintMaskTile
-          title="Canvas"
-          subtitle="Write and shape the packet."
+          title="Quinn"
+          subtitle="Return to the live conversation surface."
           large
           onPress={onOpenCanvas}
         />
 
         <PaintMaskTile
-          title="Gravity"
-          subtitle="Run and compress the strongest signal."
+          title="Voice"
+          subtitle="Record, transcribe, and preview voice handoffs."
           onPress={onOpenGravity}
         />
 
@@ -356,14 +424,14 @@ export default function HomeTileGrid({
 
         <PaintMaskTile
           title="Settings"
-          subtitle="Open the QuinnOS system surfaces."
+          subtitle="Open the system preferences and defaults."
           offset
           onPress={onOpenSettings}
         />
 
         <PaintMaskTile
           title="Switcher"
-          subtitle="Move across surfaces fast."
+          subtitle="Jump between QuinnOS layers fast."
           offset
           onPress={onOpenSwitcher}
         />
@@ -374,35 +442,8 @@ export default function HomeTileGrid({
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: TOKENS.spacing?.lg ?? 18,
-    paddingBottom: 30,
-  },
-
-  eyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  heroTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '900',
-    letterSpacing: -1.1,
-    marginBottom: 10,
-  },
-
-  heroText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '600',
-    marginBottom: 14,
+    paddingHorizontal: 18,
+    paddingBottom: 36,
   },
 
   systemDock: {
@@ -413,9 +454,9 @@ const styles = StyleSheet.create({
 
   systemPill: {
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 10,
@@ -423,18 +464,18 @@ const styles = StyleSheet.create({
   },
 
   systemPillText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 0.3,
   },
 
   heroPanel: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panel,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.xl ?? 30,
-    padding: 16,
+    borderColor: SURFACE_THEME.borderStrong,
+    borderRadius: 30,
+    padding: 18,
     marginBottom: 14,
   },
 
@@ -450,7 +491,7 @@ const styles = StyleSheet.create({
   },
 
   heroPanelEyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
@@ -459,7 +500,7 @@ const styles = StyleSheet.create({
   },
 
   heroPanelTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 24,
     lineHeight: 28,
     fontWeight: '900',
@@ -468,7 +509,7 @@ const styles = StyleSheet.create({
   },
 
   heroPanelMeta: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '700',
@@ -487,8 +528,8 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    backgroundColor: 'rgba(184,138,42,0.08)',
+    borderColor: SURFACE_THEME.borderStrong,
+    backgroundColor: SURFACE_THEME.plumSoft,
   },
 
   heroOrbInner: {
@@ -497,15 +538,15 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: TOKENS.color?.ink ?? '#111111',
-    backgroundColor: 'rgba(17,17,17,0.03)',
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: SURFACE_THEME.panelInset,
   },
 
   heroOrbCore: {
     width: 18,
     height: 18,
     borderRadius: 999,
-    backgroundColor: TOKENS.color?.ink ?? '#111111',
+    backgroundColor: SURFACE_THEME.gold,
   },
 
   heroButtonRow: {
@@ -514,27 +555,80 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
 
+  threadBand: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: SURFACE_THEME.panelInset,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+
+  threadBandEyebrow: {
+    color: SURFACE_THEME.eyebrow,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '900',
+    letterSpacing: 1.1,
+    marginBottom: 7,
+  },
+
+  threadBandTitle: {
+    color: SURFACE_THEME.text,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+
+  threadBandMeta: {
+    color: SURFACE_THEME.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+
+  threadBandBody: {
+    color: SURFACE_THEME.text,
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+
   primaryButton: {
-    backgroundColor: TOKENS.color?.ink ?? '#111111',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    backgroundColor: SURFACE_THEME.goldSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
     marginBottom: 8,
   },
 
+  primaryButtonDisabled: {
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderColor: SURFACE_THEME.border,
+  },
+
   primaryButtonText: {
-    color: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    color: SURFACE_THEME.gold,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
 
+  primaryButtonTextDisabled: {
+    color: SURFACE_THEME.textSoft,
+  },
+
   secondaryButton: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -542,9 +636,9 @@ const styles = StyleSheet.create({
   },
 
   secondaryButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
   },
 
   metricRow: {
@@ -555,15 +649,15 @@ const styles = StyleSheet.create({
 
   metricCard: {
     width: '31.5%',
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panelAlt,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.lg ?? 24,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 24,
     padding: 12,
   },
 
   metricLabel: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 10,
     lineHeight: 12,
     fontWeight: '900',
@@ -572,7 +666,7 @@ const styles = StyleSheet.create({
   },
 
   metricValue: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 20,
     lineHeight: 24,
     fontWeight: '900',
@@ -580,7 +674,7 @@ const styles = StyleSheet.create({
   },
 
   metricMeta: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 11,
     lineHeight: 15,
     fontWeight: '700',
@@ -595,10 +689,10 @@ const styles = StyleSheet.create({
 
   featureCard: {
     width: '47.5%',
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panelAlt,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.lg ?? 24,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 24,
     padding: 14,
     marginBottom: 12,
   },
@@ -608,7 +702,7 @@ const styles = StyleSheet.create({
   },
 
   featureEyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
@@ -617,7 +711,7 @@ const styles = StyleSheet.create({
   },
 
   featureTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '800',
@@ -626,7 +720,7 @@ const styles = StyleSheet.create({
   },
 
   featureMeta: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
@@ -634,7 +728,7 @@ const styles = StyleSheet.create({
   },
 
   featureBody: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
@@ -648,38 +742,39 @@ const styles = StyleSheet.create({
 
   inlineGhostButton: {
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
 
   inlineGhostButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 12,
     fontWeight: '800',
   },
 
   runDeck: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panel,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.xl ?? 30,
-    padding: 16,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 30,
+    padding: 18,
     marginBottom: 14,
   },
 
   memoryDeck: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panel,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.xl ?? 30,
-    padding: 16,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 30,
+    padding: 18,
     marginBottom: 14,
   },
 
   runDeckEyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
@@ -688,7 +783,7 @@ const styles = StyleSheet.create({
   },
 
   runDeckTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '900',
@@ -700,7 +795,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: TOKENS.color?.rule ?? '#D8C8A6',
+    borderBottomColor: SURFACE_THEME.border,
   },
 
   runRowCopy: {
@@ -708,7 +803,7 @@ const styles = StyleSheet.create({
   },
 
   runRowTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '800',
@@ -717,7 +812,7 @@ const styles = StyleSheet.create({
   },
 
   runRowMeta: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
@@ -725,7 +820,7 @@ const styles = StyleSheet.create({
   },
 
   runRowBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
@@ -737,8 +832,10 @@ const styles = StyleSheet.create({
   },
 
   feedPrimaryButton: {
-    backgroundColor: TOKENS.color?.ink ?? '#111111',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    backgroundColor: SURFACE_THEME.goldSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 10,
@@ -746,16 +843,16 @@ const styles = StyleSheet.create({
   },
 
   feedPrimaryButtonText: {
-    color: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    color: SURFACE_THEME.gold,
     fontSize: 12,
     fontWeight: '900',
   },
 
   feedSecondaryButton: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 10,
@@ -763,21 +860,21 @@ const styles = StyleSheet.create({
   },
 
   feedSecondaryButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 12,
     fontWeight: '900',
   },
 
   memoryPreviewCard: {
-    backgroundColor: '#FFFDF8',
+    backgroundColor: SURFACE_THEME.panelInset,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
+    borderColor: SURFACE_THEME.border,
     borderRadius: 18,
     padding: 14,
   },
 
   memoryPreviewTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '800',
@@ -786,7 +883,7 @@ const styles = StyleSheet.create({
   },
 
   memoryPreviewMeta: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
@@ -794,14 +891,14 @@ const styles = StyleSheet.create({
   },
 
   memoryPreviewBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
   },
 
   emptyText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
@@ -812,7 +909,7 @@ const styles = StyleSheet.create({
   },
 
   launchEyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
@@ -821,7 +918,7 @@ const styles = StyleSheet.create({
   },
 
   launchTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '900',

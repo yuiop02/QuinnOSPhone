@@ -16,13 +16,15 @@ import {
   View,
 } from 'react-native';
 
+import QuinnSurfaceShell from './QuinnSurfaceShell';
 import SectionCard from './SectionCard';
+import { buildRealtimeSpeechChunks } from './quinnSpeechText';
 import {
   getQuinnLocalVoiceBaseUrl,
   getQuinnLocalVoiceSpeakUrl,
   pingQuinnLocalVoice,
 } from './quinnLocalVoice';
-import { TOKENS } from './quinnSystem';
+import { SURFACE_THEME } from './quinnSurfaceTheme';
 import {
   VoicePipelinePhase,
   VoiceSession,
@@ -75,61 +77,6 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function splitIntoVoiceChunks(input: string): string[] {
-  const clean = String(input || '').replace(/\s+/g, ' ').trim();
-
-  if (!clean) {
-    return [];
-  }
-
-  const sentences =
-    clean.match(/[^.!?]+[.!?]?/g)?.map((part) => part.trim()).filter(Boolean) || [clean];
-
-  const chunks: string[] = [];
-  let current = '';
-
-  for (const sentence of sentences) {
-    const next = current ? `${current} ${sentence}` : sentence;
-
-    if (next.length <= 220) {
-      current = next;
-      continue;
-    }
-
-    if (current) {
-      chunks.push(current);
-      current = '';
-    }
-
-    if (sentence.length <= 220) {
-      current = sentence;
-      continue;
-    }
-
-    let remaining = sentence;
-
-    while (remaining.length > 220) {
-      const piece = remaining.slice(0, 220);
-      const lastSpace = piece.lastIndexOf(' ');
-      const safePiece =
-        lastSpace > 40 ? piece.slice(0, lastSpace).trim() : piece.trim();
-
-      chunks.push(safePiece);
-      remaining = remaining.slice(safePiece.length).trim();
-    }
-
-    if (remaining) {
-      current = remaining;
-    }
-  }
-
-  if (current) {
-    chunks.push(current);
-  }
-
-  return chunks;
-}
-
 export default function VoiceMode({
   onBack,
   onOpenCanvas,
@@ -180,10 +127,16 @@ export default function VoiceMode({
   const [isCheckingQuinnVoice, setIsCheckingQuinnVoice] = useState(false);
   const [isSpeakingQuinn, setIsSpeakingQuinn] = useState(false);
   const [quinnChunks, setQuinnChunks] = useState<string[]>([]);
-const [quinnChunkIndex, setQuinnChunkIndex] = useState(0);
+  const [quinnChunkIndex, setQuinnChunkIndex] = useState(0);
 
   useEffect(() => {
+    let isActive = true;
+
     loadAvailableSpeechVoices().then((voices) => {
+      if (!isActive) {
+        return;
+      }
+
       setAvailableVoices(
         voices.map((voice) => ({
           identifier: String(voice.identifier || ''),
@@ -192,6 +145,10 @@ const [quinnChunkIndex, setQuinnChunkIndex] = useState(0);
         }))
       );
     });
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -274,7 +231,14 @@ useEffect(() => {
     ]
   );
 
-  const recentVoiceSessions = Array.isArray(voiceSessions) ? voiceSessions : [];
+  const recentVoiceSessions = useMemo(
+    () => (Array.isArray(voiceSessions) ? voiceSessions : []),
+    [voiceSessions]
+  );
+  const visibleVoiceSessions = useMemo(
+    () => recentVoiceSessions.slice(0, 6),
+    [recentVoiceSessions]
+  );
 
   const preparePlaybackMode = useCallback(async () => {
     await setAudioModeAsync({
@@ -473,7 +437,7 @@ useEffect(() => {
   }
 
 async function handleSpeakQuinnVoice() {
-  const chunks = splitIntoVoiceChunks(spokenSummary);
+  const chunks = buildRealtimeSpeechChunks(spokenSummary);
 
   if (!chunks.length) {
     setStatusMessage('Add or rebuild a spoken summary first.');
@@ -693,18 +657,28 @@ async function handleSpeakQuinnVoice() {
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.eyebrow}>VOICE MODE</Text>
-        <Pressable onPress={onBack} style={styles.ghostButton}>
-          <Text style={styles.ghostButtonText}>Back</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.heroTitle}>Quinn voice is live.</Text>
-      <Text style={styles.heroText}>
-        Record, transcribe, compress, and speak with the real Quinn voice. Keep audio
-        short. Keep the screen text long.
-      </Text>
+      <QuinnSurfaceShell
+        eyebrow="VOICE STUDIO"
+        title="Quinn voice is live."
+        description="Record, transcribe, compress, and speak with the real Quinn voice. Keep audio short. Keep the screen text long. The spoken layer should feel intentional, not overloaded."
+        onBack={onBack}
+        actions={[
+          {
+            label:
+              quinnVoiceReachable === null
+                ? 'Voice checking'
+                : quinnVoiceReachable
+                  ? 'Voice reachable'
+                  : 'Voice offline',
+            tone: 'secondary',
+          },
+          { label: formatPipelinePhase(pipelinePhase), tone: 'ghost' },
+          {
+            label: isSpeakingQuinn ? 'Quinn speaking' : 'Ready to speak',
+            tone: 'primary',
+          },
+        ]}
+      />
 
       <SectionCard eyebrow="PIPELINE STATE" title="Voice state machine">
         <Text style={styles.bodyLine}>Phase: {formatPipelinePhase(pipelinePhase)}</Text>
@@ -828,7 +802,7 @@ async function handleSpeakQuinnVoice() {
           value={transcript}
           onChangeText={setTranscript}
           placeholder="Transcript draft"
-          placeholderTextColor="#7F776B"
+          placeholderTextColor={SURFACE_THEME.textSoft}
           style={styles.canvasInput}
           textAlignVertical="top"
         />
@@ -839,11 +813,11 @@ async function handleSpeakQuinnVoice() {
           </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={onOpenCanvas}>
-            <Text style={styles.secondaryButtonText}>Open Canvas</Text>
+            <Text style={styles.secondaryButtonText}>Open Quinn</Text>
           </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={onOpenGravity}>
-            <Text style={styles.secondaryButtonText}>Open Gravity</Text>
+            <Text style={styles.secondaryButtonText}>Open deck</Text>
           </Pressable>
         </View>
       </SectionCard>
@@ -854,7 +828,7 @@ async function handleSpeakQuinnVoice() {
           value={spokenSummary}
           onChangeText={setSpokenSummary}
           placeholder="Spoken summary"
-          placeholderTextColor="#7F776B"
+          placeholderTextColor={SURFACE_THEME.textSoft}
           style={styles.summaryInput}
           textAlignVertical="top"
         />
@@ -1016,7 +990,7 @@ async function handleSpeakQuinnVoice() {
 
       <SectionCard eyebrow="SAVED VOICE SESSIONS" title="Replay, reload, or delete">
         {recentVoiceSessions.length ? (
-          recentVoiceSessions.slice(0, 6).map((session) => (
+          visibleVoiceSessions.map((session) => (
             <View key={session.id} style={styles.feedItem}>
               <Text style={styles.feedTitle} numberOfLines={1}>
                 {session.title}
@@ -1071,60 +1045,12 @@ async function handleSpeakQuinnVoice() {
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: TOKENS.spacing?.lg ?? 18,
-    paddingBottom: 30,
-  },
-
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  eyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  heroTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '900',
-    letterSpacing: -1.1,
-    marginBottom: 10,
-  },
-
-  heroText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '600',
-    marginBottom: 14,
-  },
-
-  ghostButton: {
-    borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: TOKENS.radius?.pill ?? 999,
-    marginTop: 10,
-  },
-
-  ghostButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 12,
-    fontWeight: '800',
+    paddingHorizontal: 18,
+    paddingBottom: 36,
   },
 
   bodyLine: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
@@ -1132,7 +1058,7 @@ const styles = StyleSheet.create({
   },
 
   helperText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textSoft,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
@@ -1140,7 +1066,7 @@ const styles = StyleSheet.create({
   },
 
   errorText: {
-    color: TOKENS.color?.nodeC ?? '#8B1E2D',
+    color: '#FFB6C7',
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '800',
@@ -1148,7 +1074,7 @@ const styles = StyleSheet.create({
   },
 
   noteText: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.gold,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '800',
@@ -1162,8 +1088,10 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: TOKENS.color?.ink ?? '#111111',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    backgroundColor: SURFACE_THEME.goldSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -1171,17 +1099,17 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonText: {
-    color: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    color: SURFACE_THEME.gold,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
 
   secondaryButton: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -1189,17 +1117,17 @@ const styles = StyleSheet.create({
   },
 
   secondaryButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 13,
     fontWeight: '900',
   },
 
   canvasInput: {
     minHeight: 180,
-    color: TOKENS.color?.ink ?? '#111111',
-    backgroundColor: '#FFFDF8',
+    color: SURFACE_THEME.text,
+    backgroundColor: SURFACE_THEME.panelInset,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
+    borderColor: SURFACE_THEME.border,
     borderRadius: 18,
     padding: 14,
     fontSize: 15,
@@ -1209,10 +1137,10 @@ const styles = StyleSheet.create({
 
   summaryInput: {
     minHeight: 120,
-    color: TOKENS.color?.ink ?? '#111111',
-    backgroundColor: '#FFFDF8',
+    color: SURFACE_THEME.text,
+    backgroundColor: SURFACE_THEME.panelInset,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
+    borderColor: SURFACE_THEME.border,
     borderRadius: 18,
     padding: 14,
     fontSize: 15,
@@ -1221,15 +1149,15 @@ const styles = StyleSheet.create({
   },
 
   previewBox: {
-    backgroundColor: '#FFFDF8',
+    backgroundColor: SURFACE_THEME.panelInset,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
+    borderColor: SURFACE_THEME.border,
     borderRadius: 18,
     padding: 14,
   },
 
   previewText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '500',
@@ -1239,11 +1167,11 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: TOKENS.color?.rule ?? '#D8C8A6',
+    borderBottomColor: SURFACE_THEME.border,
   },
 
   feedTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '800',
@@ -1252,7 +1180,7 @@ const styles = StyleSheet.create({
   },
 
   feedMeta: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textSoft,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
@@ -1260,7 +1188,7 @@ const styles = StyleSheet.create({
   },
 
   feedBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
@@ -1268,16 +1196,16 @@ const styles = StyleSheet.create({
 
   statusBand: {
     marginTop: 8,
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.md ?? 18,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
 
   statusBandText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '900',

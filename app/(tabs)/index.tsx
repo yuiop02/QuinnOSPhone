@@ -68,9 +68,7 @@ import {
   toggleNotificationRead,
 } from '../../components/quinn/quinnNotificationState';
 import {
-  getCurrentSwitcherSurface,
   resolveNotificationTarget,
-  resolveSwitcherTarget,
 } from '../../components/quinn/quinnNavigation';
 import {
   buildQuinnPacket,
@@ -105,7 +103,6 @@ import type {
   NotificationTarget,
   NotificationTone,
   QuinnSettings,
-  QuinnSurfaceName,
   RunHistoryItem,
   SessionArc,
   VoiceSession,
@@ -136,6 +133,43 @@ const HEADER_HEIGHT = 236;
 const FADE_WALL_HEIGHT = 296;
 const WINDOW_WIDTH = Dimensions.get('window').width;
 const QUINN_LENSES = getQuinnLenses();
+const SNAPSHOT_PERSIST_DEBOUNCE_MS = 250;
+const AMBIENT_STARS = [
+  { x: 18, y: 82, size: 2.2, color: '#FFF7F0' },
+  { x: 56, y: 58, size: 1.8, color: '#E6EEFF' },
+  { x: 104, y: 112, size: 1.6, color: '#FFFFFF' },
+  { x: 152, y: 74, size: 2.3, color: '#FFEFE5' },
+  { x: 206, y: 124, size: 1.7, color: '#DCEBFF' },
+  { x: 262, y: 66, size: 2.1, color: '#FFFFFF' },
+  { x: 316, y: 116, size: 1.8, color: '#FCEBFF' },
+  { x: 34, y: 176, size: 1.7, color: '#FFFFFF' },
+  { x: 92, y: 214, size: 2.5, color: '#FFF4EC' },
+  { x: 148, y: 188, size: 1.5, color: '#E6F0FF' },
+  { x: 214, y: 236, size: 2.1, color: '#FFFFFF' },
+  { x: 286, y: 196, size: 1.8, color: '#FFF0E6' },
+  { x: 336, y: 252, size: 1.6, color: '#DCEBFF' },
+  { x: 48, y: 312, size: 2.3, color: '#FFFFFF' },
+  { x: 122, y: 348, size: 1.8, color: '#FFF3EA' },
+  { x: 188, y: 322, size: 1.5, color: '#E5EEFF' },
+  { x: 254, y: 374, size: 2.2, color: '#FFFFFF' },
+  { x: 324, y: 334, size: 1.7, color: '#FBE8FF' },
+  { x: 28, y: 452, size: 2.2, color: '#FFFFFF' },
+  { x: 86, y: 494, size: 1.7, color: '#FFF4EC' },
+  { x: 154, y: 462, size: 1.6, color: '#E4EEFF' },
+  { x: 230, y: 520, size: 2.1, color: '#FFFFFF' },
+  { x: 298, y: 482, size: 1.8, color: '#FFEFE5' },
+  { x: 342, y: 544, size: 1.5, color: '#DCEBFF' },
+  { x: 46, y: 620, size: 2.2, color: '#FFFFFF' },
+  { x: 118, y: 668, size: 1.7, color: '#FFF5EE' },
+  { x: 192, y: 632, size: 1.5, color: '#E3EDFF' },
+  { x: 266, y: 700, size: 2.2, color: '#FFFFFF' },
+  { x: 330, y: 658, size: 1.7, color: '#FFF0E8' },
+  { x: 32, y: 774, size: 2.3, color: '#DCEBFF' },
+  { x: 108, y: 824, size: 1.7, color: '#FFFFFF' },
+  { x: 196, y: 792, size: 2.2, color: '#FFF4EC' },
+  { x: 284, y: 850, size: 1.9, color: '#FFFFFF' },
+  { x: 336, y: 804, size: 1.6, color: '#E6EEFF' },
+] as const;
 
 function MissingScreen({ name }: { name: string }) {
   return (
@@ -234,7 +268,7 @@ function parseBareNumericSelection(text: string) {
   return Number.isFinite(index) && index > 0 ? index : null;
 }
 
-function TopFadeWall() {
+const TopFadeWall = React.memo(function TopFadeWall() {
   return (
     <View pointerEvents="none" style={styles.topFadeWall}>
       <Svg width={WINDOW_WIDTH} height={FADE_WALL_HEIGHT}>
@@ -252,9 +286,9 @@ function TopFadeWall() {
       </Svg>
     </View>
   );
-}
+});
 
-function AmbientGalaxyMotion() {
+const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
   const drift = useRef(new Animated.Value(0)).current;
   const twinkle = useRef(new Animated.Value(0)).current;
   const meteorA = useRef(new Animated.Value(0)).current;
@@ -441,43 +475,6 @@ function AmbientGalaxyMotion() {
     inputRange: [0, 1],
     outputRange: [0, 170],
   });
-
-  const stars = [
-    { x: 18, y: 82, size: 2.2, color: '#FFF7F0' },
-    { x: 56, y: 58, size: 1.8, color: '#E6EEFF' },
-    { x: 104, y: 112, size: 1.6, color: '#FFFFFF' },
-    { x: 152, y: 74, size: 2.3, color: '#FFEFE5' },
-    { x: 206, y: 124, size: 1.7, color: '#DCEBFF' },
-    { x: 262, y: 66, size: 2.1, color: '#FFFFFF' },
-    { x: 316, y: 116, size: 1.8, color: '#FCEBFF' },
-    { x: 34, y: 176, size: 1.7, color: '#FFFFFF' },
-    { x: 92, y: 214, size: 2.5, color: '#FFF4EC' },
-    { x: 148, y: 188, size: 1.5, color: '#E6F0FF' },
-    { x: 214, y: 236, size: 2.1, color: '#FFFFFF' },
-    { x: 286, y: 196, size: 1.8, color: '#FFF0E6' },
-    { x: 336, y: 252, size: 1.6, color: '#DCEBFF' },
-    { x: 48, y: 312, size: 2.3, color: '#FFFFFF' },
-    { x: 122, y: 348, size: 1.8, color: '#FFF3EA' },
-    { x: 188, y: 322, size: 1.5, color: '#E5EEFF' },
-    { x: 254, y: 374, size: 2.2, color: '#FFFFFF' },
-    { x: 324, y: 334, size: 1.7, color: '#FBE8FF' },
-    { x: 28, y: 452, size: 2.2, color: '#FFFFFF' },
-    { x: 86, y: 494, size: 1.7, color: '#FFF4EC' },
-    { x: 154, y: 462, size: 1.6, color: '#E4EEFF' },
-    { x: 230, y: 520, size: 2.1, color: '#FFFFFF' },
-    { x: 298, y: 482, size: 1.8, color: '#FFEFE5' },
-    { x: 342, y: 544, size: 1.5, color: '#DCEBFF' },
-    { x: 46, y: 620, size: 2.2, color: '#FFFFFF' },
-    { x: 118, y: 668, size: 1.7, color: '#FFF5EE' },
-    { x: 192, y: 632, size: 1.5, color: '#E3EDFF' },
-    { x: 266, y: 700, size: 2.2, color: '#FFFFFF' },
-    { x: 330, y: 658, size: 1.7, color: '#FFF0E8' },
-    { x: 32, y: 774, size: 2.3, color: '#DCEBFF' },
-    { x: 108, y: 824, size: 1.7, color: '#FFFFFF' },
-    { x: 196, y: 792, size: 2.2, color: '#FFF4EC' },
-    { x: 284, y: 850, size: 1.9, color: '#FFFFFF' },
-    { x: 336, y: 804, size: 1.6, color: '#E6EEFF' },
-  ];
 
   function ShootingStar({
     idPrefix,
@@ -697,7 +694,7 @@ function AmbientGalaxyMotion() {
           },
         ]}
       >
-        {stars.map((star, index) => (
+        {AMBIENT_STARS.map((star, index) => (
           <View
             key={`star-${index}`}
             style={{
@@ -795,9 +792,9 @@ function AmbientGalaxyMotion() {
       </Animated.View>
     </View>
   );
-}
+});
 
-function FixedQuinnHeader() {
+const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
   const aura = useRef(new Animated.Value(0)).current;
   const drift = useRef(new Animated.Value(0)).current;
 
@@ -1005,7 +1002,7 @@ function FixedQuinnHeader() {
       </Animated.Text>
     </View>
   );
-}
+});
 
 const SafeArea = (SafeAreaContext as any)?.SafeAreaView || RNSafeAreaView;
 
@@ -1103,6 +1100,27 @@ function QuinnConversationSurface({
   });
   const showThreadTitle =
     !sessionArc || displayThreadTitle.toLowerCase() !== String(sessionArc.title || '').toLowerCase();
+  const responseContextItems = [
+    {
+      label: 'Lens',
+      value: activeLens.label,
+    },
+    {
+      label: 'Carryover',
+      value: sessionArc
+        ? `${sessionArc.title}${sessionArcMeta.stepLabel ? ` • ${sessionArcMeta.stepLabel}` : ''}`
+        : 'Fresh thread',
+    },
+    {
+      label: 'Memory pull',
+      value: memoryResonance.length
+        ? `${memoryResonance.length} signal${memoryResonance.length === 1 ? '' : 's'} shaping this reply`
+        : 'No extra pull needed',
+    },
+  ];
+  const responseFooterHint = writtenResult
+    ? 'Stage next move turns this reply into the next packet so Quinn can keep carrying the same thought.'
+    : 'Once Quinn answers, you can stage the next move to keep the thought going or start fresh for a clean topic.';
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
   const {
     composerLift,
@@ -1915,10 +1933,20 @@ function QuinnConversationSurface({
           <View style={styles.responseInnerFrame}>
             <View style={styles.responseHeaderRow}>
               <View style={styles.responseHeaderTextWrap}>
-                <Text style={styles.responseLabel}>Quinn 2.0 says:</Text>
+                <Text style={styles.responseLabel}>Quinn 2.0 reply</Text>
+                <View style={styles.responseContextRow}>
+                  {responseContextItems.map((item) => (
+                    <View key={item.label} style={styles.responseContextChip}>
+                      <Text style={styles.responseContextChipLabel}>{item.label}</Text>
+                      <Text style={styles.responseContextChipValue} numberOfLines={2}>
+                        {item.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
                 {memoryResonance.length ? (
                   <View style={styles.memoryResonanceWrap}>
-                    <Text style={styles.memoryResonanceEyebrow}>Memory resonance</Text>
+                    <Text style={styles.memoryResonanceEyebrow}>Why this felt personal</Text>
                     <View style={styles.memoryResonanceRow}>
                       {memoryResonance.slice(0, 4).map((item, index) => (
                         <View
@@ -1988,6 +2016,7 @@ function QuinnConversationSurface({
                 </Animated.View>
               </View>
             </View>
+            <Text style={styles.responseFooterHint}>{responseFooterHint}</Text>
           </View>
         </View>
       </Animated.View>
@@ -2126,6 +2155,8 @@ export default function App() {
       return;
     }
 
+    let isActive = true;
+
     async function persistState() {
       const savedAt = await saveQuinnSnapshot({
         packetTitle,
@@ -2143,12 +2174,19 @@ export default function App() {
         voiceSettings,
       });
 
-      if (savedAt) {
+      if (isActive && savedAt) {
         setLastSavedAt(savedAt);
       }
     }
 
-    persistState();
+    const persistTimeout = setTimeout(() => {
+      void persistState();
+    }, SNAPSHOT_PERSIST_DEBOUNCE_MS);
+
+    return () => {
+      isActive = false;
+      clearTimeout(persistTimeout);
+    };
   }, [
     isHydrated,
     packetTitle,
@@ -2227,6 +2265,7 @@ export default function App() {
   ): Promise<QuinnRunResult | null> {
     const nextTitle = override?.packetTitle ?? packetTitle;
     const rawNextText = override?.packetText ?? packetText;
+    const stayOnScreen = override?.stayOnScreen ?? true;
     const syncVisibleInput = override?.syncVisibleInput ?? true;
     const sessionArcForRun = override?.sessionArc ?? currentSessionArc;
     const activeLensLabel = getQuinnLens(activeLensId).label;
@@ -2319,6 +2358,10 @@ export default function App() {
         target: 'QuinnConversation',
         tone: 'success',
       });
+
+      if (!stayOnScreen) {
+        setScreen('QuinnConversation');
+      }
 
       return {
         ...result,
@@ -2438,7 +2481,7 @@ export default function App() {
     pushNotification({
       title: 'Memory loaded',
       body: `${item.label} moved back into Quinn.`,
-      target: 'TileExpandedCanvas',
+      target: 'QuinnConversation',
       tone: 'gold',
     });
   }
@@ -2495,29 +2538,25 @@ export default function App() {
   }
 
   function handleRestoreRunToCanvas(run: RunHistoryItem) {
-    clearThreadContinuity();
+    clearThreadContinuity({
+      clearVisibleResponse: true,
+    });
     setPacketTitle(run.packetTitle || 'Untitled packet');
     setPacketText(run.packetText || '');
-    setCurrentMemoryResonance(Array.isArray(run.memoryResonance) ? run.memoryResonance : []);
-    setCurrentSessionArc(resumeSessionArcFromRun(run));
     setRunError('');
     setScreen('QuinnConversation');
 
     pushNotification({
       title: 'Run restored',
       body: `${run.packetTitle || 'Untitled packet'} moved back into Quinn.`,
-      target: 'TileExpandedCanvas',
+      target: 'QuinnConversation',
       tone: 'neutral',
     });
   }
 
   function handleRerunHistoryItem(run: RunHistoryItem) {
     const resumedArc = resumeSessionArcFromRun(run);
-    activeThreadIdRef.current = String(resumedArc?.id || '').trim() || buildThreadContinuityId();
-    lastAssistantResponseRef.current = null;
-    lastNumberedOptionsRef.current = null;
-    setCurrentSessionArc(resumedArc);
-    setCurrentMemoryResonance(Array.isArray(run.memoryResonance) ? run.memoryResonance : []);
+    setRunError('');
     handleRunPacket({
       packetTitle: run.packetTitle || 'Untitled packet',
       packetText: run.packetText || '',
@@ -2592,7 +2631,10 @@ export default function App() {
     setNotifications([]);
   }
 
-  const unreadCount = countUnreadNotifications(notifications);
+  const unreadCount = useMemo(
+    () => countUnreadNotifications(notifications),
+    [notifications]
+  );
 
   let content = null;
 
@@ -2696,7 +2738,7 @@ export default function App() {
     content = (
       <HomeTileGrid
         onOpenCanvas={() => setScreen('QuinnConversation')}
-        onOpenGravity={() => setScreen('QuinnConversation')}
+        onOpenGravity={() => setScreen('VoiceMode')}
         onOpenMemory={() => setScreen('MemoryPanel')}
         onOpenExports={() => setScreen('ExportsPanel')}
         onOpenSettings={() => setScreen('SettingsHome')}
@@ -2708,8 +2750,13 @@ export default function App() {
         }
         onRestoreRunToCanvas={handleRestoreRunToCanvas}
         onRerunHistoryItem={handleRerunHistoryItem}
+        canRunCurrentPacket={Boolean(String(packetText || '').trim()) && !isRunning}
         packetTitle={packetTitle}
         packetText={packetText}
+        activeLensLabel={getQuinnLens(activeLensId).label}
+        currentSessionArc={currentSessionArc}
+        currentMemoryResonance={currentMemoryResonance}
+        writtenResult={writtenResult}
         lastSummary={compressedSummary}
         lastRunAt={lastRunAt}
         lastSavedAt={lastSavedAt}
@@ -2771,8 +2818,8 @@ export default function App() {
     content = (
       <AppSwitcher
         onBack={() => setScreen('SettingsHome')}
-        onSwitchToScreen={(nextScreen: QuinnSurfaceName) => setScreen(resolveSwitcherTarget(nextScreen))}
-        currentScreen={getCurrentSwitcherSurface(screen)}
+        onSwitchToScreen={setScreen}
+        currentScreen={screen}
         packetTitle={packetTitle}
         lastSummary={compressedSummary}
         notificationCount={notifications.length}
@@ -2787,7 +2834,7 @@ export default function App() {
       <VoiceMode
         onBack={() => setScreen('SettingsHome')}
         onOpenCanvas={() => setScreen('QuinnConversation')}
-        onOpenGravity={() => setScreen('SettingsHome')}
+        onOpenGravity={() => setScreen('HomeTileGrid')}
         packetTitle={packetTitle}
         packetText={packetText}
         lastSummary={compressedSummary}
@@ -4083,6 +4130,43 @@ cardOrbGlowWarm: {
     maxWidth: 980,
   },
 
+  responseContextRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+    marginRight: -10,
+  },
+
+  responseContextChip: {
+    minWidth: 144,
+    maxWidth: 260,
+    marginRight: 10,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: 'rgba(201, 209, 241, 0.09)',
+    backgroundColor: 'rgba(11, 14, 23, 0.76)',
+  },
+
+  responseContextChipLabel: {
+    color: 'rgba(184, 193, 219, 0.56)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 1.05,
+    marginBottom: 4,
+  },
+
+  responseContextChipValue: {
+    color: 'rgba(244, 247, 255, 0.9)',
+    fontSize: 12.2,
+    lineHeight: 16,
+    fontWeight: '700',
+    letterSpacing: 0.08,
+  },
+
   memoryResonanceWrap: {
     marginBottom: 4,
   },
@@ -4175,6 +4259,15 @@ cardOrbGlowWarm: {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 22,
+  },
+
+  responseFooterHint: {
+    color: 'rgba(200, 207, 231, 0.54)',
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: '500',
+    marginTop: 12,
+    maxWidth: 720,
   },
 
   responseFooterActions: {
