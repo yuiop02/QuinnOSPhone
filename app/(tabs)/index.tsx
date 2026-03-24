@@ -127,6 +127,11 @@ type QuinnRunResult = {
   memoryResonance?: MemoryResonanceItem[];
 };
 
+type NumberedOption = {
+  index: number;
+  text: string;
+};
+
 const HEADER_HEIGHT = 236;
 const FADE_WALL_HEIGHT = 296;
 const WINDOW_WIDTH = Dimensions.get('window').width;
@@ -161,6 +166,72 @@ function resolveScreen(moduleValue: any, exportName: string): React.ComponentTyp
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildThreadContinuityId() {
+  return `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function cleanOptionText(value: string, maxLength = 240) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+
+  if (!clean) {
+    return '';
+  }
+
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 3).trim()}...` : clean;
+}
+
+function extractNumberedOptions(text: string): NumberedOption[] {
+  const clean = String(text || '').replace(/\r\n?/g, '\n').trim();
+
+  if (!clean) {
+    return [];
+  }
+
+  const matches = [
+    ...clean.matchAll(
+      /(?:^|\n)\s*(\d{1,2})[.)]\s+([\s\S]*?)(?=(?:\n\s*\d{1,2}[.)]\s+)|(?:\n{2,})|$)/g
+    ),
+  ];
+
+  const options = matches
+    .map((match) => ({
+      index: Number(match[1] || 0),
+      text: cleanOptionText(match[2] || ''),
+    }))
+    .filter((option) => Number.isFinite(option.index) && option.index > 0 && option.text);
+
+  if (options.length < 2) {
+    return [];
+  }
+
+  const unique = new Map<number, NumberedOption>();
+
+  for (const option of options) {
+    if (!unique.has(option.index)) {
+      unique.set(option.index, option);
+    }
+  }
+
+  return [...unique.values()].sort((a, b) => a.index - b.index);
+}
+
+function parseBareNumericSelection(text: string) {
+  const clean = String(text || '').trim().toLowerCase();
+
+  if (!clean) {
+    return null;
+  }
+
+  const match = clean.match(/^(?:option\s*)?#?\s*(\d{1,2})[.!?]*$/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const index = Number(match[1] || 0);
+  return Number.isFinite(index) && index > 0 ? index : null;
 }
 
 function TopFadeWall() {
@@ -1946,6 +2017,61 @@ export default function App() {
   const [voiceSessions, setVoiceSessions] = useState<VoiceSession[]>([]);
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(INITIAL_VOICE_SETTINGS);
   const [waveKey, setWaveKey] = useState(0);
+  const activeThreadIdRef = useRef(buildThreadContinuityId());
+  const lastAssistantResponseRef = useRef<{ threadId: string; text: string } | null>(null);
+  const lastNumberedOptionsRef = useRef<{
+    threadId: string;
+    options: NumberedOption[];
+  } | null>(null);
+
+  function primeThreadContinuity(threadId: string, responseText: string) {
+    const cleanResponse = String(responseText || '').trim();
+
+    lastAssistantResponseRef.current = cleanResponse
+      ? {
+          threadId,
+          text: cleanResponse,
+        }
+      : null;
+
+    const numberedOptions = extractNumberedOptions(cleanResponse);
+    lastNumberedOptionsRef.current = numberedOptions.length
+      ? {
+          threadId,
+          options: numberedOptions,
+        }
+      : null;
+  }
+
+  function clearThreadContinuity({
+    clearVisibleResponse = false,
+    clearComposer = false,
+    resetTitle = false,
+  }: {
+    clearVisibleResponse?: boolean;
+    clearComposer?: boolean;
+    resetTitle?: boolean;
+  } = {}) {
+    activeThreadIdRef.current = buildThreadContinuityId();
+    lastAssistantResponseRef.current = null;
+    lastNumberedOptionsRef.current = null;
+    setCurrentSessionArc(null);
+    setCurrentMemoryResonance([]);
+    setCompressedSummary('');
+    setRunError('');
+
+    if (clearVisibleResponse) {
+      setWrittenResult('');
+    }
+
+    if (resetTitle) {
+      setPacketTitle(INITIAL_PACKET_TITLE);
+    }
+
+    if (clearComposer) {
+      setPacketText('');
+    }
+  }
 
   useEffect(() => {
     let isActive = true;
@@ -1958,6 +2084,11 @@ export default function App() {
       }
 
       if (snapshot) {
+        const hydratedThreadId =
+          String(snapshot.currentSessionArc?.id || '').trim() || buildThreadContinuityId();
+
+        activeThreadIdRef.current = hydratedThreadId;
+        primeThreadContinuity(hydratedThreadId, snapshot.writtenResult || '');
         setPacketTitle(snapshot.packetTitle || INITIAL_PACKET_TITLE);
         setPacketText('');
         setWrittenResult(snapshot.writtenResult || '');
@@ -2095,10 +2226,22 @@ export default function App() {
     }
   ): Promise<QuinnRunResult | null> {
     const nextTitle = override?.packetTitle ?? packetTitle;
-    const nextText = override?.packetText ?? packetText;
+    const rawNextText = override?.packetText ?? packetText;
     const syncVisibleInput = override?.syncVisibleInput ?? true;
     const sessionArcForRun = override?.sessionArc ?? currentSessionArc;
     const activeLensLabel = getQuinnLens(activeLensId).label;
+    const selectedOptionIndex = parseBareNumericSelection(rawNextText);
+    const selectedOption =
+      selectedOptionIndex &&
+      lastNumberedOptionsRef.current?.threadId === activeThreadIdRef.current &&
+      lastAssistantResponseRef.current?.threadId === activeThreadIdRef.current
+        ? lastNumberedOptionsRef.current.options.find(
+            (option) => option.index === selectedOptionIndex
+          ) || null
+        : null;
+    const nextText = selectedOption
+      ? `I choose option ${selectedOption.index} from your previous list: ${selectedOption.text}. Please continue from that choice.\n\nMy raw reply was: ${String(rawNextText || '').trim()}`
+      : rawNextText;
     const effectiveTitle = derivePacketTitle({
       packetTitle: nextTitle,
       packetText: nextText,
@@ -2122,7 +2265,7 @@ export default function App() {
       setPacketTitle(effectiveTitle);
 
       if (syncVisibleInput) {
-        setPacketText(nextText);
+        setPacketText(rawNextText);
       }
     } else if (effectiveTitle !== packetTitle) {
       setPacketTitle(effectiveTitle);
@@ -2156,9 +2299,12 @@ export default function App() {
         compressedSummary: shortSummary,
         timestamp,
         memoryResonance: result.memoryResonance,
-        sessionArc: nextSessionArc,
-      });
+          sessionArc: nextSessionArc,
+        });
+      const nextThreadId = String(nextSessionArc?.id || '').trim() || activeThreadIdRef.current;
 
+      activeThreadIdRef.current = nextThreadId;
+      primeThreadContinuity(nextThreadId, result.written);
       setWrittenResult(result.written);
       setCompressedSummary(shortSummary);
       setCurrentMemoryResonance(result.memoryResonance);
@@ -2266,17 +2412,24 @@ export default function App() {
   }
 
   function handleStartFreshArc() {
-    setCurrentSessionArc(null);
+    clearThreadContinuity({
+      clearVisibleResponse: true,
+      clearComposer: true,
+      resetTitle: true,
+    });
 
     pushNotification({
-      title: 'Arc cleared',
-      body: 'The next Quinn run will start a fresh line of thought.',
+      title: 'Fresh thread ready',
+      body: 'Quinn will treat the next run as a new topic with no carryover from the prior thread.',
       target: 'QuinnConversation',
       tone: 'gold',
     });
   }
 
   function handleLoadMemoryItem(item: MemoryItem) {
+    clearThreadContinuity({
+      clearVisibleResponse: true,
+    });
     setPacketTitle(item.label);
     setPacketText(item.body);
     setRunError('');
@@ -2342,6 +2495,7 @@ export default function App() {
   }
 
   function handleRestoreRunToCanvas(run: RunHistoryItem) {
+    clearThreadContinuity();
     setPacketTitle(run.packetTitle || 'Untitled packet');
     setPacketText(run.packetText || '');
     setCurrentMemoryResonance(Array.isArray(run.memoryResonance) ? run.memoryResonance : []);
@@ -2359,6 +2513,9 @@ export default function App() {
 
   function handleRerunHistoryItem(run: RunHistoryItem) {
     const resumedArc = resumeSessionArcFromRun(run);
+    activeThreadIdRef.current = String(resumedArc?.id || '').trim() || buildThreadContinuityId();
+    lastAssistantResponseRef.current = null;
+    lastNumberedOptionsRef.current = null;
     setCurrentSessionArc(resumedArc);
     setCurrentMemoryResonance(Array.isArray(run.memoryResonance) ? run.memoryResonance : []);
     handleRunPacket({
