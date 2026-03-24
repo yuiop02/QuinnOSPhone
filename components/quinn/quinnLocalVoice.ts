@@ -10,9 +10,46 @@ export function getQuinnLocalVoiceHealthUrl(): string {
   return buildQuinnBackendUrl('/voice-health');
 }
 
-export function getQuinnLocalVoiceSpeakUrl(text: string) {
+function normalizeVoiceQueryText(value: string, maxLength = 360) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+
+  if (!clean) {
+    return '';
+  }
+
+  if (clean.length <= maxLength) {
+    return clean;
+  }
+
+  return `${clean.slice(0, maxLength - 3).trim()}...`;
+}
+
+export function getQuinnLocalVoiceSpeakUrl(
+  text: string,
+  {
+    previousText = '',
+    nextText = '',
+  }: {
+    previousText?: string;
+    nextText?: string;
+  } = {}
+) {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
-  return `${buildQuinnBackendUrl('/voice-speak')}?text=${encodeURIComponent(clean)}`;
+  const params = new URLSearchParams({
+    text: clean,
+  });
+  const cleanPreviousText = normalizeVoiceQueryText(previousText);
+  const cleanNextText = normalizeVoiceQueryText(nextText);
+
+  if (cleanPreviousText) {
+    params.set('previous_text', cleanPreviousText);
+  }
+
+  if (cleanNextText) {
+    params.set('next_text', cleanNextText);
+  }
+
+  return `${buildQuinnBackendUrl('/voice-speak')}?${params.toString()}`;
 }
 
 export async function pingQuinnLocalVoice(): Promise<boolean> {

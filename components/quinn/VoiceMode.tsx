@@ -190,7 +190,10 @@ useEffect(() => {
     if (nextIndex < quinnChunks.length) {
       setQuinnChunkIndex(nextIndex);
       setStatusMessage('Quinn voice speaking now.');
-      void playQuinnChunk(quinnChunks[nextIndex]);
+      void playQuinnChunk(quinnChunks[nextIndex], {
+        previousText: quinnChunks[nextIndex - 1] || '',
+        nextText: quinnChunks[nextIndex + 1] || '',
+      });
       return;
     }
 
@@ -249,17 +252,32 @@ useEffect(() => {
     });
   }, []);
 
-  const playQuinnChunk = useCallback(async (text: string) => {
-  await preparePlaybackMode();
+  const playQuinnChunk = useCallback(
+    async (
+      text: string,
+      {
+        previousText = '',
+        nextText = '',
+      }: {
+        previousText?: string;
+        nextText?: string;
+      } = {}
+    ) => {
+      await preparePlaybackMode();
 
-  const url = `${getQuinnLocalVoiceSpeakUrl(text)}&t=${Date.now()}`;
+      const url = `${getQuinnLocalVoiceSpeakUrl(text, {
+        previousText,
+        nextText,
+      })}&t=${Date.now()}`;
 
-  player.replace(url);
-  await wait(120);
-  player.play();
+      player.replace(url);
+      await wait(120);
+      player.play();
 
-  setPlayerMode('quinn-preview');
-}, [player, preparePlaybackMode]);
+      setPlayerMode('quinn-preview');
+    },
+    [player, preparePlaybackMode]
+  );
 
   async function handleCheckQuinnVoice(showStatus = true) {
     try {
@@ -475,7 +493,9 @@ async function handleSpeakQuinnVoice() {
 
     setStatusMessage('Quinn voice speaking now.');
 
-    await playQuinnChunk(chunks[0]);
+    await playQuinnChunk(chunks[0], {
+      nextText: chunks[1] || '',
+    });
   } catch (error) {
     const message = buildVoiceFailureMessage(error);
     setPipelinePhase('failed');

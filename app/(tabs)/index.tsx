@@ -1273,8 +1273,14 @@ function QuinnConversationSurface({
       const upcomingChunks = speechChunksRef.current.slice(startIndex, startIndex + count);
 
       await Promise.all(
-        upcomingChunks.map((chunk) =>
-          warmSpeechChunk(getQuinnLocalVoiceSpeakUrl(chunk), sessionId)
+        upcomingChunks.map((chunk, offset) =>
+          warmSpeechChunk(
+            getQuinnLocalVoiceSpeakUrl(chunk, {
+              previousText: speechChunksRef.current[startIndex + offset - 1] || '',
+              nextText: speechChunksRef.current[startIndex + offset + 1] || '',
+            }),
+            sessionId
+          )
         )
       );
     },
@@ -1311,7 +1317,10 @@ function QuinnConversationSurface({
 
         const currentPart = chunkIndex + 1;
         const totalParts = chunks.length;
-        const url = getQuinnLocalVoiceSpeakUrl(nextChunk);
+        const url = getQuinnLocalVoiceSpeakUrl(nextChunk, {
+          previousText: chunks[chunkIndex - 1] || '',
+          nextText: chunks[chunkIndex + 1] || '',
+        });
 
         setVoiceStatus(
           totalParts > 1

@@ -71,7 +71,11 @@ function normalizeSpeechStructureForTts(input: string) {
     const numberedMatch = line.match(/^(\d{1,2})[.)]\s+(.+)$/);
 
     if (numberedMatch) {
-      output.push(`Option ${toSpokenOptionLabel(numberedMatch[1])}: ${numberedMatch[2].trim()}`);
+      const numberedLead =
+        lastListType === 'numbered'
+          ? `Next, option ${toSpokenOptionLabel(numberedMatch[1])}`
+          : `Option ${toSpokenOptionLabel(numberedMatch[1])}`;
+      output.push(`${numberedLead}: ${numberedMatch[2].trim()}`);
       lastListType = 'numbered';
       continue;
     }
@@ -96,15 +100,29 @@ function normalizeSpeechStructureForTts(input: string) {
   return output.join('\n');
 }
 
+function normalizeSpeechCadenceForTts(input: string) {
+  return String(input || '')
+    .replace(/\bvs\.\b/gi, 'versus')
+    .replace(/\s+[—–]\s+/g, ', ')
+    .replace(
+      /([A-Za-z0-9)])\s*:\s*(?=(?:next,\s+)?option\b|point:|next point:)/g,
+      '$1. '
+    )
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function normalizeSpeechChunkSource(input: string): string {
-  return normalizeSpeechStructureForTts(
-    String(input || '')
-      .replace(/\r\n?/g, '\n')
-      .replace(/[ \t]+\n/g, '\n')
-      .replace(/\n[ \t]+/g, '\n')
-      .replace(/[ \t]+/g, ' ')
-      .replace(/\n{3,}/g, '\n\n')
-      .replace(/…/g, '...')
+  return normalizeSpeechCadenceForTts(
+    normalizeSpeechStructureForTts(
+      String(input || '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/…/g, '...')
+    )
   )
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n[ \t]+/g, '\n')
