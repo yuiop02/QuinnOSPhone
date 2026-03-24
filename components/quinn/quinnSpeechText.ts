@@ -5,14 +5,110 @@ export function normalizeSpeechText(input: string): string {
     .trim();
 }
 
-export function normalizeSpeechChunkSource(input: string): string {
+const SPOKEN_OPTION_WORDS: Record<number, string> = {
+  0: 'zero',
+  1: 'one',
+  2: 'two',
+  3: 'three',
+  4: 'four',
+  5: 'five',
+  6: 'six',
+  7: 'seven',
+  8: 'eight',
+  9: 'nine',
+  10: 'ten',
+  11: 'eleven',
+  12: 'twelve',
+};
+
+function toSpokenOptionLabel(rawIndex: string) {
+  const parsed = Number(rawIndex);
+
+  if (Number.isInteger(parsed) && Object.prototype.hasOwnProperty.call(SPOKEN_OPTION_WORDS, parsed)) {
+    return SPOKEN_OPTION_WORDS[parsed];
+  }
+
+  return String(rawIndex || '').trim();
+}
+
+function normalizeSpeechInlineFormatting(input: string) {
   return String(input || '')
-    .replace(/\r\n?/g, '\n')
+    .replace(/(^|\n)\s{0,3}#{1,6}\s+/g, '$1')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/_([^_\n]+)_/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1');
+}
+
+function normalizeSpeechStructureForTts(input: string) {
+  const lines = normalizeSpeechInlineFormatting(input).split('\n');
+  const output: string[] = [];
+  let lastListType: 'numbered' | 'bullet' | null = null;
+
+  const appendToPrevious = (extra: string) => {
+    if (!output.length) {
+      output.push(extra);
+      return;
+    }
+
+    output[output.length - 1] = `${output[output.length - 1]} ${extra}`
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  for (const rawLine of lines) {
+    const line = String(rawLine || '').trim();
+
+    if (!line) {
+      output.push('');
+      lastListType = null;
+      continue;
+    }
+
+    const numberedMatch = line.match(/^(\d{1,2})[.)]\s+(.+)$/);
+
+    if (numberedMatch) {
+      output.push(`Option ${toSpokenOptionLabel(numberedMatch[1])}: ${numberedMatch[2].trim()}`);
+      lastListType = 'numbered';
+      continue;
+    }
+
+    const bulletMatch = line.match(/^[-*•]\s+(.+)$/);
+
+    if (bulletMatch) {
+      output.push(`${lastListType === 'bullet' ? 'Next point' : 'Point'}: ${bulletMatch[1].trim()}`);
+      lastListType = 'bullet';
+      continue;
+    }
+
+    if (lastListType && /^\s+/.test(rawLine) && output.length) {
+      appendToPrevious(line);
+      continue;
+    }
+
+    output.push(line);
+    lastListType = null;
+  }
+
+  return output.join('\n');
+}
+
+export function normalizeSpeechChunkSource(input: string): string {
+  return normalizeSpeechStructureForTts(
+    String(input || '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n[ \t]+/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/…/g, '...')
+  )
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n[ \t]+/g, '\n')
-    .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
-    .replace(/…/g, '...')
     .trim();
 }
 
@@ -95,6 +191,33 @@ function splitBySpeechPattern(input: string, pattern: RegExp) {
   return parts.length ? parts : [clean];
 }
 
+function mergeDetachedListLeadClauses(input: string[]) {
+  const merged: string[] = [];
+
+  for (let i = 0; i < input.length; i += 1) {
+    const current = finalizeSpeechChunk(input[i]);
+    const next = finalizeSpeechChunk(input[i + 1] || '');
+
+    if (
+      current &&
+      next &&
+      /^(?:\d+[.)]?|option (?:\d+|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve):?)$/i.test(
+        current
+      )
+    ) {
+      merged.push(finalizeSpeechChunk(`${current} ${next}`));
+      i += 1;
+      continue;
+    }
+
+    if (current) {
+      merged.push(current);
+    }
+  }
+
+  return merged;
+}
+
 function splitIntoSpeechClauses(input: string, maxChars = 175) {
   const clean = finalizeSpeechChunk(input);
 
@@ -127,7 +250,7 @@ function splitIntoSpeechClauses(input: string, maxChars = 175) {
     }
   }
 
-  return clauses.filter(Boolean);
+  return mergeDetachedListLeadClauses(clauses.filter(Boolean));
 }
 
 function endsWithStrongPause(input: string) {
