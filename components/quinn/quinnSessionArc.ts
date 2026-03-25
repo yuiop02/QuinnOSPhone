@@ -166,17 +166,17 @@ export function buildSessionArcPacketContext(sessionArc: SessionArc | null | und
   const beats = Array.isArray(sessionArc.beats) ? sessionArc.beats.slice(-3) : [];
 
   return [
-    `SESSION ARC:\n${sessionArc.title}`,
-    `ARC STEP:\n${sessionArc.stepCount}`,
+    `CURRENT THREAD:\n${sessionArc.title}`,
+    `THREAD STEP:\n${sessionArc.stepCount}`,
     beats.length
-      ? `RECENT ARC BEATS:\n${beats
+      ? `RECENT THREAD BEATS:\n${beats
           .map(
             (beat, index) =>
               `${index + 1}. ${beat.lensLabel}: ${cleanArcText(beat.summary, 110)}`
           )
           .join('\n')}`
       : '',
-    'ARC CONTINUITY:\nCarry this thought forward instead of restarting from zero unless the new signal clearly breaks away.',
+    'CONTINUITY NOTE:\nCarry this thought forward instead of restarting from zero unless the new signal clearly breaks away.',
   ]
     .filter(Boolean)
     .join('\n\n');

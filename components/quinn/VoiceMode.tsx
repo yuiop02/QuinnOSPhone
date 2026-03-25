@@ -21,8 +21,8 @@ import SectionCard from './SectionCard';
 import { buildRealtimeSpeechChunks } from './quinnSpeechText';
 import {
   getQuinnLocalVoiceBaseUrl,
-  getQuinnLocalVoiceSpeakUrl,
   pingQuinnLocalVoice,
+  prepareQuinnLocalVoiceSpeakUrl,
 } from './quinnLocalVoice';
 import { SURFACE_THEME } from './quinnSurfaceTheme';
 import {
@@ -263,18 +263,29 @@ useEffect(() => {
         nextText?: string;
       } = {}
     ) => {
-      await preparePlaybackMode();
+      try {
+        await preparePlaybackMode();
 
-      const url = `${getQuinnLocalVoiceSpeakUrl(text, {
-        previousText,
-        nextText,
-      })}&t=${Date.now()}`;
+        const playUrl = await prepareQuinnLocalVoiceSpeakUrl(text, {
+          previousText,
+          nextText,
+        });
 
-      player.replace(url);
-      await wait(120);
-      player.play();
+        player.replace(playUrl);
+        await wait(120);
+        player.play();
 
-      setPlayerMode('quinn-preview');
+        setPlayerMode('quinn-preview');
+      } catch (error) {
+        const message = buildVoiceFailureMessage(error);
+        setPipelinePhase('failed');
+        setLastError(message);
+        setStatusMessage(message);
+        setPlayerMode(null);
+        setIsSpeakingQuinn(false);
+        setQuinnChunks([]);
+        setQuinnChunkIndex(0);
+      }
     },
     [player, preparePlaybackMode]
   );

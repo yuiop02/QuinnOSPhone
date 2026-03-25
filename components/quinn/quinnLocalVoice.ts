@@ -1,6 +1,7 @@
 import { buildQuinnBackendUrl, QUINN_BACKEND_BASE_URL } from './quinnEndpoints';
 
 const QUINN_LOCAL_VOICE_BASE_URL = QUINN_BACKEND_BASE_URL;
+const VOICE_PREPARE_ENDPOINT = buildQuinnBackendUrl('/voice-speak/prepare');
 
 export function getQuinnLocalVoiceBaseUrl(): string {
   return QUINN_LOCAL_VOICE_BASE_URL;
@@ -24,6 +25,35 @@ function normalizeVoiceQueryText(value: string, maxLength = 360) {
   return `${clean.slice(0, maxLength - 3).trim()}...`;
 }
 
+function buildVoiceSpeakPayload(
+  text: string,
+  {
+    previousText = '',
+    nextText = '',
+  }: {
+    previousText?: string;
+    nextText?: string;
+  } = {}
+) {
+  const cleanText = String(text || '').replace(/\s+/g, ' ').trim();
+  const cleanPreviousText = normalizeVoiceQueryText(previousText);
+  const cleanNextText = normalizeVoiceQueryText(nextText);
+
+  return {
+    text: cleanText,
+    ...(cleanPreviousText ? { previous_text: cleanPreviousText } : {}),
+    ...(cleanNextText ? { next_text: cleanNextText } : {}),
+  };
+}
+
+async function parseJsonSafely(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export function getQuinnLocalVoiceSpeakUrl(
   text: string,
   {
@@ -34,22 +64,93 @@ export function getQuinnLocalVoiceSpeakUrl(
     nextText?: string;
   } = {}
 ) {
-  const clean = String(text || '').replace(/\s+/g, ' ').trim();
-  const params = new URLSearchParams({
-    text: clean,
+  const payload = buildVoiceSpeakPayload(text, {
+    previousText,
+    nextText,
   });
-  const cleanPreviousText = normalizeVoiceQueryText(previousText);
-  const cleanNextText = normalizeVoiceQueryText(nextText);
+  const params = new URLSearchParams({
+    text: payload.text,
+  });
 
-  if (cleanPreviousText) {
-    params.set('previous_text', cleanPreviousText);
+  if (payload.previous_text) {
+    params.set('previous_text', payload.previous_text);
   }
 
-  if (cleanNextText) {
-    params.set('next_text', cleanNextText);
+  if (payload.next_text) {
+    params.set('next_text', payload.next_text);
   }
 
   return `${buildQuinnBackendUrl('/voice-speak')}?${params.toString()}`;
+}
+
+export function getQuinnLocalVoiceSpeakRequestKey(
+  text: string,
+  {
+    previousText = '',
+    nextText = '',
+  }: {
+    previousText?: string;
+    nextText?: string;
+  } = {}
+) {
+  const payload = buildVoiceSpeakPayload(text, {
+    previousText,
+    nextText,
+  });
+
+  return [payload.text, payload.previous_text || '', payload.next_text || ''].join('::');
+}
+
+export async function prepareQuinnLocalVoiceSpeakUrl(
+  text: string,
+  {
+    previousText = '',
+    nextText = '',
+  }: {
+    previousText?: string;
+    nextText?: string;
+  } = {}
+): Promise<string> {
+  const payload = buildVoiceSpeakPayload(text, {
+    previousText,
+    nextText,
+  });
+
+  if (!payload.text) {
+    throw new Error('No text was provided for Quinn voice.');
+  }
+
+  const response = await fetch(VOICE_PREPARE_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJsonSafely(response);
+
+  if (response.status === 404 || response.status === 405) {
+    return getQuinnLocalVoiceSpeakUrl(text, {
+      previousText,
+      nextText,
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      String(data?.error || data?.message || `Voice prepare request failed (${response.status})`)
+    );
+  }
+
+  const token = String(data?.token || '').trim();
+
+  if (!token) {
+    throw new Error('Voice prepare response did not include a playback token.');
+  }
+
+  return `${buildQuinnBackendUrl('/voice-speak')}?${new URLSearchParams({
+    token,
+  }).toString()}`;
 }
 
 export async function pingQuinnLocalVoice(): Promise<boolean> {

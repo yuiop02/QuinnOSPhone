@@ -57,8 +57,9 @@ import {
 } from '../../components/quinn/quinnAppState';
 import {
   getQuinnLocalVoiceBaseUrl,
-  getQuinnLocalVoiceSpeakUrl,
+  getQuinnLocalVoiceSpeakRequestKey,
   pingQuinnLocalVoice,
+  prepareQuinnLocalVoiceSpeakUrl,
 } from '../../components/quinn/quinnLocalVoice';
 import {
   countUnreadNotifications,
@@ -1075,7 +1076,7 @@ function QuinnConversationSurface({
   const speechChunksRef = useRef<string[]>([]);
   const speechActiveChunkIndexRef = useRef(-1);
   const speechSessionRef = useRef(0);
-  const warmedChunkUrlsRef = useRef(new Set<string>());
+  const warmedChunkKeysRef = useRef(new Set<string>());
   const speechAdvanceInFlightRef = useRef(false);
   const awaitingSpeechFinishRef = useRef(false);
   const awaitingSpeechFinishSessionRef = useRef(0);
@@ -1238,26 +1239,54 @@ function QuinnConversationSurface({
     awaitingSpeechFinishSessionRef.current = 0;
     awaitingSpeechFinishChunkIndexRef.current = -1;
     speechPlaybackStartedAtRef.current = 0;
-    warmedChunkUrlsRef.current.clear();
+    warmedChunkKeysRef.current.clear();
   }
 
-  const warmSpeechChunk = useCallback(async (url: string, sessionId: number) => {
-    if (!url || sessionId !== speechSessionRef.current) {
-      return;
-    }
+  const warmSpeechChunk = useCallback(
+    async (
+      text: string,
+      {
+        previousText = '',
+        nextText = '',
+      }: {
+        previousText?: string;
+        nextText?: string;
+      },
+      sessionId: number
+    ) => {
+      if (!text || sessionId !== speechSessionRef.current) {
+        return;
+      }
 
-    if (warmedChunkUrlsRef.current.has(url)) {
-      return;
-    }
+      const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
+        previousText,
+        nextText,
+      });
 
-    warmedChunkUrlsRef.current.add(url);
+      if (warmedChunkKeysRef.current.has(requestKey)) {
+        return;
+      }
 
-    try {
-      await fetch(url);
-    } catch {
-      // ignore warm-up failures; normal playback can still try
-    }
-  }, []);
+      warmedChunkKeysRef.current.add(requestKey);
+
+      try {
+        const preparedUrl = await prepareQuinnLocalVoiceSpeakUrl(text, {
+          previousText,
+          nextText,
+        });
+
+        if (sessionId !== speechSessionRef.current) {
+          warmedChunkKeysRef.current.delete(requestKey);
+          return;
+        }
+
+        await fetch(preparedUrl);
+      } catch {
+        warmedChunkKeysRef.current.delete(requestKey);
+      }
+    },
+    []
+  );
 
   const warmUpcomingSpeechChunks = useCallback(
     async (sessionId: number, count = 3, fromIndex?: number) => {
@@ -1275,10 +1304,11 @@ function QuinnConversationSurface({
       await Promise.all(
         upcomingChunks.map((chunk, offset) =>
           warmSpeechChunk(
-            getQuinnLocalVoiceSpeakUrl(chunk, {
+            chunk,
+            {
               previousText: speechChunksRef.current[startIndex + offset - 1] || '',
               nextText: speechChunksRef.current[startIndex + offset + 1] || '',
-            }),
+            },
             sessionId
           )
         )
@@ -1317,9 +1347,11 @@ function QuinnConversationSurface({
 
         const currentPart = chunkIndex + 1;
         const totalParts = chunks.length;
-        const url = getQuinnLocalVoiceSpeakUrl(nextChunk, {
-          previousText: chunks[chunkIndex - 1] || '',
-          nextText: chunks[chunkIndex + 1] || '',
+        const previousText = chunks[chunkIndex - 1] || '';
+        const nextText = chunks[chunkIndex + 1] || '';
+        const playUrl = await prepareQuinnLocalVoiceSpeakUrl(nextChunk, {
+          previousText,
+          nextText,
         });
 
         setVoiceStatus(
@@ -1334,7 +1366,11 @@ function QuinnConversationSurface({
         awaitingSpeechFinishChunkIndexRef.current = -1;
         speechPlaybackStartedAtRef.current = 0;
 
-        player.replace(url);
+        if (sessionId !== speechSessionRef.current) {
+          return;
+        }
+
+        player.replace(playUrl);
         void warmUpcomingSpeechChunks(sessionId, 2, chunkIndex + 1);
 
         await wait(currentPart === 1 ? 160 : 40);
@@ -1355,6 +1391,14 @@ function QuinnConversationSurface({
         awaitingSpeechFinishRef.current = true;
         setIsPreparingQuinnVoice(false);
         setIsSpeakingResponse(true);
+      } catch (error) {
+        clearSpeechQueue();
+        const message =
+          error instanceof Error ? error.message : 'Quinn voice playback failed.';
+        setVoiceError(message);
+        setVoiceStatus(message);
+        setIsPreparingQuinnVoice(false);
+        setIsSpeakingResponse(false);
       } finally {
         speechAdvanceInFlightRef.current = false;
       }
