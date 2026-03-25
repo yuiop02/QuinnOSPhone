@@ -94,7 +94,7 @@ export async function runQuinnPacket({
     body: JSON.stringify({
       packet: builtPacket,
       prompt:
-        'Run this QuinnOS packet. Give the strongest natural response to the signal. Default to clean prose unless the user clearly wants options, bullets, or a step-by-step structure. Use long-term memory only when it materially sharpens the answer.',
+        'Reply to this Quinn note the way someone close, sharp, and already in the context would. Keep it natural, prose-first, and only use memory when it genuinely helps.',
       packetTitle,
       packetText,
       projectTag: 'General',

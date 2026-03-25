@@ -54,7 +54,7 @@ export function deriveSessionArcTitle(packetTitle: string, packetText: string) {
     return derived;
   }
 
-  return 'Current arc';
+  return 'Current thread';
 }
 
 export function startSessionArc({
@@ -166,17 +166,16 @@ export function buildSessionArcPacketContext(sessionArc: SessionArc | null | und
   const beats = Array.isArray(sessionArc.beats) ? sessionArc.beats.slice(-3) : [];
 
   return [
-    `CURRENT THREAD:\n${sessionArc.title}`,
-    `THREAD STEP:\n${sessionArc.stepCount}`,
+    `LIVE CONTINUITY:\nThis is still the same line of thought: ${sessionArc.title}`,
     beats.length
-      ? `RECENT THREAD BEATS:\n${beats
+      ? `RECENT TURNS:\n${beats
           .map(
             (beat, index) =>
-              `${index + 1}. ${beat.lensLabel}: ${cleanArcText(beat.summary, 110)}`
+              `${index + 1}. ${cleanArcText(beat.summary, 110)}`
           )
           .join('\n')}`
       : '',
-    'CONTINUITY NOTE:\nCarry this thought forward instead of restarting from zero unless the new signal clearly breaks away.',
+    `THREAD MOMENTUM:\nThis is turn ${sessionArc.stepCount}. Let it carry forward naturally only if the new note still clearly belongs to the same topic.`,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -194,7 +193,9 @@ export function buildSessionArcMeta(sessionArc: SessionArc | null | undefined) {
   return {
     stepLabel: `Step ${sessionArc.stepCount}`,
     continuityLabel:
-      sessionArc.stepCount > 1 ? 'Thought is carrying forward.' : 'The first move is live.',
+      sessionArc.stepCount > 1
+        ? 'This thought is still carrying forward.'
+        : 'This thread just started.',
     beats: Array.isArray(sessionArc.beats) ? sessionArc.beats.slice(-3) : [],
   };
 }
