@@ -166,16 +166,16 @@ export function buildSessionArcPacketContext(sessionArc: SessionArc | null | und
   const beats = Array.isArray(sessionArc.beats) ? sessionArc.beats.slice(-3) : [];
 
   return [
-    `LIVE CONTINUITY:\nThis is still the same line of thought: ${sessionArc.title}`,
+    `SAME CONVERSATION:\nThis still belongs to the same line of thought: ${sessionArc.title}`,
     beats.length
-      ? `RECENT TURNS:\n${beats
+      ? `WHAT WAS JUST SAID:\n${beats
           .map(
             (beat, index) =>
               `${index + 1}. ${cleanArcText(beat.summary, 110)}`
           )
           .join('\n')}`
       : '',
-    `THREAD MOMENTUM:\nThis is turn ${sessionArc.stepCount}. Let it carry forward naturally only if the new note still clearly belongs to the same topic.`,
+    `KEEP CARRYING IT ONLY IF IT STILL FITS:\nThis is turn ${sessionArc.stepCount}. Let it keep going only if the new note clearly belongs to the same thing.`,
   ]
     .filter(Boolean)
     .join('\n\n');

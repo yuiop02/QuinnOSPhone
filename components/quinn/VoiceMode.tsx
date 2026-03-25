@@ -22,7 +22,7 @@ import { buildRealtimeSpeechChunks } from './quinnSpeechText';
 import {
   getQuinnLocalVoiceBaseUrl,
   pingQuinnLocalVoice,
-  prepareQuinnLocalVoiceSpeakUrl,
+  prepareQuinnLocalVoicePlaybackSource,
 } from './quinnLocalVoice';
 import { SURFACE_THEME } from './quinnSurfaceTheme';
 import {
@@ -266,12 +266,12 @@ useEffect(() => {
       try {
         await preparePlaybackMode();
 
-        const playUrl = await prepareQuinnLocalVoiceSpeakUrl(text, {
+        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
           previousText,
           nextText,
         });
 
-        player.replace(playUrl);
+        player.replace(playbackSource);
         await wait(120);
         player.play();
 

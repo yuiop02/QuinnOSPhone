@@ -58,8 +58,9 @@ import {
 import {
   getQuinnLocalVoiceBaseUrl,
   getQuinnLocalVoiceSpeakRequestKey,
+  isQuinnLocalVoiceRemoteSource,
   pingQuinnLocalVoice,
-  prepareQuinnLocalVoiceSpeakUrl,
+  prepareQuinnLocalVoicePlaybackSource,
 } from '../../components/quinn/quinnLocalVoice';
 import {
   countUnreadNotifications,
@@ -1270,7 +1271,7 @@ function QuinnConversationSurface({
       warmedChunkKeysRef.current.add(requestKey);
 
       try {
-        const preparedUrl = await prepareQuinnLocalVoiceSpeakUrl(text, {
+        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
           previousText,
           nextText,
         });
@@ -1280,7 +1281,9 @@ function QuinnConversationSurface({
           return;
         }
 
-        await fetch(preparedUrl);
+        if (isQuinnLocalVoiceRemoteSource(playbackSource)) {
+          await fetch(playbackSource);
+        }
       } catch {
         warmedChunkKeysRef.current.delete(requestKey);
       }
@@ -1349,7 +1352,7 @@ function QuinnConversationSurface({
         const totalParts = chunks.length;
         const previousText = chunks[chunkIndex - 1] || '';
         const nextText = chunks[chunkIndex + 1] || '';
-        const playUrl = await prepareQuinnLocalVoiceSpeakUrl(nextChunk, {
+        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(nextChunk, {
           previousText,
           nextText,
         });
@@ -1370,7 +1373,7 @@ function QuinnConversationSurface({
           return;
         }
 
-        player.replace(playUrl);
+        player.replace(playbackSource);
         void warmUpcomingSpeechChunks(sessionId, 2, chunkIndex + 1);
 
         await wait(currentPart === 1 ? 160 : 40);
