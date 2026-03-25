@@ -1079,6 +1079,9 @@ function QuinnConversationSurface({
   const speechActiveChunkIndexRef = useRef(-1);
   const speechSessionRef = useRef(0);
   const warmedChunkKeysRef = useRef(new Set<string>());
+  const preparedSpeechSourcesRef = useRef(new Map<string, string>());
+  const preparedSpeechSourcePromisesRef = useRef(new Map<string, Promise<string>>());
+  const readySpeechSourceKeysRef = useRef(new Set<string>());
   const speechAdvanceInFlightRef = useRef(false);
   const awaitingSpeechFinishRef = useRef(false);
   const awaitingSpeechFinishSessionRef = useRef(0);
@@ -1086,7 +1089,7 @@ function QuinnConversationSurface({
   const speechPlaybackStartedAtRef = useRef(0);
 
   const player = useAudioPlayer(playbackSource, {
-    updateInterval: 60,
+    updateInterval: 40,
     downloadFirst: true,
   });
   const playerStatus = useAudioPlayerStatus(player);
@@ -1242,7 +1245,75 @@ function QuinnConversationSurface({
     awaitingSpeechFinishChunkIndexRef.current = -1;
     speechPlaybackStartedAtRef.current = 0;
     warmedChunkKeysRef.current.clear();
+    preparedSpeechSourcesRef.current.clear();
+    preparedSpeechSourcePromisesRef.current.clear();
+    readySpeechSourceKeysRef.current.clear();
   }
+
+  const prepareSpeechPlaybackSource = useCallback(
+    async (
+      text: string,
+      {
+        previousText = '',
+        nextText = '',
+      }: {
+        previousText?: string;
+        nextText?: string;
+      },
+      sessionId: number
+    ) => {
+      const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
+        previousText,
+        nextText,
+      });
+      const cachedSource = preparedSpeechSourcesRef.current.get(requestKey);
+
+      if (cachedSource) {
+        return {
+          requestKey,
+          playbackSource: cachedSource,
+        };
+      }
+
+      const existingPromise = preparedSpeechSourcePromisesRef.current.get(requestKey);
+
+      if (existingPromise) {
+        return {
+          requestKey,
+          playbackSource: await existingPromise,
+        };
+      }
+
+      const preparePromise = (async () => {
+        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
+          previousText,
+          nextText,
+        });
+
+        if (sessionId === speechSessionRef.current) {
+          preparedSpeechSourcesRef.current.set(requestKey, playbackSource);
+        }
+
+        return playbackSource;
+      })();
+
+      preparedSpeechSourcePromisesRef.current.set(requestKey, preparePromise);
+
+      try {
+        return {
+          requestKey,
+          playbackSource: await preparePromise,
+        };
+      } finally {
+        const activePromise = preparedSpeechSourcePromisesRef.current.get(requestKey);
+
+        if (activePromise === preparePromise) {
+          preparedSpeechSourcePromisesRef.current.delete(requestKey);
+        }
+      }
+    },
+    []
+  );
 
   const warmSpeechChunk = useCallback(
     async (
@@ -1272,24 +1343,35 @@ function QuinnConversationSurface({
       warmedChunkKeysRef.current.add(requestKey);
 
       try {
-        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
-          previousText,
-          nextText,
-        });
+        const { playbackSource } = await prepareSpeechPlaybackSource(
+          text,
+          {
+            previousText,
+            nextText,
+          },
+          sessionId
+        );
 
         if (sessionId !== speechSessionRef.current) {
           warmedChunkKeysRef.current.delete(requestKey);
+          preparedSpeechSourcesRef.current.delete(requestKey);
+          readySpeechSourceKeysRef.current.delete(requestKey);
           return;
         }
 
         if (isQuinnLocalVoiceRemoteSource(playbackSource)) {
           await fetch(playbackSource);
         }
+
+        if (sessionId === speechSessionRef.current) {
+          readySpeechSourceKeysRef.current.add(requestKey);
+        }
       } catch {
         warmedChunkKeysRef.current.delete(requestKey);
+        readySpeechSourceKeysRef.current.delete(requestKey);
       }
     },
-    []
+    [prepareSpeechPlaybackSource]
   );
 
   const warmUpcomingSpeechChunks = useCallback(
@@ -1353,9 +1435,27 @@ function QuinnConversationSurface({
         const totalParts = chunks.length;
         const previousText = chunks[chunkIndex - 1] || '';
         const nextText = chunks[chunkIndex + 1] || '';
-        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(nextChunk, {
+        const requestKey = getQuinnLocalVoiceSpeakRequestKey(nextChunk, {
           previousText,
           nextText,
+        });
+        const wasWarmSource =
+          readySpeechSourceKeysRef.current.has(requestKey) ||
+          !isQuinnLocalVoiceRemoteSource(preparedSpeechSourcesRef.current.get(requestKey) || '');
+        const { playbackSource } = await prepareSpeechPlaybackSource(
+          nextChunk,
+          {
+            previousText,
+            nextText,
+          },
+          sessionId
+        );
+        const playbackDelayMs = getQuinnVoicePlaybackStartDelayMs(playbackSource, {
+          isFirstChunk: currentPart === 1,
+          isWarmSource:
+            wasWarmSource ||
+            (!isQuinnLocalVoiceRemoteSource(playbackSource) &&
+              preparedSpeechSourcesRef.current.has(requestKey)),
         });
 
         setVoiceStatus(
@@ -1377,11 +1477,9 @@ function QuinnConversationSurface({
         void warmUpcomingSpeechChunks(sessionId, 2, chunkIndex + 1);
         player.replace(playbackSource);
 
-        await wait(
-          getQuinnVoicePlaybackStartDelayMs(playbackSource, {
-            isFirstChunk: currentPart === 1,
-          })
-        );
+        if (playbackDelayMs > 0) {
+          await wait(playbackDelayMs);
+        }
 
         if (sessionId !== speechSessionRef.current) {
           return;
@@ -1411,7 +1509,7 @@ function QuinnConversationSurface({
         speechAdvanceInFlightRef.current = false;
       }
     },
-    [player, warmUpcomingSpeechChunks]
+    [player, prepareSpeechPlaybackSource, warmUpcomingSpeechChunks]
   );
 
   async function interruptQuinnPlayback() {

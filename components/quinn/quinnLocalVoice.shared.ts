@@ -103,13 +103,27 @@ export function getQuinnLocalVoiceSpeakRequestKey(
 
 export function getQuinnVoicePlaybackStartDelayMs(
   playbackSource: string,
-  { isFirstChunk = false }: { isFirstChunk?: boolean } = {}
+  {
+    isFirstChunk = false,
+    isWarmSource = false,
+  }: {
+    isFirstChunk?: boolean;
+    isWarmSource?: boolean;
+  } = {}
 ) {
   if (isQuinnLocalVoiceRemoteSource(playbackSource)) {
-    return isFirstChunk ? 72 : 8;
+    if (isWarmSource) {
+      return isFirstChunk ? 18 : 2;
+    }
+
+    return isFirstChunk ? 48 : 6;
   }
 
-  return isFirstChunk ? 10 : 2;
+  if (isWarmSource) {
+    return isFirstChunk ? 1 : 0;
+  }
+
+  return isFirstChunk ? 4 : 0;
 }
 
 export async function prepareQuinnLocalVoiceSpeakUrl(

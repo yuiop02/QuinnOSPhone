@@ -6,7 +6,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -21,6 +21,7 @@ import SectionCard from './SectionCard';
 import { buildRealtimeSpeechChunks } from './quinnSpeechText';
 import {
   getQuinnLocalVoiceBaseUrl,
+  getQuinnLocalVoiceSpeakRequestKey,
   getQuinnVoicePlaybackStartDelayMs,
   isQuinnLocalVoiceRemoteSource,
   pingQuinnLocalVoice,
@@ -98,7 +99,7 @@ export default function VoiceMode({
   const [playbackSource, setPlaybackSource] = useState<string | null>(null);
   const [playerMode, setPlayerMode] = useState<PlayerMode>(null);
   const player = useAudioPlayer(playbackSource, {
-    updateInterval: 60,
+    updateInterval: 40,
     downloadFirst: true,
   });
   const playerStatus = useAudioPlayerStatus(player);
@@ -130,6 +131,9 @@ export default function VoiceMode({
   const [isSpeakingQuinn, setIsSpeakingQuinn] = useState(false);
   const [quinnChunks, setQuinnChunks] = useState<string[]>([]);
   const [quinnChunkIndex, setQuinnChunkIndex] = useState(0);
+  const preparedQuinnChunkSourcesRef = useRef(new Map<string, string>());
+  const preparedQuinnChunkPromisesRef = useRef(new Map<string, Promise<string>>());
+  const readyQuinnChunkKeysRef = useRef(new Set<string>());
 
   useEffect(() => {
     let isActive = true;
@@ -171,6 +175,73 @@ export default function VoiceMode({
     };
   }, []);
 
+  const clearPreparedQuinnChunkState = useCallback(() => {
+    preparedQuinnChunkSourcesRef.current.clear();
+    preparedQuinnChunkPromisesRef.current.clear();
+    readyQuinnChunkKeysRef.current.clear();
+  }, []);
+
+  const prepareQuinnChunkPlaybackSource = useCallback(
+    async (
+      text: string,
+      {
+        previousText = '',
+        nextText = '',
+      }: {
+        previousText?: string;
+        nextText?: string;
+      } = {}
+    ) => {
+      const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
+        previousText,
+        nextText,
+      });
+      const cachedSource = preparedQuinnChunkSourcesRef.current.get(requestKey);
+
+      if (cachedSource) {
+        return {
+          requestKey,
+          playbackSource: cachedSource,
+        };
+      }
+
+      const existingPromise = preparedQuinnChunkPromisesRef.current.get(requestKey);
+
+      if (existingPromise) {
+        return {
+          requestKey,
+          playbackSource: await existingPromise,
+        };
+      }
+
+      const preparePromise = (async () => {
+        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
+          previousText,
+          nextText,
+        });
+
+        preparedQuinnChunkSourcesRef.current.set(requestKey, playbackSource);
+        return playbackSource;
+      })();
+
+      preparedQuinnChunkPromisesRef.current.set(requestKey, preparePromise);
+
+      try {
+        return {
+          requestKey,
+          playbackSource: await preparePromise,
+        };
+      } finally {
+        const activePromise = preparedQuinnChunkPromisesRef.current.get(requestKey);
+
+        if (activePromise === preparePromise) {
+          preparedQuinnChunkPromisesRef.current.delete(requestKey);
+        }
+      }
+    },
+    []
+  );
+
   const warmQuinnChunk = useCallback(
     async (chunks: string[], chunkIndex: number) => {
       const text = chunks[chunkIndex];
@@ -180,7 +251,7 @@ export default function VoiceMode({
       }
 
       try {
-        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
+        const { requestKey, playbackSource } = await prepareQuinnChunkPlaybackSource(text, {
           previousText: chunks[chunkIndex - 1] || '',
           nextText: chunks[chunkIndex + 1] || '',
         });
@@ -188,9 +259,11 @@ export default function VoiceMode({
         if (isQuinnLocalVoiceRemoteSource(playbackSource)) {
           await fetch(playbackSource);
         }
+
+        readyQuinnChunkKeysRef.current.add(requestKey);
       } catch {}
     },
-    []
+    [prepareQuinnChunkPlaybackSource]
   );
 
 // `playQuinnChunk` intentionally stays outside the dependency list here so this
@@ -232,8 +305,9 @@ useEffect(() => {
     setIsSpeakingQuinn(false);
     setQuinnChunks([]);
     setQuinnChunkIndex(0);
+    clearPreparedQuinnChunkState();
   }
-}, [playerMode, playerStatus.didJustFinish, quinnChunkIndex, quinnChunks]);
+}, [clearPreparedQuinnChunkState, playerMode, playerStatus.didJustFinish, quinnChunkIndex, quinnChunks]);
 /* eslint-enable react-hooks/exhaustive-deps */
   const providerPayload = useMemo(
     () =>
@@ -297,21 +371,36 @@ useEffect(() => {
       try {
         await preparePlaybackMode();
 
-        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
+        const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
           previousText,
           nextText,
         });
+        const wasWarmSource =
+          readyQuinnChunkKeysRef.current.has(requestKey) ||
+          !isQuinnLocalVoiceRemoteSource(preparedQuinnChunkSourcesRef.current.get(requestKey) || '');
+        const { playbackSource } = await prepareQuinnChunkPlaybackSource(text, {
+          previousText,
+          nextText,
+        });
+        const playbackDelayMs = getQuinnVoicePlaybackStartDelayMs(playbackSource, {
+          isFirstChunk,
+          isWarmSource:
+            wasWarmSource ||
+            (!isQuinnLocalVoiceRemoteSource(playbackSource) &&
+              preparedQuinnChunkSourcesRef.current.has(requestKey)),
+        });
 
         player.replace(playbackSource);
-        await wait(
-          getQuinnVoicePlaybackStartDelayMs(playbackSource, {
-            isFirstChunk,
-          })
-        );
+
+        if (playbackDelayMs > 0) {
+          await wait(playbackDelayMs);
+        }
+
         player.play();
 
         setPlayerMode('quinn-preview');
       } catch (error) {
+        clearPreparedQuinnChunkState();
         const message = buildVoiceFailureMessage(error);
         setPipelinePhase('failed');
         setLastError(message);
@@ -322,7 +411,7 @@ useEffect(() => {
         setQuinnChunkIndex(0);
       }
     },
-    [player, preparePlaybackMode]
+    [clearPreparedQuinnChunkState, player, preparePlaybackMode, prepareQuinnChunkPlaybackSource]
   );
 
   async function handleCheckQuinnVoice(showStatus = true) {
@@ -514,6 +603,7 @@ async function handleSpeakQuinnVoice() {
   }
 
   try {
+    clearPreparedQuinnChunkState();
     setIsSpeakingQuinn(true);
     setQuinnChunks(chunks);
     setQuinnChunkIndex(0);
@@ -534,6 +624,7 @@ async function handleSpeakQuinnVoice() {
       setIsSpeakingQuinn(false);
       setQuinnChunks([]);
       setQuinnChunkIndex(0);
+      clearPreparedQuinnChunkState();
       return;
     }
 
@@ -545,6 +636,7 @@ async function handleSpeakQuinnVoice() {
       nextText: chunks[1] || '',
     });
   } catch (error) {
+    clearPreparedQuinnChunkState();
     const message = buildVoiceFailureMessage(error);
     setPipelinePhase('failed');
     setLastError(message);
@@ -596,6 +688,7 @@ async function handleSpeakQuinnVoice() {
   setIsSpeakingQuinn(false);
   setQuinnChunks([]);
   setQuinnChunkIndex(0);
+  clearPreparedQuinnChunkState();
   setPipelinePhase('ready');
   setStatusMessage('Voice playback stopped.');
 }
