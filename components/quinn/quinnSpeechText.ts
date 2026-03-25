@@ -384,6 +384,21 @@ function rebalanceSpeechChunks(chunks: string[], maxChars = 175) {
     }
   }
 
+  for (let i = 0; i < output.length - 1; i += 1) {
+    const current = output[i];
+    const next = output[i + 1];
+    const merged = finalizeSpeechChunk(`${current} ${next}`);
+
+    if (
+      !endsWithStrongPause(current) &&
+      !endsWithMediumPause(current) &&
+      merged.length <= maxChars + 20
+    ) {
+      output.splice(i, 2, merged);
+      i = Math.max(-1, i - 1);
+    }
+  }
+
   if (output.length >= 2) {
     const last = output[output.length - 1];
     const prev = output[output.length - 2];
@@ -409,8 +424,8 @@ function splitTextForSpeech(input: string, maxChars = 175, firstChunkMax = 160) 
     .map((part) => finalizeSpeechChunk(part))
     .filter(Boolean);
 
-  const targetMin = 95;
-  const targetIdeal = 135;
+  const targetMin = 110;
+  const targetIdeal = 155;
   const chunks: string[] = [];
   const activeChunkMax = () => (chunks.length === 0 ? firstChunkMax : maxChars);
 
@@ -480,7 +495,7 @@ function splitTextForSpeech(input: string, maxChars = 175, firstChunkMax = 160) 
 }
 
 export function buildRealtimeSpeechChunks(input: string) {
-  return splitTextForSpeech(input, 175, 160)
+  return splitTextForSpeech(input, 195, 160)
     .map((chunk) => finalizeSpeechChunk(chunk))
     .filter(Boolean);
 }

@@ -42,12 +42,11 @@ export function buildVoiceSpeakPayload(
 ) {
   const cleanText = String(text || '').replace(/\s+/g, ' ').trim();
   const cleanPreviousText = normalizeVoiceQueryText(previousText);
-  const cleanNextText = normalizeVoiceQueryText(nextText);
+  void nextText;
 
   return {
     text: cleanText,
     ...(cleanPreviousText ? { previous_text: cleanPreviousText } : {}),
-    ...(cleanNextText ? { next_text: cleanNextText } : {}),
   };
 }
 
@@ -81,10 +80,6 @@ export function getQuinnLocalVoiceSpeakUrl(
     params.set('previous_text', payload.previous_text);
   }
 
-  if (payload.next_text) {
-    params.set('next_text', payload.next_text);
-  }
-
   return `${buildQuinnBackendUrl('/voice-speak')}?${params.toString()}`;
 }
 
@@ -103,7 +98,18 @@ export function getQuinnLocalVoiceSpeakRequestKey(
     nextText,
   });
 
-  return [payload.text, payload.previous_text || '', payload.next_text || ''].join('::');
+  return [payload.text, payload.previous_text || '', ''].join('::');
+}
+
+export function getQuinnVoicePlaybackStartDelayMs(
+  playbackSource: string,
+  { isFirstChunk = false }: { isFirstChunk?: boolean } = {}
+) {
+  if (isQuinnLocalVoiceRemoteSource(playbackSource)) {
+    return isFirstChunk ? 100 : 18;
+  }
+
+  return isFirstChunk ? 24 : 6;
 }
 
 export async function prepareQuinnLocalVoiceSpeakUrl(

@@ -58,6 +58,7 @@ import {
 import {
   getQuinnLocalVoiceBaseUrl,
   getQuinnLocalVoiceSpeakRequestKey,
+  getQuinnVoicePlaybackStartDelayMs,
   isQuinnLocalVoiceRemoteSource,
   pingQuinnLocalVoice,
   prepareQuinnLocalVoicePlaybackSource,
@@ -1085,7 +1086,7 @@ function QuinnConversationSurface({
   const speechPlaybackStartedAtRef = useRef(0);
 
   const player = useAudioPlayer(playbackSource, {
-    updateInterval: 100,
+    updateInterval: 80,
     downloadFirst: true,
   });
   const playerStatus = useAudioPlayerStatus(player);
@@ -1376,7 +1377,11 @@ function QuinnConversationSurface({
         player.replace(playbackSource);
         void warmUpcomingSpeechChunks(sessionId, 2, chunkIndex + 1);
 
-        await wait(currentPart === 1 ? 160 : 40);
+        await wait(
+          getQuinnVoicePlaybackStartDelayMs(playbackSource, {
+            isFirstChunk: currentPart === 1,
+          })
+        );
 
         if (sessionId !== speechSessionRef.current) {
           return;
@@ -1533,6 +1538,10 @@ function QuinnConversationSurface({
         ? `Quinn voice warming up 1/${chunks.length}...`
         : 'Quinn voice requested. Hold for a moment.'
     );
+
+    if (chunks.length > 1) {
+      void warmUpcomingSpeechChunks(sessionId, 2, 1);
+    }
 
     await playSpeechChunkAtIndex(sessionId, 0);
   } catch (error) {

@@ -21,6 +21,8 @@ import SectionCard from './SectionCard';
 import { buildRealtimeSpeechChunks } from './quinnSpeechText';
 import {
   getQuinnLocalVoiceBaseUrl,
+  getQuinnVoicePlaybackStartDelayMs,
+  isQuinnLocalVoiceRemoteSource,
   pingQuinnLocalVoice,
   prepareQuinnLocalVoicePlaybackSource,
 } from './quinnLocalVoice';
@@ -96,7 +98,7 @@ export default function VoiceMode({
   const [playbackSource, setPlaybackSource] = useState<string | null>(null);
   const [playerMode, setPlayerMode] = useState<PlayerMode>(null);
   const player = useAudioPlayer(playbackSource, {
-    updateInterval: 250,
+    updateInterval: 80,
     downloadFirst: true,
   });
   const playerStatus = useAudioPlayerStatus(player);
@@ -169,6 +171,28 @@ export default function VoiceMode({
     };
   }, []);
 
+  const warmQuinnChunk = useCallback(
+    async (chunks: string[], chunkIndex: number) => {
+      const text = chunks[chunkIndex];
+
+      if (!text) {
+        return;
+      }
+
+      try {
+        const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
+          previousText: chunks[chunkIndex - 1] || '',
+          nextText: chunks[chunkIndex + 1] || '',
+        });
+
+        if (isQuinnLocalVoiceRemoteSource(playbackSource)) {
+          await fetch(playbackSource);
+        }
+      } catch {}
+    },
+    []
+  );
+
 // `playQuinnChunk` intentionally stays outside the dependency list here so this
 // effect only responds to the player finish transition.
 /* eslint-disable react-hooks/exhaustive-deps */
@@ -190,7 +214,9 @@ useEffect(() => {
     if (nextIndex < quinnChunks.length) {
       setQuinnChunkIndex(nextIndex);
       setStatusMessage('Quinn voice speaking now.');
+      void warmQuinnChunk(quinnChunks, nextIndex + 1);
       void playQuinnChunk(quinnChunks[nextIndex], {
+        isFirstChunk: false,
         previousText: quinnChunks[nextIndex - 1] || '',
         nextText: quinnChunks[nextIndex + 1] || '',
       });
@@ -256,9 +282,11 @@ useEffect(() => {
     async (
       text: string,
       {
+        isFirstChunk = false,
         previousText = '',
         nextText = '',
       }: {
+        isFirstChunk?: boolean;
         previousText?: string;
         nextText?: string;
       } = {}
@@ -272,7 +300,11 @@ useEffect(() => {
         });
 
         player.replace(playbackSource);
-        await wait(120);
+        await wait(
+          getQuinnVoicePlaybackStartDelayMs(playbackSource, {
+            isFirstChunk,
+          })
+        );
         player.play();
 
         setPlayerMode('quinn-preview');
@@ -503,8 +535,10 @@ async function handleSpeakQuinnVoice() {
     }
 
     setStatusMessage('Quinn voice speaking now.');
+    void warmQuinnChunk(chunks, 1);
 
     await playQuinnChunk(chunks[0], {
+      isFirstChunk: true,
       nextText: chunks[1] || '',
     });
   } catch (error) {
