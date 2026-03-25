@@ -106,10 +106,10 @@ export function getQuinnVoicePlaybackStartDelayMs(
   { isFirstChunk = false }: { isFirstChunk?: boolean } = {}
 ) {
   if (isQuinnLocalVoiceRemoteSource(playbackSource)) {
-    return isFirstChunk ? 100 : 18;
+    return isFirstChunk ? 72 : 8;
   }
 
-  return isFirstChunk ? 24 : 6;
+  return isFirstChunk ? 10 : 2;
 }
 
 export async function prepareQuinnLocalVoiceSpeakUrl(

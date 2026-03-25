@@ -1086,7 +1086,7 @@ function QuinnConversationSurface({
   const speechPlaybackStartedAtRef = useRef(0);
 
   const player = useAudioPlayer(playbackSource, {
-    updateInterval: 80,
+    updateInterval: 60,
     downloadFirst: true,
   });
   const playerStatus = useAudioPlayerStatus(player);
@@ -1374,8 +1374,8 @@ function QuinnConversationSurface({
           return;
         }
 
-        player.replace(playbackSource);
         void warmUpcomingSpeechChunks(sessionId, 2, chunkIndex + 1);
+        player.replace(playbackSource);
 
         await wait(
           getQuinnVoicePlaybackStartDelayMs(playbackSource, {

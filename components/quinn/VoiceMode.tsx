@@ -98,7 +98,7 @@ export default function VoiceMode({
   const [playbackSource, setPlaybackSource] = useState<string | null>(null);
   const [playerMode, setPlayerMode] = useState<PlayerMode>(null);
   const player = useAudioPlayer(playbackSource, {
-    updateInterval: 80,
+    updateInterval: 60,
     downloadFirst: true,
   });
   const playerStatus = useAudioPlayerStatus(player);
@@ -214,7 +214,10 @@ useEffect(() => {
     if (nextIndex < quinnChunks.length) {
       setQuinnChunkIndex(nextIndex);
       setStatusMessage('Quinn voice speaking now.');
-      void warmQuinnChunk(quinnChunks, nextIndex + 1);
+      void Promise.all([
+        warmQuinnChunk(quinnChunks, nextIndex + 1),
+        warmQuinnChunk(quinnChunks, nextIndex + 2),
+      ]);
       void playQuinnChunk(quinnChunks[nextIndex], {
         isFirstChunk: false,
         previousText: quinnChunks[nextIndex - 1] || '',
@@ -535,7 +538,7 @@ async function handleSpeakQuinnVoice() {
     }
 
     setStatusMessage('Quinn voice speaking now.');
-    void warmQuinnChunk(chunks, 1);
+    void Promise.all([warmQuinnChunk(chunks, 1), warmQuinnChunk(chunks, 2)]);
 
     await playQuinnChunk(chunks[0], {
       isFirstChunk: true,

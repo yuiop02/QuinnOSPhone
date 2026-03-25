@@ -71,10 +71,7 @@ function normalizeSpeechStructureForTts(input: string) {
     const numberedMatch = line.match(/^(\d{1,2})[.)]\s+(.+)$/);
 
     if (numberedMatch) {
-      const numberedLead =
-        lastListType === 'numbered'
-          ? `Next, option ${toSpokenOptionLabel(numberedMatch[1])}`
-          : `Option ${toSpokenOptionLabel(numberedMatch[1])}`;
+      const numberedLead = `Option ${toSpokenOptionLabel(numberedMatch[1])}`;
       output.push(`${numberedLead}: ${numberedMatch[2].trim()}`);
       lastListType = 'numbered';
       continue;
@@ -83,7 +80,7 @@ function normalizeSpeechStructureForTts(input: string) {
     const bulletMatch = line.match(/^[-*•]\s+(.+)$/);
 
     if (bulletMatch) {
-      output.push(`${lastListType === 'bullet' ? 'Next point' : 'Point'}: ${bulletMatch[1].trim()}`);
+      output.push(`Point: ${bulletMatch[1].trim()}`);
       lastListType = 'bullet';
       continue;
     }
@@ -424,8 +421,8 @@ function splitTextForSpeech(input: string, maxChars = 175, firstChunkMax = 160) 
     .map((part) => finalizeSpeechChunk(part))
     .filter(Boolean);
 
-  const targetMin = 110;
-  const targetIdeal = 155;
+  const targetMin = 118;
+  const targetIdeal = 165;
   const chunks: string[] = [];
   const activeChunkMax = () => (chunks.length === 0 ? firstChunkMax : maxChars);
 
@@ -495,7 +492,7 @@ function splitTextForSpeech(input: string, maxChars = 175, firstChunkMax = 160) 
 }
 
 export function buildRealtimeSpeechChunks(input: string) {
-  return splitTextForSpeech(input, 195, 160)
+  return splitTextForSpeech(input, 205, 160)
     .map((chunk) => finalizeSpeechChunk(chunk))
     .filter(Boolean);
 }
