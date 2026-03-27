@@ -44,8 +44,10 @@ import Feather from '@expo/vector-icons/Feather';
 import QuinnField from '../../components/quinn/QuinnField';
 import QuinnSurfaceShell from '../../components/quinn/QuinnSurfaceShell';
 import {
+  buildCompressionSummary,
   generateFollowupPacket,
   runQuinnPacket,
+  sanitizeQuinnVisibleReplyText,
   transcribeAudioFile,
 } from '../../components/quinn/quinnApi';
 import {
@@ -289,6 +291,22 @@ function parseBareNumericSelection(text: string) {
 
   const index = Number(match[1] || 0);
   return Number.isFinite(index) && index > 0 ? index : null;
+}
+
+function sanitizeRunHistoryItemForDisplay(item: RunHistoryItem): RunHistoryItem {
+  const cleanWrittenResult = sanitizeQuinnVisibleReplyText(item.writtenResult || '');
+  const cleanCompressedSummary = sanitizeQuinnVisibleReplyText(item.compressedSummary || '');
+
+  return {
+    ...item,
+    writtenResult: cleanWrittenResult,
+    compressedSummary:
+      cleanCompressedSummary || buildCompressionSummary(cleanWrittenResult || item.packetText || ''),
+  };
+}
+
+function sanitizeRunHistoryItemsForDisplay(items: RunHistoryItem[]) {
+  return items.map(sanitizeRunHistoryItemForDisplay);
 }
 
 const TopFadeWall = React.memo(function TopFadeWall() {
@@ -2357,19 +2375,26 @@ export default function App() {
       if (snapshot) {
         const hydratedThreadId =
           String(snapshot.currentSessionArc?.id || '').trim() || buildThreadContinuityId();
+        const hydratedWrittenResult = sanitizeQuinnVisibleReplyText(snapshot.writtenResult || '');
+        const hydratedCompressedSummary =
+          sanitizeQuinnVisibleReplyText(snapshot.compressedSummary || '') ||
+          buildCompressionSummary(hydratedWrittenResult || snapshot.packetText || '');
+        const hydratedRecentRuns = Array.isArray(snapshot.recentRuns)
+          ? sanitizeRunHistoryItemsForDisplay(snapshot.recentRuns)
+          : [];
 
         activeThreadIdRef.current = hydratedThreadId;
-        primeThreadContinuity(hydratedThreadId, snapshot.writtenResult || '');
+        primeThreadContinuity(hydratedThreadId, hydratedWrittenResult);
         setPacketTitle(snapshot.packetTitle || INITIAL_PACKET_TITLE);
         setPacketText('');
-        setWrittenResult(snapshot.writtenResult || '');
-        setCompressedSummary(snapshot.compressedSummary || '');
+        setWrittenResult(hydratedWrittenResult);
+        setCompressedSummary(hydratedCompressedSummary);
         setCurrentMemoryResonance(
           Array.isArray(snapshot.currentMemoryResonance) ? snapshot.currentMemoryResonance : []
         );
         setCurrentSessionArc(snapshot.currentSessionArc || null);
         setLastRunAt(snapshot.lastRunAt || null);
-        setRecentRuns(Array.isArray(snapshot.recentRuns) ? snapshot.recentRuns : []);
+        setRecentRuns(hydratedRecentRuns);
         setMemories(
           Array.isArray(snapshot.memories) && snapshot.memories.length
             ? snapshot.memories
@@ -2563,12 +2588,16 @@ export default function App() {
         sessionArc: sessionArcForRun,
       });
 
-      const shortSummary = buildSpokenSummary(result.summary, result.written);
+      const cleanWrittenResult = sanitizeQuinnVisibleReplyText(result.written);
+      const shortSummary = buildSpokenSummary(result.summary, cleanWrittenResult);
+      const cleanCompressedSummary =
+        sanitizeQuinnVisibleReplyText(shortSummary) ||
+        buildCompressionSummary(cleanWrittenResult || nextText);
       const timestamp = result.timestamp;
       const nextSessionArc = advanceSessionArc(sessionArcForRun, {
         packetTitle: effectiveTitle,
         packetText: nextText,
-        compressedSummary: shortSummary,
+        compressedSummary: cleanCompressedSummary,
         timestamp,
         lensLabel: activeLensLabel,
       });
@@ -2576,22 +2605,24 @@ export default function App() {
       const { runItem, memoryItem } = createRunArtifacts({
         packetTitle: effectiveTitle,
         packetText: nextText,
-        writtenResult: result.written,
-        compressedSummary: shortSummary,
+        writtenResult: cleanWrittenResult,
+        compressedSummary: cleanCompressedSummary,
         timestamp,
         memoryResonance: result.memoryResonance,
-          sessionArc: nextSessionArc,
-        });
+        sessionArc: nextSessionArc,
+      });
       const nextThreadId = String(nextSessionArc?.id || '').trim() || activeThreadIdRef.current;
 
       activeThreadIdRef.current = nextThreadId;
-      primeThreadContinuity(nextThreadId, result.written);
-      setWrittenResult(result.written);
-      setCompressedSummary(shortSummary);
+      primeThreadContinuity(nextThreadId, cleanWrittenResult);
+      setWrittenResult(cleanWrittenResult);
+      setCompressedSummary(cleanCompressedSummary);
       setCurrentMemoryResonance(result.memoryResonance);
       setCurrentSessionArc(nextSessionArc);
       setLastRunAt(timestamp);
-      setRecentRuns((prev) => [runItem, ...prev].slice(0, 24));
+      setRecentRuns((prev) =>
+        sanitizeRunHistoryItemsForDisplay([runItem, ...prev]).slice(0, 24)
+      );
       setMemories((prev) => [memoryItem, ...prev].slice(0, 12));
 
       pushNotification({
@@ -2607,7 +2638,8 @@ export default function App() {
 
       return {
         ...result,
-        summary: shortSummary,
+        written: cleanWrittenResult,
+        summary: cleanCompressedSummary,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The backend run failed.';
@@ -2628,7 +2660,7 @@ export default function App() {
   }
 
   async function handleStageNextMove() {
-    const responseText = String(writtenResult || '').trim();
+    const responseText = sanitizeQuinnVisibleReplyText(writtenResult);
 
     if (!responseText) {
       pushNotification({

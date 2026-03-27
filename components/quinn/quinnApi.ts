@@ -48,6 +48,261 @@ export type FollowUpPacket = {
   form: Record<string, string>;
 };
 
+const INTERNAL_REPLY_SECTION_LABELS = new Set([
+  'background context',
+  'freshness guard',
+  'quiet background that may help',
+  'background that may help here',
+  'reply stance',
+  'default feel',
+  'the live note to respond to',
+  'same thread',
+  'recent flow',
+  'open / write',
+  'open/write',
+  'project tag',
+  'mode',
+  'ask',
+  'task',
+  'output',
+  'context',
+]);
+
+function joinCleanParts(parts: string[], separator = '\n\n') {
+  return parts
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(separator)
+    .trim();
+}
+
+function stripFenceWrapper(text: string) {
+  const match = String(text || '')
+    .trim()
+    .match(/^```(?:json|javascript|js|typescript|ts|txt)?\s*([\s\S]*?)```$/i);
+
+  return match ? String(match[1] || '').trim() : String(text || '').trim();
+}
+
+function tryParseStructuredText(text: string): unknown | null {
+  const candidates = [String(text || '').trim(), stripFenceWrapper(text)];
+
+  for (const candidate of candidates) {
+    if (!candidate || (!candidate.startsWith('{') && !candidate.startsWith('['))) {
+      continue;
+    }
+
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // Keep falling through to the plain-text cleanup path.
+    }
+  }
+
+  return null;
+}
+
+function extractStructuredAssistantText(
+  value: unknown,
+  seen = new Set<unknown>()
+): string {
+  if (typeof value === 'string') {
+    return String(value || '').trim();
+  }
+
+  if (!value || typeof value !== 'object') {
+    return '';
+  }
+
+  if (seen.has(value)) {
+    return '';
+  }
+
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return joinCleanParts(
+      value.map((item) => extractStructuredAssistantText(item, seen))
+    );
+  }
+
+  const record = value as Record<string, unknown>;
+  const type = String(record.type || '')
+    .trim()
+    .toLowerCase();
+
+  if (
+    type.includes('reasoning') ||
+    type.includes('tool') ||
+    type.includes('function') ||
+    type.includes('web_search') ||
+    type.includes('file_search')
+  ) {
+    return '';
+  }
+
+  if (type === 'message' && Array.isArray(record.content)) {
+    return joinCleanParts(
+      record.content.map((item) => extractStructuredAssistantText(item, seen))
+    );
+  }
+
+  if ((type === 'output_text' || type === 'text') && typeof record.text === 'string') {
+    return String(record.text || '').trim();
+  }
+
+  if ((type === 'output_text' || type === 'text') && typeof record.value === 'string') {
+    return String(record.value || '').trim();
+  }
+
+  if (typeof record.output_text === 'string' && String(record.output_text || '').trim()) {
+    return String(record.output_text || '').trim();
+  }
+
+  if (Array.isArray(record.output)) {
+    const outputText = joinCleanParts(
+      record.output.map((item) => extractStructuredAssistantText(item, seen))
+    );
+
+    if (outputText) {
+      return outputText;
+    }
+  }
+
+  if (Array.isArray(record.content)) {
+    const contentText = joinCleanParts(
+      record.content.map((item) => extractStructuredAssistantText(item, seen))
+    );
+
+    if (contentText) {
+      return contentText;
+    }
+  }
+
+  for (const key of ['written', 'writtenResult', 'message', 'result', 'response', 'data']) {
+    const nested = extractStructuredAssistantText(record[key], seen);
+
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return '';
+}
+
+function countInternalLeakMarkers(text: string) {
+  const clean = String(text || '').toLowerCase();
+  let count = 0;
+
+  for (const label of INTERNAL_REPLY_SECTION_LABELS) {
+    if (clean.includes(label)) {
+      count += 1;
+    }
+  }
+
+  if (/rs_[\w-]+/i.test(text)) {
+    count += 2;
+  }
+
+  if (/"type"\s*:\s*"reasoning"|type\s*:\s*reasoning/i.test(text)) {
+    count += 2;
+  }
+
+  if (/"summary"\s*:\s*\[\s*\]|summary\s*:\s*\[\s*\]/i.test(text)) {
+    count += 1;
+  }
+
+  return count;
+}
+
+function isInternalMetadataBlock(block: string) {
+  const trimmed = String(block || '').trim();
+
+  if (!trimmed) {
+    return true;
+  }
+
+  const firstLine = String(trimmed.split('\n')[0] || '')
+    .trim()
+    .replace(/:$/, '')
+    .toLowerCase();
+
+  if (INTERNAL_REPLY_SECTION_LABELS.has(firstLine)) {
+    return true;
+  }
+
+  if (
+    /rs_[\w-]+/i.test(trimmed) ||
+    /"type"\s*:\s*"reasoning"|type\s*:\s*reasoning/i.test(trimmed) ||
+    /"summary"\s*:\s*\[\s*\]|summary\s*:\s*\[\s*\]/i.test(trimmed)
+  ) {
+    return true;
+  }
+
+  if (/^[\[{]/.test(trimmed) && /"type"\s*:|"id"\s*:|"summary"\s*:|rs_/i.test(trimmed)) {
+    return true;
+  }
+
+  return false;
+}
+
+function stripMetadataLines(text: string) {
+  return String(text || '')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = String(line || '').trim();
+
+      if (!trimmed) {
+        return true;
+      }
+
+      if (
+        /^rs_[\w-]+$/i.test(trimmed) ||
+        /^id\s*:\s*rs_[\w-]+$/i.test(trimmed) ||
+        /^type\s*:\s*reasoning$/i.test(trimmed) ||
+        /^summary\s*:\s*\[\s*\]$/i.test(trimmed) ||
+        /^"id"\s*:\s*"rs_[^"]+"\s*,?$/i.test(trimmed) ||
+        /^"type"\s*:\s*"reasoning"\s*,?$/i.test(trimmed) ||
+        /^"summary"\s*:\s*\[\s*\]\s*,?$/i.test(trimmed) ||
+        /^[\[\]{},]+$/.test(trimmed)
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .join('\n');
+}
+
+export function sanitizeQuinnVisibleReplyText(value: unknown): string {
+  const raw = typeof value === 'string' ? value : String(value ?? '');
+  const parsed = tryParseStructuredText(raw);
+  const extracted = parsed ? extractStructuredAssistantText(parsed) : '';
+  let clean = String(extracted || raw || '').replace(/\r\n?/g, '\n').trim();
+
+  if (!clean) {
+    return '';
+  }
+
+  if (countInternalLeakMarkers(clean) >= 2) {
+    const cleanedBlocks = clean
+      .split(/\n{2,}/)
+      .map((block) => block.trim())
+      .filter((block) => block && !isInternalMetadataBlock(block));
+
+    if (cleanedBlocks.length) {
+      clean = cleanedBlocks.join('\n\n').trim();
+    }
+  }
+
+  clean = stripMetadataLines(clean)
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return clean;
+}
+
 function buildReadableError(status: number, fallback: string) {
   return `${fallback} (${status})`;
 }
@@ -113,19 +368,20 @@ export async function runQuinnPacket({
     );
   }
 
-  const written = String(
+  const written = sanitizeQuinnVisibleReplyText(
     data?.written ??
       data?.writtenResult ??
       data?.result ??
       data?.output ??
       ''
-  ).trim();
+  );
 
-  const summary = String(
+  const summaryCandidate = sanitizeQuinnVisibleReplyText(
     data?.summary ??
       data?.compressedSummary ??
-      buildCompressionSummary(written || packetText)
-  ).trim();
+      ''
+  );
+  const summary = summaryCandidate || buildCompressionSummary(written || packetText);
 
   const timestamp = String(
     data?.timestamp ||
@@ -183,8 +439,8 @@ export async function generateFollowupPacket({
 
   return {
     sessionName: String(followUp.sessionName || 'Next move').trim(),
-    focusText: String(followUp.focusText || '').trim(),
-    summary: String(followUp.summary || '').trim(),
+    focusText: sanitizeQuinnVisibleReplyText(followUp.focusText || ''),
+    summary: sanitizeQuinnVisibleReplyText(followUp.summary || ''),
     form:
       followUp.form && typeof followUp.form === 'object'
         ? Object.fromEntries(
