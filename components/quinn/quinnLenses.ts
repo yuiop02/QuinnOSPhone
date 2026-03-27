@@ -29,7 +29,7 @@ const QUINN_LENSES: QuinnLens[] = [
     label: 'Open',
     blurb: 'Let Quinn decide the strongest shape.',
     mode: 'adaptive',
-    ask: 'Text back the way Quinn would when she already knows what this really is.',
+    ask: 'Text back the way Quinn would when she already knows what this really is. Lead with the real reply, not a guide.',
     output: 'A direct, natural reply that feels close, grounded, and real.',
   },
   {
@@ -45,8 +45,8 @@ const QUINN_LENSES: QuinnLens[] = [
     label: 'Strategy',
     blurb: 'Get decisive moves instead of vibes.',
     mode: 'strategy',
-    ask: 'Say the cleanest move here in a grounded way. Use structure only if it truly helps.',
-    output: 'The most useful next move, or a short plan that still sounds natural.',
+    ask: 'Say the cleanest move here like you would text it to me. Only turn it into a plan if that is genuinely the clearest way to say it.',
+    output: 'The clearest next move, said naturally. A short plan only if it truly helps.',
   },
   {
     id: 'write',
@@ -111,7 +111,7 @@ export function buildQuinnPacket({
     listPacketSection('OUTPUT', lens.output),
     listPacketSection(
       'CONTEXT',
-      'Treat the packet below like the thing I just said. Stay close to what is actually meant, and do not drift into stale assumptions or system language.'
+      'Treat the packet below like the thing I just said. Stay close to what is actually meant. Answer like a person, not a guide, unless the note clearly asks for structure.'
     ),
     sessionArcContext,
     listPacketSection('PACKET', safeText),

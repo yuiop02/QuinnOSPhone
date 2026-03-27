@@ -164,18 +164,15 @@ export function buildSessionArcPacketContext(sessionArc: SessionArc | null | und
   }
 
   const beats = Array.isArray(sessionArc.beats) ? sessionArc.beats.slice(-3) : [];
+  const recentFlow = beats
+    .map((beat) => cleanArcText(beat.summary, 110))
+    .filter(Boolean)
+    .join('\n');
 
   return [
-    `SAME CONVERSATION:\nThis still belongs to the same line of thought: ${sessionArc.title}`,
-    beats.length
-      ? `WHAT WAS JUST SAID:\n${beats
-          .map(
-            (beat, index) =>
-              `${index + 1}. ${cleanArcText(beat.summary, 110)}`
-          )
-          .join('\n')}`
-      : '',
-    `KEEP CARRYING IT ONLY IF IT STILL FITS:\nThis is turn ${sessionArc.stepCount}. Let it keep going only if the new note clearly belongs to the same thing.`,
+    `SAME THREAD:\nThis still belongs to the same line of thought: ${sessionArc.title}`,
+    recentFlow ? `RECENT FLOW:\n${recentFlow}` : '',
+    `ONLY KEEP THE CARRYOVER IF IT STILL FITS:\nThis is turn ${sessionArc.stepCount}. Keep the continuity only if the new note clearly belongs to the same thing.`,
   ]
     .filter(Boolean)
     .join('\n\n');

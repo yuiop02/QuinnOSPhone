@@ -18,7 +18,11 @@ import {
 
 import QuinnSurfaceShell from './QuinnSurfaceShell';
 import SectionCard from './SectionCard';
-import { buildRealtimeSpeechChunks } from './quinnSpeechText';
+import {
+  buildRealtimeSpeechChunks,
+  canUseSingleReplySpeech,
+  normalizeSpeechChunkSource,
+} from './quinnSpeechText';
 import {
   getQuinnLocalVoiceBaseUrl,
   getQuinnLocalVoiceSpeakRequestKey,
@@ -78,6 +82,25 @@ type PlayerMode = 'recording' | 'quinn-preview' | null;
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const SINGLE_REPLY_SPEECH_PREPARE_TIMEOUT_MS = 12000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 export default function VoiceMode({
@@ -399,6 +422,7 @@ useEffect(() => {
         player.play();
 
         setPlayerMode('quinn-preview');
+        return true;
       } catch (error) {
         clearPreparedQuinnChunkState();
         const message = buildVoiceFailureMessage(error);
@@ -409,9 +433,49 @@ useEffect(() => {
         setIsSpeakingQuinn(false);
         setQuinnChunks([]);
         setQuinnChunkIndex(0);
+        return false;
       }
     },
     [clearPreparedQuinnChunkState, player, preparePlaybackMode, prepareQuinnChunkPlaybackSource]
+  );
+
+  const tryPlaySingleQuinnVoice = useCallback(
+    async (clean: string) => {
+      if (!canUseSingleReplySpeech(clean)) {
+        return false;
+      }
+
+      setQuinnChunks([clean]);
+      setQuinnChunkIndex(0);
+      setStatusMessage('Quinn voice loading full preview...');
+
+      try {
+        await withTimeout(
+          prepareQuinnChunkPlaybackSource(clean, {
+            previousText: '',
+            nextText: '',
+          }),
+          SINGLE_REPLY_SPEECH_PREPARE_TIMEOUT_MS,
+          'Full reply preview voice preparation timed out.'
+        );
+
+        const started = await playQuinnChunk(clean, {
+          isFirstChunk: true,
+          previousText: '',
+          nextText: '',
+        });
+
+        if (started) {
+          return true;
+        }
+      } catch {}
+
+      clearPreparedQuinnChunkState();
+      setQuinnChunks([]);
+      setQuinnChunkIndex(0);
+      return false;
+    },
+    [clearPreparedQuinnChunkState, playQuinnChunk, prepareQuinnChunkPlaybackSource]
   );
 
   async function handleCheckQuinnVoice(showStatus = true) {
@@ -590,9 +654,9 @@ useEffect(() => {
   }
 
 async function handleSpeakQuinnVoice() {
-  const chunks = buildRealtimeSpeechChunks(spokenSummary);
+  const clean = normalizeSpeechChunkSource(spokenSummary);
 
-  if (!chunks.length) {
+  if (!clean) {
     setStatusMessage('Add or rebuild a spoken summary first.');
     return;
   }
@@ -605,7 +669,6 @@ async function handleSpeakQuinnVoice() {
   try {
     clearPreparedQuinnChunkState();
     setIsSpeakingQuinn(true);
-    setQuinnChunks(chunks);
     setQuinnChunkIndex(0);
     setPipelinePhase('speaking-preview');
     setLastError(null);
@@ -625,6 +688,24 @@ async function handleSpeakQuinnVoice() {
       setQuinnChunks([]);
       setQuinnChunkIndex(0);
       clearPreparedQuinnChunkState();
+      return;
+    }
+
+    if (await tryPlaySingleQuinnVoice(clean)) {
+      return;
+    }
+
+    setIsSpeakingQuinn(true);
+    setPipelinePhase('speaking-preview');
+    setLastError(null);
+
+    const chunks = buildRealtimeSpeechChunks(clean);
+
+    if (!chunks.length) {
+      setStatusMessage('Add or rebuild a spoken summary first.');
+      setIsSpeakingQuinn(false);
+      setQuinnChunks([]);
+      setQuinnChunkIndex(0);
       return;
     }
 

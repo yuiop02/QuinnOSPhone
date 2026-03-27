@@ -84,6 +84,7 @@ import {
 import {
   buildRealtimeSpeechChunks,
   buildSpokenSummary,
+  canUseSingleReplySpeech,
   normalizeSpeechChunkSource,
 } from '../../components/quinn/quinnSpeechText';
 import {
@@ -203,6 +204,25 @@ function resolveScreen(moduleValue: any, exportName: string): React.ComponentTyp
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const SINGLE_REPLY_SPEECH_PREPARE_TIMEOUT_MS = 12000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 function buildThreadContinuityId() {
@@ -1406,14 +1426,14 @@ function QuinnConversationSurface({
   const playSpeechChunkAtIndex = useCallback(
     async (sessionId: number, chunkIndex: number) => {
       if (sessionId !== speechSessionRef.current || speechAdvanceInFlightRef.current) {
-        return;
+        return false;
       }
 
       speechAdvanceInFlightRef.current = true;
 
       try {
         if (sessionId !== speechSessionRef.current) {
-          return;
+          return false;
         }
 
         const chunks = speechChunksRef.current;
@@ -1428,7 +1448,7 @@ function QuinnConversationSurface({
           setIsPreparingQuinnVoice(false);
           setIsSpeakingResponse(false);
           setVoiceStatus('Audio finished.');
-          return;
+          return false;
         }
 
         const currentPart = chunkIndex + 1;
@@ -1471,7 +1491,7 @@ function QuinnConversationSurface({
         speechPlaybackStartedAtRef.current = 0;
 
         if (sessionId !== speechSessionRef.current) {
-          return;
+          return false;
         }
 
         void warmUpcomingSpeechChunks(sessionId, 2, chunkIndex + 1);
@@ -1482,11 +1502,11 @@ function QuinnConversationSurface({
         }
 
         if (sessionId !== speechSessionRef.current) {
-          return;
+          return false;
         }
 
         if (speechChunksRef.current[chunkIndex] !== nextChunk) {
-          return;
+          return false;
         }
 
         speechActiveChunkIndexRef.current = chunkIndex;
@@ -1497,6 +1517,7 @@ function QuinnConversationSurface({
         awaitingSpeechFinishRef.current = true;
         setIsPreparingQuinnVoice(false);
         setIsSpeakingResponse(true);
+        return true;
       } catch (error) {
         clearSpeechQueue();
         const message =
@@ -1505,11 +1526,61 @@ function QuinnConversationSurface({
         setVoiceStatus(message);
         setIsPreparingQuinnVoice(false);
         setIsSpeakingResponse(false);
+        return false;
       } finally {
         speechAdvanceInFlightRef.current = false;
       }
     },
     [player, prepareSpeechPlaybackSource, warmUpcomingSpeechChunks]
+  );
+
+  const tryPlaySingleReplySpeech = useCallback(
+    async (clean: string) => {
+      if (!canUseSingleReplySpeech(clean)) {
+        return false;
+      }
+
+      speechChunksRef.current = [clean];
+      speechActiveChunkIndexRef.current = -1;
+      speechSessionRef.current += 1;
+
+      const sessionId = speechSessionRef.current;
+
+      setVoiceStatus('Quinn voice loading full reply...');
+
+      try {
+        await withTimeout(
+          prepareSpeechPlaybackSource(
+            clean,
+            {
+              previousText: '',
+              nextText: '',
+            },
+            sessionId
+          ),
+          SINGLE_REPLY_SPEECH_PREPARE_TIMEOUT_MS,
+          'Full reply voice preparation timed out.'
+        );
+
+        if (sessionId !== speechSessionRef.current) {
+          return true;
+        }
+
+        const started = await playSpeechChunkAtIndex(sessionId, 0);
+
+        if (started) {
+          return true;
+        }
+      } catch {}
+
+      if (sessionId === speechSessionRef.current) {
+        clearSpeechQueue();
+        player.pause();
+      }
+
+      return false;
+    },
+    [player, playSpeechChunkAtIndex, prepareSpeechPlaybackSource]
   );
 
   async function interruptQuinnPlayback() {
@@ -1588,7 +1659,7 @@ function QuinnConversationSurface({
     }
   }
 
- async function handleSpeakQuinnText(text: string) {
+  async function handleSpeakQuinnText(text: string) {
   const clean = normalizeSpeechChunkSource(text);
 
   if (!clean) {
@@ -1617,6 +1688,14 @@ function QuinnConversationSurface({
 
     await preparePlaybackMode();
 
+    if (await tryPlaySingleReplySpeech(clean)) {
+      return;
+    }
+
+    setVoiceError(null);
+    setIsPreparingQuinnVoice(true);
+    setIsSpeakingResponse(false);
+
     const chunks = buildRealtimeSpeechChunks(clean);
 
     if (!chunks.length) {
@@ -1634,7 +1713,7 @@ function QuinnConversationSurface({
     setVoiceStatus(
       chunks.length > 1
         ? `Quinn voice warming up 1/${chunks.length}...`
-        : 'Quinn voice requested. Hold for a moment.'
+        : 'Quinn voice requested. Using buffered playback.'
     );
 
     if (chunks.length > 1) {

@@ -94,7 +94,7 @@ export async function runQuinnPacket({
     body: JSON.stringify({
       packet: builtPacket,
       prompt:
-        'Reply like the version of me that already knows exactly what I mean. Keep it natural, grounded, prose-first, and only use memory if it quietly sharpens the reply.',
+        'Reply like the version of me that already knows exactly what I mean. Start with the real reply in natural prose, usually one to three short paragraphs. Do not turn it into steps, options, or a how-to unless I clearly asked for that. Let memory stay quiet unless it genuinely sharpens the answer.',
       packetTitle,
       packetText,
       projectTag: 'General',

@@ -127,6 +127,16 @@ export function normalizeSpeechChunkSource(input: string): string {
     .trim();
 }
 
+export const QUINN_SINGLE_REPLY_SPEECH_MAX_CHARS = 900;
+
+export function canUseSingleReplySpeech(
+  input: string,
+  maxChars = QUINN_SINGLE_REPLY_SPEECH_MAX_CHARS
+) {
+  const clean = normalizeSpeechChunkSource(input);
+  return Boolean(clean) && clean.length <= maxChars;
+}
+
 export function buildSpokenSummary(summary: string, written: string): string {
   const cleanSummary = normalizeSpeechText(summary);
   const cleanWritten = normalizeSpeechText(written);
