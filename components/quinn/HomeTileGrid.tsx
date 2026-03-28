@@ -351,17 +351,33 @@ export default function HomeTileGrid({
 
               <View style={styles.runRowActions}>
                 <Pressable
-                  style={styles.feedPrimaryButton}
+                  style={[styles.feedPrimaryButton, isRunning && styles.feedButtonDisabled]}
                   onPress={() => onRestoreRunToCanvas(run)}
+                  disabled={isRunning}
                 >
-                  <Text style={styles.feedPrimaryButtonText}>Load</Text>
+                  <Text
+                    style={[
+                      styles.feedPrimaryButtonText,
+                      isRunning && styles.feedButtonTextDisabled,
+                    ]}
+                  >
+                    Load
+                  </Text>
                 </Pressable>
 
                 <Pressable
-                  style={styles.feedSecondaryButton}
+                  style={[styles.feedSecondaryButton, isRunning && styles.feedButtonDisabled]}
                   onPress={() => onRerunHistoryItem(run)}
+                  disabled={isRunning}
                 >
-                  <Text style={styles.feedSecondaryButtonText}>Rerun</Text>
+                  <Text
+                    style={[
+                      styles.feedSecondaryButtonText,
+                      isRunning && styles.feedButtonTextDisabled,
+                    ]}
+                  >
+                    Rerun
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -863,6 +879,14 @@ const styles = StyleSheet.create({
     color: SURFACE_THEME.text,
     fontSize: 12,
     fontWeight: '900',
+  },
+
+  feedButtonDisabled: {
+    opacity: 0.45,
+  },
+
+  feedButtonTextDisabled: {
+    color: SURFACE_THEME.textSoft,
   },
 
   memoryPreviewCard: {

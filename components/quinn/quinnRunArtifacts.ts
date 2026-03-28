@@ -11,6 +11,7 @@ export type CreateRunArtifactsArgs = {
   writtenResult: string;
   compressedSummary: string;
   timestamp: string;
+  lensId?: string;
   memoryResonance?: MemoryResonanceItem[];
   sessionArc?: SessionArc | null;
 };
@@ -21,6 +22,7 @@ export function createRunArtifacts({
   writtenResult,
   compressedSummary,
   timestamp,
+  lensId = '',
   memoryResonance = [],
   sessionArc = null,
 }: CreateRunArtifactsArgs): {
@@ -49,6 +51,7 @@ export function createRunArtifacts({
       writtenResult: safeWrittenResult,
       compressedSummary: safeCompressedSummary,
       timestamp: safeTimestamp,
+      lensId: String(lensId || '').trim() || undefined,
       memoryResonance: safeMemoryResonance,
       sessionArcId: String(sessionArc?.id || '').trim() || undefined,
       sessionArcTitle: String(sessionArc?.title || '').trim() || undefined,

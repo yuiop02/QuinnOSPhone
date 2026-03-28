@@ -135,6 +135,12 @@ type NumberedOption = {
   text: string;
 };
 
+type VisibleReplySource = {
+  packetTitle: string;
+  packetText: string;
+  lensId: QuinnLensId;
+};
+
 const HEADER_HEIGHT = 236;
 const FADE_WALL_HEIGHT = 296;
 const WINDOW_WIDTH = Dimensions.get('window').width;
@@ -291,6 +297,52 @@ function parseBareNumericSelection(text: string) {
 
   const index = Number(match[1] || 0);
   return Number.isFinite(index) && index > 0 ? index : null;
+}
+
+function coerceQuinnLensId(value: unknown): QuinnLensId {
+  const clean = String(value || '').trim().toLowerCase();
+
+  if (
+    clean === 'open' ||
+    clean === 'read' ||
+    clean === 'strategy' ||
+    clean === 'write' ||
+    clean === 'reality'
+  ) {
+    return clean as QuinnLensId;
+  }
+
+  return DEFAULT_QUINN_LENS_ID;
+}
+
+function deriveVisibleReplySource({
+  writtenResult,
+  recentRuns,
+  packetTitle,
+  packetText,
+  activeLensId,
+}: {
+  writtenResult: string;
+  recentRuns: RunHistoryItem[];
+  packetTitle: string;
+  packetText: string;
+  activeLensId: QuinnLensId;
+}): VisibleReplySource {
+  const latestRun = Array.isArray(recentRuns) ? recentRuns[0] : null;
+
+  if (String(writtenResult || '').trim() && latestRun) {
+    return {
+      packetTitle: latestRun.packetTitle || packetTitle,
+      packetText: latestRun.packetText || packetText,
+      lensId: latestRun.lensId ? coerceQuinnLensId(latestRun.lensId) : activeLensId,
+    };
+  }
+
+  return {
+    packetTitle,
+    packetText,
+    lensId: activeLensId,
+  };
 }
 
 function sanitizeRunHistoryItemForDisplay(item: RunHistoryItem): RunHistoryItem {
@@ -1058,6 +1110,9 @@ const VoiceMode = resolveScreen(VoiceModeModule, 'VoiceMode');
 type QuinnConversationSurfaceProps = {
   packetTitle: string;
   packetText: string;
+  responsePacketTitle: string;
+  responsePacketText: string;
+  responseLensId: QuinnLensId;
   writtenResult: string;
   compressedSummary: string;
   memoryResonance: MemoryResonanceItem[];
@@ -1074,6 +1129,7 @@ type QuinnConversationSurfaceProps = {
   onRunPacket: (override?: {
     packetTitle: string;
     packetText: string;
+    lensId?: QuinnLensId;
     stayOnScreen?: boolean;
     syncVisibleInput?: boolean;
     sessionArc?: SessionArc | null;
@@ -1083,6 +1139,9 @@ type QuinnConversationSurfaceProps = {
 function QuinnConversationSurface({
   packetTitle,
   packetText,
+  responsePacketTitle,
+  responsePacketText,
+  responseLensId,
   writtenResult,
   compressedSummary,
   memoryResonance,
@@ -1135,11 +1194,12 @@ function QuinnConversationSurface({
   const trimmedInput = String(packetText || '').trim();
   const canSend = trimmedInput.length > 0 && !isRunning;
   const activeLens = getQuinnLens(activeLensId);
+  const responseLens = getQuinnLens(responseLensId);
   const sessionArcMeta = buildSessionArcMeta(sessionArc);
   const displayThreadTitle = derivePacketTitle({
-    packetTitle,
-    packetText,
-    lensLabel: activeLens.label,
+    packetTitle: responsePacketTitle,
+    packetText: responsePacketText,
+    lensLabel: responseLens.label,
     sessionArcTitle: sessionArc?.title || '',
   });
   const showThreadTitle =
@@ -1147,7 +1207,7 @@ function QuinnConversationSurface({
   const responseContextItems = [
     {
       label: 'Lens',
-      value: activeLens.label,
+      value: responseLens.label,
     },
     {
       label: 'Carryover',
@@ -2234,20 +2294,26 @@ function QuinnConversationSurface({
               <Pressable
                 style={[
                   styles.responseActionChip,
-                  (!writtenResult || isStagingNextMove) && styles.responseActionChipDisabled,
+                  (!writtenResult || isStagingNextMove || isRunning) &&
+                    styles.responseActionChipDisabled,
                 ]}
                 onPress={() => {
                   void onStageNextMove();
                 }}
-                disabled={!writtenResult || isStagingNextMove}
+                disabled={!writtenResult || isStagingNextMove || isRunning}
               >
                 <Text
                   style={[
                     styles.responseActionChipText,
-                    (!writtenResult || isStagingNextMove) && styles.responseActionChipTextDisabled,
+                    (!writtenResult || isStagingNextMove || isRunning) &&
+                      styles.responseActionChipTextDisabled,
                   ]}
                 >
-                  {isStagingNextMove ? 'Staging next move...' : 'Stage next move'}
+                  {isStagingNextMove
+                    ? 'Staging next move...'
+                    : isRunning
+                      ? 'Run in progress...'
+                      : 'Stage next move'}
                 </Text>
               </Pressable>
 
@@ -2312,6 +2378,9 @@ export default function App() {
     threadId: string;
     options: NumberedOption[];
   } | null>(null);
+  const activeRunTokenRef = useRef(0);
+  const runInFlightRef = useRef(false);
+  const activeStageTokenRef = useRef(0);
 
   function primeThreadContinuity(threadId: string, responseText: string) {
     const cleanResponse = String(responseText || '').trim();
@@ -2341,6 +2410,11 @@ export default function App() {
     clearComposer?: boolean;
     resetTitle?: boolean;
   } = {}) {
+    activeRunTokenRef.current += 1;
+    runInFlightRef.current = false;
+    activeStageTokenRef.current += 1;
+    setIsRunning(false);
+    setIsStagingNextMove(false);
     activeThreadIdRef.current = buildThreadContinuityId();
     lastAssistantResponseRef.current = null;
     lastNumberedOptionsRef.current = null;
@@ -2525,17 +2599,31 @@ export default function App() {
     override?: {
       packetTitle: string;
       packetText: string;
+      lensId?: QuinnLensId;
       stayOnScreen?: boolean;
       syncVisibleInput?: boolean;
       sessionArc?: SessionArc | null;
     }
   ): Promise<QuinnRunResult | null> {
+    if (runInFlightRef.current) {
+      const message = 'Quinn is already running. Let the current run finish first.';
+      setRunError(message);
+      pushNotification({
+        title: 'Run already in progress',
+        body: message,
+        target: 'QuinnConversation',
+        tone: 'alert',
+      });
+      return null;
+    }
+
     const nextTitle = override?.packetTitle ?? packetTitle;
     const rawNextText = override?.packetText ?? packetText;
+    const effectiveLensId = override?.lensId ?? activeLensId;
     const stayOnScreen = override?.stayOnScreen ?? true;
     const syncVisibleInput = override?.syncVisibleInput ?? true;
     const sessionArcForRun = override?.sessionArc ?? currentSessionArc;
-    const activeLensLabel = getQuinnLens(activeLensId).label;
+    const activeLensLabel = getQuinnLens(effectiveLensId).label;
     const selectedOptionIndex = parseBareNumericSelection(rawNextText);
     const selectedOption =
       selectedOptionIndex &&
@@ -2573,10 +2661,17 @@ export default function App() {
       if (syncVisibleInput) {
         setPacketText(rawNextText);
       }
+
+      if (effectiveLensId !== activeLensId) {
+        setActiveLensId(effectiveLensId);
+      }
     } else if (effectiveTitle !== packetTitle) {
       setPacketTitle(effectiveTitle);
     }
 
+    const runToken = activeRunTokenRef.current + 1;
+    activeRunTokenRef.current = runToken;
+    runInFlightRef.current = true;
     setIsRunning(true);
     setRunError('');
 
@@ -2584,9 +2679,13 @@ export default function App() {
       const result = await runQuinnPacket({
         packetTitle: effectiveTitle,
         packetText: nextText,
-        lensId: activeLensId,
+        lensId: effectiveLensId,
         sessionArc: sessionArcForRun,
       });
+
+      if (activeRunTokenRef.current !== runToken) {
+        return null;
+      }
 
       const cleanWrittenResult = sanitizeQuinnVisibleReplyText(result.written);
       const shortSummary = buildSpokenSummary(result.summary, cleanWrittenResult);
@@ -2608,6 +2707,7 @@ export default function App() {
         writtenResult: cleanWrittenResult,
         compressedSummary: cleanCompressedSummary,
         timestamp,
+        lensId: effectiveLensId,
         memoryResonance: result.memoryResonance,
         sessionArc: nextSessionArc,
       });
@@ -2642,6 +2742,10 @@ export default function App() {
         summary: cleanCompressedSummary,
       };
     } catch (error) {
+      if (activeRunTokenRef.current !== runToken) {
+        return null;
+      }
+
       const message = error instanceof Error ? error.message : 'The backend run failed.';
 
       setRunError(message);
@@ -2655,12 +2759,32 @@ export default function App() {
 
       return null;
     } finally {
-      setIsRunning(false);
+      if (activeRunTokenRef.current === runToken) {
+        runInFlightRef.current = false;
+        setIsRunning(false);
+      }
     }
   }
 
   async function handleStageNextMove() {
+    if (isRunning) {
+      pushNotification({
+        title: 'Run in progress',
+        body: 'Wait for Quinn to finish, then stage the next move from the latest reply.',
+        target: 'QuinnConversation',
+        tone: 'alert',
+      });
+      return;
+    }
+
     const responseText = sanitizeQuinnVisibleReplyText(writtenResult);
+    const visibleReplySource = deriveVisibleReplySource({
+      writtenResult,
+      recentRuns,
+      packetTitle,
+      packetText,
+      activeLensId,
+    });
 
     if (!responseText) {
       pushNotification({
@@ -2673,17 +2797,23 @@ export default function App() {
     }
 
     setIsStagingNextMove(true);
+    const stageToken = activeStageTokenRef.current + 1;
+    activeStageTokenRef.current = stageToken;
 
     try {
       const followUp = await generateFollowupPacket({
         responseText,
         currentPacket: buildQuinnPacket({
-          packetTitle,
-          packetText,
-          lensId: activeLensId,
+          packetTitle: visibleReplySource.packetTitle,
+          packetText: visibleReplySource.packetText,
+          lensId: visibleReplySource.lensId,
           sessionArc: currentSessionArc,
         }),
       });
+
+      if (activeStageTokenRef.current !== stageToken) {
+        return;
+      }
 
       const nextLensId = inferQuinnLensFromFollowUp(followUp);
       const nextText =
@@ -2714,6 +2844,10 @@ export default function App() {
         tone: 'gold',
       });
     } catch (error) {
+      if (activeStageTokenRef.current !== stageToken) {
+        return;
+      }
+
       const message =
         error instanceof Error ? error.message : 'Could not stage the next move.';
 
@@ -2724,7 +2858,9 @@ export default function App() {
         tone: 'alert',
       });
     } finally {
-      setIsStagingNextMove(false);
+      if (activeStageTokenRef.current === stageToken) {
+        setIsStagingNextMove(false);
+      }
     }
   }
 
@@ -2815,6 +2951,7 @@ export default function App() {
     clearThreadContinuity({
       clearVisibleResponse: true,
     });
+    setActiveLensId(run.lensId ? coerceQuinnLensId(run.lensId) : activeLensId);
     setPacketTitle(run.packetTitle || 'Untitled packet');
     setPacketText(run.packetText || '');
     setRunError('');
@@ -2834,6 +2971,7 @@ export default function App() {
     handleRunPacket({
       packetTitle: run.packetTitle || 'Untitled packet',
       packetText: run.packetText || '',
+      lensId: run.lensId ? coerceQuinnLensId(run.lensId) : activeLensId,
       stayOnScreen: screen === 'QuinnConversation',
       syncVisibleInput: true,
       sessionArc: resumedArc,
@@ -2909,15 +3047,29 @@ export default function App() {
     () => countUnreadNotifications(notifications),
     [notifications]
   );
+  const visibleReplySource = useMemo(
+    () =>
+      deriveVisibleReplySource({
+        writtenResult,
+        recentRuns,
+        packetTitle,
+        packetText,
+        activeLensId,
+      }),
+    [activeLensId, packetText, packetTitle, recentRuns, writtenResult]
+  );
 
   let content = null;
 
   if (screen === 'QuinnConversation') {
     content = (
-      <QuinnConversationSurface
-        packetTitle={packetTitle}
-        packetText={packetText}
-        writtenResult={writtenResult}
+        <QuinnConversationSurface
+          packetTitle={packetTitle}
+          packetText={packetText}
+          responsePacketTitle={visibleReplySource.packetTitle}
+          responsePacketText={visibleReplySource.packetText}
+          responseLensId={visibleReplySource.lensId}
+          writtenResult={writtenResult}
         compressedSummary={compressedSummary}
         memoryResonance={currentMemoryResonance}
         sessionArc={currentSessionArc}
@@ -3027,7 +3179,7 @@ export default function App() {
         canRunCurrentPacket={Boolean(String(packetText || '').trim()) && !isRunning}
         packetTitle={packetTitle}
         packetText={packetText}
-        activeLensLabel={getQuinnLens(activeLensId).label}
+        activeLensLabel={getQuinnLens(visibleReplySource.lensId).label}
         currentSessionArc={currentSessionArc}
         currentMemoryResonance={currentMemoryResonance}
         writtenResult={writtenResult}

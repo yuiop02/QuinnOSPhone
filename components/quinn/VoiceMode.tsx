@@ -837,19 +837,43 @@ async function handleSpeakQuinnVoice() {
   }
 
   function handleLoadVoiceSession(session: VoiceSession) {
+    void stopSystemVoicePreview();
+    player.pause();
+    setPlayerMode(null);
+    setIsSpeakingQuinn(false);
+    setQuinnChunks([]);
+    setQuinnChunkIndex(0);
+    clearPreparedQuinnChunkState();
     setTranscript(session.transcript);
     setSpokenSummary(session.spokenSummary);
     setRecordingUri(session.recordingUri);
     setRecordingDuration(session.durationMillis);
     setPlaybackSource(session.recordingUri);
-    setPipelinePhase(session.pipelinePhase || 'ready');
+    setPipelinePhase(
+      session.pipelinePhase === 'playing-recording' || session.pipelinePhase === 'speaking-preview'
+        ? 'ready'
+        : session.pipelinePhase || 'ready'
+    );
     setLastError(session.errorMessage || null);
+    setLastTranscriptNote('Loaded from saved voice handoff.');
     setStatusMessage(`${session.title} loaded into Voice Mode.`);
   }
 
   async function handleDeleteVoiceSession(id: string, uri: string | null) {
     await deleteLocalRecording(uri);
     onDeleteVoiceSession(id);
+
+    if (uri && recordingUri === uri) {
+      player.pause();
+      setPlayerMode(null);
+      setRecordingUri(null);
+      setRecordingDuration(0);
+      setPlaybackSource(null);
+      setPipelinePhase('idle');
+      setLastTranscriptNote('');
+      clearPreparedQuinnChunkState();
+    }
+
     setStatusMessage('Saved voice session deleted.');
   }
     function handleCycleProvider() {

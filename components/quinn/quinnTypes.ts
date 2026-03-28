@@ -48,6 +48,7 @@ export type RunHistoryItem = {
   writtenResult: string;
   compressedSummary: string;
   timestamp: string;
+  lensId?: string;
   memoryResonance?: MemoryResonanceItem[];
   sessionArcId?: string;
   sessionArcTitle?: string;

@@ -161,6 +161,7 @@ function normalizeRunHistoryItem(item: any): RunHistoryItem | null {
     writtenResult: String(item.writtenResult || ''),
     compressedSummary: String(item.compressedSummary || ''),
     timestamp: String(item.timestamp || ''),
+    lensId: item.lensId ? String(item.lensId) : undefined,
     memoryResonance,
     sessionArcId: item.sessionArcId ? String(item.sessionArcId) : undefined,
     sessionArcTitle: item.sessionArcTitle ? String(item.sessionArcTitle) : undefined,
