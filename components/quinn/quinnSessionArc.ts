@@ -170,9 +170,9 @@ export function buildSessionArcPacketContext(sessionArc: SessionArc | null | und
     .join('\n');
 
   return [
-    `SAME THREAD:\nThis still belongs to the same line of thought: ${sessionArc.title}`,
-    recentFlow ? `RECENT FLOW:\n${recentFlow}` : '',
-    `ONLY KEEP THE CARRYOVER IF IT STILL FITS:\nThis is turn ${sessionArc.stepCount}. Keep the continuity only if the new note clearly belongs to the same thing.`,
+    `This is still the same thread:\n${sessionArc.title}`,
+    recentFlow ? `What we were just circling:\n${recentFlow}` : '',
+    `Only carry it forward if it still fits:\nThis is turn ${sessionArc.stepCount}. If the new note has clearly shifted, answer the new thing instead of forcing the old thread. If the thread is still exploratory, stay with the exploration instead of pushing it into a conclusion too early.`,
   ]
     .filter(Boolean)
     .join('\n\n');

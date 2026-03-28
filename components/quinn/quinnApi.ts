@@ -349,7 +349,7 @@ export async function runQuinnPacket({
     body: JSON.stringify({
       packet: builtPacket,
       prompt:
-        'Reply like the version of me that already knows exactly what I mean. Start with the real reply in natural prose, usually one to three short paragraphs. Do not turn it into steps, options, or a how-to unless I clearly asked for that. Let memory stay quiet unless it genuinely sharpens the answer.',
+        'Reply like another me in the same headspace, not like someone helping from the outside. First notice whether I am exploring, venting, riffing, conflicted, or actually asking for advice. If I am exploring, stay with the thought and bounce it back instead of solving too fast. If I clearly want a move, options, or a plan, then be direct and useful. Say what you actually think in natural prose, usually one to three short paragraphs. Do not default to steps, options, or a how-to unless I clearly asked for that or the thought truly needs structure. Let memory stay quiet unless it genuinely sharpens the reply.',
       packetTitle,
       packetText,
       projectTag: 'General',
