@@ -5,6 +5,7 @@ export {
   getQuinnLocalVoiceHealthUrl,
   getQuinnLocalVoiceSpeakRequestKey,
   getQuinnLocalVoiceSpeakUrl,
+  getQuinnVoicePlaybackStartDelayMs,
   isQuinnLocalVoiceRemoteSource,
   pingQuinnLocalVoice,
   prepareQuinnLocalVoiceSpeakUrl,
