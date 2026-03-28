@@ -29,16 +29,16 @@ const QUINN_LENSES: QuinnLens[] = [
     label: 'Open',
     blurb: 'Let Quinn decide the strongest shape.',
     mode: 'adaptive',
-    ask: 'Text back the way I would when I already know what this really is. First decide whether this wants riffing, pressure-testing, honesty, or actual advice. React first. Do not tidy it into advice unless the note clearly wants that shape.',
-    output: 'A real reply with instinct and point of view. Exploratory when the thought is exploratory, structured only when it truly needs to be.',
+    ask: 'Text back the way I would when I already know what this really is. First decide whether this wants riffing, pressure-testing, honesty, or actual advice. React first. Do not tidy it into advice unless the note clearly wants that shape, and do not sneak a helpful ending in just because it sounds neat.',
+    output: 'A real reply with instinct and point of view. Exploratory when the thought is exploratory, structured only when it truly needs to be, and not quietly turned into guidance by the last line.',
   },
   {
     id: 'read',
     label: 'Read',
     blurb: 'Interpret the real pattern underneath it.',
     mode: 'interpretation',
-    ask: 'Say what is actually going on here without stepping outside it and turning it into distant analysis. If the tension matters more than the answer, name the tension instead of rushing to wrap it up.',
-    output: 'The real subtext, said plainly and personally, without flattening the tension.',
+    ask: 'Say what is actually going on here without stepping outside it and turning it into distant analysis. If the tension matters more than the answer, name the tension instead of rushing to wrap it up or pivoting into what to do about it.',
+    output: 'The real subtext, said plainly and personally, without flattening the tension or automatically resolving it.',
   },
   {
     id: 'strategy',
@@ -111,7 +111,7 @@ export function buildQuinnPacket({
     listPacketSection('OUTPUT', lens.output),
     listPacketSection(
       'CONTEXT',
-      'Treat the packet below like the thing I just said out loud. Stay inside what is actually meant. First notice whether this is exploratory or solution-seeking. React before you organize, and only bring structure in if the note clearly needs it.'
+      'Treat the packet below like the thing I just said out loud. Stay inside what is actually meant. First notice whether this is exploratory, conversational, or solution-seeking. React before you organize, and only bring structure in if the note clearly needs it. If the note is just talking, just talk back. Do not tack on options, next steps, or what might help unless the note clearly asks for that.'
     ),
     sessionArcContext,
     listPacketSection('PACKET', safeText),
