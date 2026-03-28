@@ -4,7 +4,7 @@
     "slug": "quinnos",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app icon.png",
     "scheme": "quinnosphone",
     "userInterfaceStyle": "dark",
     "ios": {
@@ -16,10 +16,8 @@
       "package": "com.mrbro.quinnos",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#120B1E",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#05030B",
+        "foregroundImage": "./assets/images/app icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
