@@ -6,7 +6,8 @@ import {
     Text,
     View,
 } from 'react-native';
-import { TOKENS } from './quinnSystem';
+import QuinnSurfaceShell from './QuinnSurfaceShell';
+import { SURFACE_THEME } from './quinnSurfaceTheme';
 import { QuinnSettings } from './quinnTypes';
 
 type ControlCenterProps = {
@@ -51,17 +52,17 @@ export default function ControlCenter({
 }: ControlCenterProps) {
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.eyebrow}>CONTROL CENTER</Text>
-        <Pressable onPress={onBack} style={styles.ghostButton}>
-          <Text style={styles.ghostButtonText}>Back</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.heroTitle}>Control, without clutter.</Text>
-      <Text style={styles.heroText}>
-        Tune the QuinnOS surface here. These switches affect motion, alerts, and focus.
-      </Text>
+      <QuinnSurfaceShell
+        eyebrow="CONTROL CENTER"
+        title="Control, without clutter."
+        description="Tune the QuinnOS surface here. These switches affect motion, alerts, and focus without turning the product into a settings swamp."
+        onBack={onBack}
+        actions={[
+          { label: settings.focusMode ? 'Focus on' : 'Focus off', tone: 'secondary' },
+          { label: settings.reduceMotion ? 'Motion reduced' : 'Motion live', tone: 'ghost' },
+          { label: unreadCount ? `${unreadCount} alerts waiting` : 'Alerts quiet', tone: 'primary' },
+        ]}
+      />
 
       <View style={styles.utilityRow}>
         <Pressable style={styles.utilityPill} onPress={onOpenSettings}>
@@ -76,7 +77,7 @@ export default function ControlCenter({
       <View style={styles.grid}>
         <ToggleCard
           title="Reduce motion"
-          body="Gravity shifts to a still version so the surface stays quieter."
+          body="The homepage atmosphere shifts to a stiller version so the surface stays quieter."
           active={settings.reduceMotion}
           onPress={() => onToggleSetting('reduceMotion')}
         />
@@ -115,56 +116,8 @@ export default function ControlCenter({
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: TOKENS.spacing?.lg ?? 18,
-    paddingBottom: 30,
-  },
-
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  eyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  heroTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '900',
-    letterSpacing: -1.1,
-    marginBottom: 10,
-  },
-
-  heroText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '600',
-    marginBottom: 14,
-  },
-
-  ghostButton: {
-    borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: TOKENS.radius?.pill ?? 999,
-    marginTop: 10,
-  },
-
-  ghostButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 12,
-    fontWeight: '800',
+    paddingHorizontal: 18,
+    paddingBottom: 36,
   },
 
   utilityRow: {
@@ -175,9 +128,9 @@ const styles = StyleSheet.create({
 
   utilityPill: {
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 10,
@@ -185,7 +138,7 @@ const styles = StyleSheet.create({
   },
 
   utilityPillText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 12,
     fontWeight: '900',
   },
@@ -195,21 +148,21 @@ const styles = StyleSheet.create({
   },
 
   toggleCard: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panelAlt,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.xl ?? 30,
-    padding: 16,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 30,
+    padding: 18,
     marginBottom: 12,
   },
 
   toggleCardActive: {
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    borderColor: SURFACE_THEME.borderStrong,
+    backgroundColor: SURFACE_THEME.plumSoft,
   },
 
   toggleTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '900',
@@ -217,7 +170,7 @@ const styles = StyleSheet.create({
   },
 
   toggleMeta: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '900',
@@ -225,22 +178,22 @@ const styles = StyleSheet.create({
   },
 
   toggleBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
   },
 
   summaryCard: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panel,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.xl ?? 30,
-    padding: 16,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 30,
+    padding: 18,
   },
 
   summaryEyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
@@ -249,7 +202,7 @@ const styles = StyleSheet.create({
   },
 
   summaryTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '900',
@@ -257,7 +210,7 @@ const styles = StyleSheet.create({
   },
 
   summaryBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',

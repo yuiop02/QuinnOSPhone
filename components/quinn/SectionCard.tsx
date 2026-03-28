@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { TOKENS } from './quinnSystem';
+import { SURFACE_THEME } from './quinnSurfaceTheme';
 
 type SectionCardProps = {
   eyebrow: string;
@@ -24,21 +24,21 @@ export default function SectionCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
-    borderRadius: TOKENS.radius?.lg ?? 24,
+    backgroundColor: SURFACE_THEME.panelAlt,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    padding: 16,
+    borderColor: SURFACE_THEME.border,
+    padding: 18,
     marginBottom: 12,
-    shadowColor: 'rgba(17,17,17,0.08)',
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 18,
-    elevation: 1,
+    shadowColor: SURFACE_THEME.shadow,
+    shadowOpacity: 0.28,
+    shadowOffset: { width: 0, height: 14 },
+    shadowRadius: 26,
+    elevation: 6,
   },
 
   cardEyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
+    color: SURFACE_THEME.eyebrow,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   },
 
   cardTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '900',

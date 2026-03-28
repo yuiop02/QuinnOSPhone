@@ -6,7 +6,8 @@ import {
     Text,
     View,
 } from 'react-native';
-import { TOKENS } from './quinnSystem';
+import QuinnSurfaceShell from './QuinnSurfaceShell';
+import { SURFACE_THEME, toneToSurfaceAccent } from './quinnSurfaceTheme';
 import { NotificationItem } from './quinnTypes';
 
 type NotificationsPanelProps = {
@@ -28,19 +29,7 @@ function formatTimestamp(value: string) {
 }
 
 function toneBorderColor(tone: NotificationItem['tone']) {
-  if (tone === 'alert') {
-    return TOKENS.color?.nodeC ?? '#8B1E2D';
-  }
-
-  if (tone === 'success') {
-    return TOKENS.color?.nodeA ?? '#1E3C34';
-  }
-
-  if (tone === 'gold') {
-    return TOKENS.color?.gold ?? '#B88A2A';
-  }
-
-  return TOKENS.color?.rule ?? '#D8C8A6';
+  return toneToSurfaceAccent(tone).borderColor;
 }
 
 export default function NotificationsPanel({
@@ -60,28 +49,22 @@ export default function NotificationsPanel({
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.eyebrow}>NOTIFICATIONS</Text>
-        <Pressable onPress={onBack} style={styles.ghostButton}>
-          <Text style={styles.ghostButtonText}>Back</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.heroTitle}>Alerts, trimmed down.</Text>
-      <Text style={styles.heroText}>
-        This is the notification surface. Runs, memory actions, and system changes land here.
-      </Text>
+      <QuinnSurfaceShell
+        eyebrow="SIGNAL STACK"
+        title="Alerts, trimmed down."
+        description="Runs, memory actions, and system changes land here. The stack stays quiet, readable, and ready to move you back into the right Quinn surface."
+        onBack={onBack}
+        actions={[
+          { label: `${unreadCount} unread`, tone: 'secondary' },
+          { label: quietNotifications ? 'Quiet mode on' : 'Live feed', tone: 'ghost' },
+          { label: 'Clear all', tone: 'primary', onPress: onClearAll },
+        ]}
+      />
 
       <View style={styles.statusBand}>
         <Text style={styles.statusBandText}>
           {unreadCount} unread • quiet mode {quietNotifications ? 'on' : 'off'}
         </Text>
-      </View>
-
-      <View style={styles.actionRow}>
-        <Pressable style={styles.secondaryButton} onPress={onClearAll}>
-          <Text style={styles.secondaryButtonText}>Clear all</Text>
-        </Pressable>
       </View>
 
       {orderedNotifications.length ? (
@@ -142,91 +125,37 @@ export default function NotificationsPanel({
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: TOKENS.spacing?.lg ?? 18,
-    paddingBottom: 30,
-  },
-
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  eyebrow: {
-    color: TOKENS.color?.gold ?? '#B88A2A',
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  heroTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '900',
-    letterSpacing: -1.1,
-    marginBottom: 10,
-  },
-
-  heroText: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '600',
-    marginBottom: 14,
-  },
-
-  ghostButton: {
-    borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: TOKENS.radius?.pill ?? 999,
-    marginTop: 10,
-  },
-
-  ghostButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
-    fontSize: 12,
-    fontWeight: '800',
+    paddingHorizontal: 18,
+    paddingBottom: 36,
   },
 
   statusBand: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.md ?? 18,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 12,
   },
 
   statusBandText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.textMuted,
     fontSize: 13,
     lineHeight: 19,
     fontWeight: '800',
   },
 
-  actionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
-
   notificationCard: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panelAlt,
     borderWidth: 1,
-    borderRadius: TOKENS.radius?.lg ?? 24,
+    borderRadius: 24,
     padding: 16,
     marginBottom: 12,
   },
 
   notificationTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 18,
     lineHeight: 23,
     fontWeight: '900',
@@ -234,7 +163,7 @@ const styles = StyleSheet.create({
   },
 
   notificationMeta: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textSoft,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
@@ -242,7 +171,7 @@ const styles = StyleSheet.create({
   },
 
   notificationBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
@@ -255,8 +184,10 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: TOKENS.color?.ink ?? '#111111',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    backgroundColor: SURFACE_THEME.goldSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -264,16 +195,16 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonText: {
-    color: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    color: SURFACE_THEME.gold,
     fontSize: 13,
     fontWeight: '900',
   },
 
   secondaryButton: {
-    backgroundColor: TOKENS.color?.goldSoft ?? 'rgba(184,138,42,0.16)',
+    backgroundColor: SURFACE_THEME.panelSoft,
     borderWidth: 1,
-    borderColor: TOKENS.color?.gold ?? '#B88A2A',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -281,16 +212,16 @@ const styles = StyleSheet.create({
   },
 
   secondaryButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 13,
     fontWeight: '900',
   },
 
   deleteButton: {
-    backgroundColor: 'rgba(139,30,45,0.10)',
+    backgroundColor: SURFACE_THEME.danger,
     borderWidth: 1,
-    borderColor: TOKENS.color?.nodeC ?? '#8B1E2D',
-    borderRadius: TOKENS.radius?.pill ?? 999,
+    borderColor: 'rgba(233, 116, 142, 0.3)',
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10,
@@ -298,21 +229,21 @@ const styles = StyleSheet.create({
   },
 
   deleteButtonText: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: '#FFD6E1',
     fontSize: 13,
     fontWeight: '900',
   },
 
   emptyCard: {
-    backgroundColor: TOKENS.color?.creamSoft ?? '#FBF7EF',
+    backgroundColor: SURFACE_THEME.panel,
     borderWidth: 1,
-    borderColor: TOKENS.color?.rule ?? '#D8C8A6',
-    borderRadius: TOKENS.radius?.xl ?? 30,
-    padding: 16,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 30,
+    padding: 18,
   },
 
   emptyTitle: {
-    color: TOKENS.color?.ink ?? '#111111',
+    color: SURFACE_THEME.text,
     fontSize: 22,
     lineHeight: 26,
     fontWeight: '900',
@@ -320,7 +251,7 @@ const styles = StyleSheet.create({
   },
 
   emptyBody: {
-    color: TOKENS.color?.inkMuted ?? '#4A463E',
+    color: SURFACE_THEME.textMuted,
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '500',
