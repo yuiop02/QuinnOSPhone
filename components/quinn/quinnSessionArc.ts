@@ -172,7 +172,7 @@ export function buildSessionArcPacketContext(sessionArc: SessionArc | null | und
   return [
     `This is still the same thread:\n${sessionArc.title}`,
     recentFlow ? `What we were just circling:\n${recentFlow}` : '',
-    `Only carry it forward if it still fits:\nThis is turn ${sessionArc.stepCount}. If the new note has clearly shifted, answer the new thing instead of forcing the old thread. If the thread is still exploratory, stay with the exploration instead of pushing it into a conclusion too early or ending on advice just to make it feel useful.`,
+    `Only carry it forward if it still fits:\nThis is turn ${sessionArc.stepCount}. If the new note has clearly shifted, answer the new thing instead of forcing the old thread. If the thread is still exploratory, stay with the exploration instead of pushing it into a conclusion too early, ending on advice just to make it feel useful, or shrinking a live thought into a cleaner answer before it is ready. Let continuity show up as quicker understanding and better calibration more often than as named callbacks to the thread itself.`,
   ]
     .filter(Boolean)
     .join('\n\n');

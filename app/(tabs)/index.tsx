@@ -84,10 +84,9 @@ import {
   type QuinnLensId,
 } from '../../components/quinn/quinnLenses';
 import {
-  buildRealtimeSpeechChunks,
   buildSpokenSummary,
-  canUseSingleReplySpeech,
-  normalizeSpeechChunkSource,
+  getSingleReplySpeechPolicy,
+  prepareQuinnVoiceSpeech,
 } from '../../components/quinn/quinnSpeechText';
 import {
   advanceSessionArc,
@@ -101,6 +100,7 @@ import { useQuinnConversationMotion } from '../../components/quinn/useQuinnConve
 import { loadQuinnSnapshot, saveQuinnSnapshot } from '../../components/quinn/quinnStorage';
 import { TOKENS } from '../../components/quinn/quinnSystem';
 import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
+import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
 import type {
   AppScreen,
   MemoryItem,
@@ -213,8 +213,6 @@ function resolveScreen(moduleValue: any, exportName: string): React.ComponentTyp
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-const SINGLE_REPLY_SPEECH_PREPARE_TIMEOUT_MS = 12000;
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string) {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -1179,6 +1177,7 @@ function QuinnConversationSurface({
   const preparedSpeechSourcesRef = useRef(new Map<string, string>());
   const preparedSpeechSourcePromisesRef = useRef(new Map<string, Promise<string>>());
   const readySpeechSourceKeysRef = useRef(new Set<string>());
+  const speechProsodyHintRef = useRef<QuinnVoiceTtsHint | null>(null);
   const speechAdvanceInFlightRef = useRef(false);
   const awaitingSpeechFinishRef = useRef(false);
   const awaitingSpeechFinishSessionRef = useRef(0);
@@ -1346,6 +1345,7 @@ function QuinnConversationSurface({
     preparedSpeechSourcesRef.current.clear();
     preparedSpeechSourcePromisesRef.current.clear();
     readySpeechSourceKeysRef.current.clear();
+    speechProsodyHintRef.current = null;
   }
 
   const prepareSpeechPlaybackSource = useCallback(
@@ -1354,15 +1354,19 @@ function QuinnConversationSurface({
       {
         previousText = '',
         nextText = '',
+        prosodyHint = null,
       }: {
         previousText?: string;
         nextText?: string;
+        prosodyHint?: QuinnVoiceTtsHint | null;
       },
       sessionId: number
     ) => {
+      const activeProsodyHint = prosodyHint ?? speechProsodyHintRef.current;
       const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
         previousText,
         nextText,
+        prosodyHint: activeProsodyHint,
       });
       const cachedSource = preparedSpeechSourcesRef.current.get(requestKey);
 
@@ -1386,6 +1390,7 @@ function QuinnConversationSurface({
         const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
           previousText,
           nextText,
+          prosodyHint: activeProsodyHint,
         });
 
         if (sessionId === speechSessionRef.current) {
@@ -1419,9 +1424,11 @@ function QuinnConversationSurface({
       {
         previousText = '',
         nextText = '',
+        prosodyHint = null,
       }: {
         previousText?: string;
         nextText?: string;
+        prosodyHint?: QuinnVoiceTtsHint | null;
       },
       sessionId: number
     ) => {
@@ -1432,6 +1439,7 @@ function QuinnConversationSurface({
       const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
         previousText,
         nextText,
+        prosodyHint: prosodyHint ?? speechProsodyHintRef.current,
       });
 
       if (warmedChunkKeysRef.current.has(requestKey)) {
@@ -1446,6 +1454,7 @@ function QuinnConversationSurface({
           {
             previousText,
             nextText,
+            prosodyHint,
           },
           sessionId
         );
@@ -1536,6 +1545,7 @@ function QuinnConversationSurface({
         const requestKey = getQuinnLocalVoiceSpeakRequestKey(nextChunk, {
           previousText,
           nextText,
+          prosodyHint: speechProsodyHintRef.current,
         });
         const wasWarmSource =
           readySpeechSourceKeysRef.current.has(requestKey) ||
@@ -1545,6 +1555,7 @@ function QuinnConversationSurface({
           {
             previousText,
             nextText,
+            prosodyHint: speechProsodyHintRef.current,
           },
           sessionId
         );
@@ -1613,32 +1624,54 @@ function QuinnConversationSurface({
   );
 
   const tryPlaySingleReplySpeech = useCallback(
-    async (clean: string) => {
-      if (!canUseSingleReplySpeech(clean)) {
+    async (clean: string, prosodyHint: QuinnVoiceTtsHint | null) => {
+      const policy = getSingleReplySpeechPolicy(clean);
+
+      if (!policy.shouldAttemptSingleFile) {
         return false;
       }
 
       speechChunksRef.current = [clean];
       speechActiveChunkIndexRef.current = -1;
       speechSessionRef.current += 1;
+      speechProsodyHintRef.current = prosodyHint;
 
       const sessionId = speechSessionRef.current;
 
       setVoiceStatus('Quinn voice loading full reply...');
+      const timeoutMessage = 'Full reply voice preparation timed out.';
+      const prepareFullReplySource = () =>
+        prepareSpeechPlaybackSource(
+          clean,
+          {
+            previousText: '',
+            nextText: '',
+            prosodyHint,
+          },
+          sessionId
+        );
 
       try {
-        await withTimeout(
-          prepareSpeechPlaybackSource(
-            clean,
-            {
-              previousText: '',
-              nextText: '',
-            },
-            sessionId
-          ),
-          SINGLE_REPLY_SPEECH_PREPARE_TIMEOUT_MS,
-          'Full reply voice preparation timed out.'
-        );
+        try {
+          await withTimeout(
+            prepareFullReplySource(),
+            policy.initialPrepareTimeoutMs,
+            timeoutMessage
+          );
+        } catch (error) {
+          const timedOut = error instanceof Error && error.message === timeoutMessage;
+
+          if (!timedOut || policy.gracePrepareTimeoutMs <= 0) {
+            throw error;
+          }
+
+          setVoiceStatus('Quinn voice still loading full reply...');
+          await withTimeout(
+            prepareFullReplySource(),
+            policy.gracePrepareTimeoutMs,
+            timeoutMessage
+          );
+        }
 
         if (sessionId !== speechSessionRef.current) {
           return true;
@@ -1738,7 +1771,13 @@ function QuinnConversationSurface({
   }
 
   async function handleSpeakQuinnText(text: string) {
-  const clean = normalizeSpeechChunkSource(text);
+  const voicePlan = prepareQuinnVoiceSpeech({
+    text,
+    stateSeedText: responsePacketText || packetText || text,
+    sessionArc,
+    lensMode: getQuinnLens(responseLensId).mode,
+  });
+  const clean = voicePlan.clean;
 
   if (!clean) {
     setVoiceStatus('Run Quinn first so there is something to speak.');
@@ -1766,7 +1805,7 @@ function QuinnConversationSurface({
 
     await preparePlaybackMode();
 
-    if (await tryPlaySingleReplySpeech(clean)) {
+    if (await tryPlaySingleReplySpeech(clean, voicePlan.ttsHint)) {
       return;
     }
 
@@ -1774,7 +1813,7 @@ function QuinnConversationSurface({
     setIsPreparingQuinnVoice(true);
     setIsSpeakingResponse(false);
 
-    const chunks = buildRealtimeSpeechChunks(clean);
+    const chunks = voicePlan.chunks;
 
     if (!chunks.length) {
       setVoiceStatus('Run Quinn first so there is something to speak.');
@@ -1785,6 +1824,7 @@ function QuinnConversationSurface({
     speechChunksRef.current = [...chunks];
     speechActiveChunkIndexRef.current = -1;
     speechSessionRef.current += 1;
+    speechProsodyHintRef.current = voicePlan.ttsHint;
 
     const sessionId = speechSessionRef.current;
 
