@@ -1,4 +1,5 @@
 import { prepareQuinnLocalVoiceSpeakUrl } from './quinnLocalVoice.shared';
+import type { QuinnVoiceTtsHint } from './quinnVoiceProsody';
 
 export {
   getQuinnLocalVoiceBaseUrl,
@@ -16,13 +17,16 @@ export async function prepareQuinnLocalVoicePlaybackSource(
   {
     previousText = '',
     nextText = '',
+    prosodyHint = null,
   }: {
     previousText?: string;
     nextText?: string;
+    prosodyHint?: QuinnVoiceTtsHint | null;
   } = {}
 ): Promise<string> {
   return prepareQuinnLocalVoiceSpeakUrl(text, {
     previousText,
     nextText,
+    prosodyHint,
   });
 }

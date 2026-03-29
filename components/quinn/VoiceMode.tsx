@@ -19,9 +19,8 @@ import {
 import QuinnSurfaceShell from './QuinnSurfaceShell';
 import SectionCard from './SectionCard';
 import {
-  buildRealtimeSpeechChunks,
-  canUseSingleReplySpeech,
-  normalizeSpeechChunkSource,
+  getSingleReplySpeechPolicy,
+  prepareQuinnVoiceSpeech,
 } from './quinnSpeechText';
 import {
   getQuinnLocalVoiceBaseUrl,
@@ -32,6 +31,7 @@ import {
   prepareQuinnLocalVoicePlaybackSource,
 } from './quinnLocalVoice';
 import { SURFACE_THEME } from './quinnSurfaceTheme';
+import type { QuinnVoiceTtsHint } from './quinnVoiceProsody';
 import {
   VoicePipelinePhase,
   VoiceSession,
@@ -83,8 +83,6 @@ type PlayerMode = 'recording' | 'quinn-preview' | null;
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-const SINGLE_REPLY_SPEECH_PREPARE_TIMEOUT_MS = 12000;
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string) {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -157,6 +155,7 @@ export default function VoiceMode({
   const preparedQuinnChunkSourcesRef = useRef(new Map<string, string>());
   const preparedQuinnChunkPromisesRef = useRef(new Map<string, Promise<string>>());
   const readyQuinnChunkKeysRef = useRef(new Set<string>());
+  const quinnVoiceProsodyHintRef = useRef<QuinnVoiceTtsHint | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -202,6 +201,7 @@ export default function VoiceMode({
     preparedQuinnChunkSourcesRef.current.clear();
     preparedQuinnChunkPromisesRef.current.clear();
     readyQuinnChunkKeysRef.current.clear();
+    quinnVoiceProsodyHintRef.current = null;
   }, []);
 
   const prepareQuinnChunkPlaybackSource = useCallback(
@@ -210,14 +210,18 @@ export default function VoiceMode({
       {
         previousText = '',
         nextText = '',
+        prosodyHint = null,
       }: {
         previousText?: string;
         nextText?: string;
+        prosodyHint?: QuinnVoiceTtsHint | null;
       } = {}
     ) => {
+      const activeProsodyHint = prosodyHint ?? quinnVoiceProsodyHintRef.current;
       const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
         previousText,
         nextText,
+        prosodyHint: activeProsodyHint,
       });
       const cachedSource = preparedQuinnChunkSourcesRef.current.get(requestKey);
 
@@ -241,6 +245,7 @@ export default function VoiceMode({
         const playbackSource = await prepareQuinnLocalVoicePlaybackSource(text, {
           previousText,
           nextText,
+          prosodyHint: activeProsodyHint,
         });
 
         preparedQuinnChunkSourcesRef.current.set(requestKey, playbackSource);
@@ -277,6 +282,7 @@ export default function VoiceMode({
         const { requestKey, playbackSource } = await prepareQuinnChunkPlaybackSource(text, {
           previousText: chunks[chunkIndex - 1] || '',
           nextText: chunks[chunkIndex + 1] || '',
+          prosodyHint: quinnVoiceProsodyHintRef.current,
         });
 
         if (isQuinnLocalVoiceRemoteSource(playbackSource)) {
@@ -385,10 +391,12 @@ useEffect(() => {
         isFirstChunk = false,
         previousText = '',
         nextText = '',
+        prosodyHint = null,
       }: {
         isFirstChunk?: boolean;
         previousText?: string;
         nextText?: string;
+        prosodyHint?: QuinnVoiceTtsHint | null;
       } = {}
     ) => {
       try {
@@ -397,6 +405,7 @@ useEffect(() => {
         const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
           previousText,
           nextText,
+          prosodyHint: prosodyHint ?? quinnVoiceProsodyHintRef.current,
         });
         const wasWarmSource =
           readyQuinnChunkKeysRef.current.has(requestKey) ||
@@ -404,6 +413,7 @@ useEffect(() => {
         const { playbackSource } = await prepareQuinnChunkPlaybackSource(text, {
           previousText,
           nextText,
+          prosodyHint,
         });
         const playbackDelayMs = getQuinnVoicePlaybackStartDelayMs(playbackSource, {
           isFirstChunk,
@@ -440,29 +450,52 @@ useEffect(() => {
   );
 
   const tryPlaySingleQuinnVoice = useCallback(
-    async (clean: string) => {
-      if (!canUseSingleReplySpeech(clean)) {
+    async (clean: string, prosodyHint: QuinnVoiceTtsHint | null) => {
+      const policy = getSingleReplySpeechPolicy(clean);
+
+      if (!policy.shouldAttemptSingleFile) {
         return false;
       }
 
       setQuinnChunks([clean]);
       setQuinnChunkIndex(0);
+      quinnVoiceProsodyHintRef.current = prosodyHint;
       setStatusMessage('Quinn voice loading full preview...');
+      const timeoutMessage = 'Full reply preview voice preparation timed out.';
+      const prepareFullReplySource = () =>
+        prepareQuinnChunkPlaybackSource(clean, {
+          previousText: '',
+          nextText: '',
+          prosodyHint,
+        });
 
       try {
-        await withTimeout(
-          prepareQuinnChunkPlaybackSource(clean, {
-            previousText: '',
-            nextText: '',
-          }),
-          SINGLE_REPLY_SPEECH_PREPARE_TIMEOUT_MS,
-          'Full reply preview voice preparation timed out.'
-        );
+        try {
+          await withTimeout(
+            prepareFullReplySource(),
+            policy.initialPrepareTimeoutMs,
+            timeoutMessage
+          );
+        } catch (error) {
+          const timedOut = error instanceof Error && error.message === timeoutMessage;
+
+          if (!timedOut || policy.gracePrepareTimeoutMs <= 0) {
+            throw error;
+          }
+
+          setStatusMessage('Quinn voice still loading full preview...');
+          await withTimeout(
+            prepareFullReplySource(),
+            policy.gracePrepareTimeoutMs,
+            timeoutMessage
+          );
+        }
 
         const started = await playQuinnChunk(clean, {
           isFirstChunk: true,
           previousText: '',
           nextText: '',
+          prosodyHint,
         });
 
         if (started) {
@@ -654,7 +687,13 @@ useEffect(() => {
   }
 
 async function handleSpeakQuinnVoice() {
-  const clean = normalizeSpeechChunkSource(spokenSummary);
+  const voicePlan = prepareQuinnVoiceSpeech({
+    text: spokenSummary,
+    stateSeedText: transcript || packetText || spokenSummary,
+    sessionArc: null,
+    lensMode: 'adaptive',
+  });
+  const clean = voicePlan.clean;
 
   if (!clean) {
     setStatusMessage('Add or rebuild a spoken summary first.');
@@ -691,7 +730,7 @@ async function handleSpeakQuinnVoice() {
       return;
     }
 
-    if (await tryPlaySingleQuinnVoice(clean)) {
+    if (await tryPlaySingleQuinnVoice(clean, voicePlan.ttsHint)) {
       return;
     }
 
@@ -699,7 +738,7 @@ async function handleSpeakQuinnVoice() {
     setPipelinePhase('speaking-preview');
     setLastError(null);
 
-    const chunks = buildRealtimeSpeechChunks(clean);
+    const chunks = voicePlan.chunks;
 
     if (!chunks.length) {
       setStatusMessage('Add or rebuild a spoken summary first.');
@@ -709,12 +748,14 @@ async function handleSpeakQuinnVoice() {
       return;
     }
 
+    quinnVoiceProsodyHintRef.current = voicePlan.ttsHint;
     setStatusMessage('Quinn voice speaking now.');
     void Promise.all([warmQuinnChunk(chunks, 1), warmQuinnChunk(chunks, 2)]);
 
     await playQuinnChunk(chunks[0], {
       isFirstChunk: true,
       nextText: chunks[1] || '',
+      prosodyHint: voicePlan.ttsHint,
     });
   } catch (error) {
     clearPreparedQuinnChunkState();

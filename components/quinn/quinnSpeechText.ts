@@ -1,3 +1,10 @@
+import type { SessionArc } from './quinnTypes';
+import {
+  inferQuinnVoiceProsody,
+  type QuinnVoiceProsodyInference,
+  type QuinnVoiceTtsHint,
+} from './quinnVoiceProsody';
+
 export function normalizeSpeechText(input: string): string {
   return String(input || '')
     .replace(/\s+/g, ' ')
@@ -127,14 +134,90 @@ export function normalizeSpeechChunkSource(input: string): string {
     .trim();
 }
 
-export const QUINN_SINGLE_REPLY_SPEECH_MAX_CHARS = 900;
+export type QuinnSingleReplySpeechPreference =
+  | 'preferSingleFile'
+  | 'neutral'
+  | 'preferFallback';
+
+export const QUINN_SINGLE_REPLY_SPEECH_TUNING = {
+  preferSingleFileMaxChars: 1400,
+  neutralMaxChars: 1850,
+  paragraphPenaltyChars: 70,
+  linePenaltyChars: 22,
+  structuredLinePenaltyChars: 60,
+  preferSingleFilePrepareTimeoutMs: 15000,
+  neutralPrepareTimeoutMs: 18000,
+  gracePrepareTimeoutMs: 3500,
+} as const;
+
+export const QUINN_SINGLE_REPLY_SPEECH_MAX_CHARS =
+  QUINN_SINGLE_REPLY_SPEECH_TUNING.neutralMaxChars;
+
+function estimateSingleReplySpeechWeight(input: string) {
+  const clean = normalizeSpeechChunkSource(input);
+
+  if (!clean) {
+    return 0;
+  }
+
+  const lines = clean.split('\n').map((line) => String(line || '').trim()).filter(Boolean);
+  const paragraphCount = clean.split(/\n\s*\n/).filter((part) => String(part || '').trim()).length;
+  const structuredLineCount = lines.filter((line) => /^(Option|Point):\s/i.test(line)).length;
+
+  return (
+    clean.length +
+    Math.max(0, paragraphCount - 1) * QUINN_SINGLE_REPLY_SPEECH_TUNING.paragraphPenaltyChars +
+    Math.max(0, lines.length - 1) * QUINN_SINGLE_REPLY_SPEECH_TUNING.linePenaltyChars +
+    structuredLineCount * QUINN_SINGLE_REPLY_SPEECH_TUNING.structuredLinePenaltyChars
+  );
+}
+
+export function getSingleReplySpeechPreference(input: string): QuinnSingleReplySpeechPreference {
+  const weightedLength = estimateSingleReplySpeechWeight(input);
+
+  if (!weightedLength) {
+    return 'preferFallback';
+  }
+
+  if (weightedLength <= QUINN_SINGLE_REPLY_SPEECH_TUNING.preferSingleFileMaxChars) {
+    return 'preferSingleFile';
+  }
+
+  if (weightedLength <= QUINN_SINGLE_REPLY_SPEECH_TUNING.neutralMaxChars) {
+    return 'neutral';
+  }
+
+  return 'preferFallback';
+}
+
+export function getSingleReplySpeechPolicy(input: string) {
+  const clean = normalizeSpeechChunkSource(input);
+  const weightedLength = estimateSingleReplySpeechWeight(clean);
+  const preference = getSingleReplySpeechPreference(clean);
+  const shouldAttemptSingleFile = Boolean(clean) && preference !== 'preferFallback';
+  const initialPrepareTimeoutMs =
+    preference === 'neutral'
+      ? QUINN_SINGLE_REPLY_SPEECH_TUNING.neutralPrepareTimeoutMs
+      : QUINN_SINGLE_REPLY_SPEECH_TUNING.preferSingleFilePrepareTimeoutMs;
+
+  return {
+    clean,
+    weightedLength,
+    preference,
+    shouldAttemptSingleFile,
+    initialPrepareTimeoutMs,
+    gracePrepareTimeoutMs: shouldAttemptSingleFile
+      ? QUINN_SINGLE_REPLY_SPEECH_TUNING.gracePrepareTimeoutMs
+      : 0,
+  };
+}
 
 export function canUseSingleReplySpeech(
   input: string,
   maxChars = QUINN_SINGLE_REPLY_SPEECH_MAX_CHARS
 ) {
-  const clean = normalizeSpeechChunkSource(input);
-  return Boolean(clean) && clean.length <= maxChars;
+  const policy = getSingleReplySpeechPolicy(input);
+  return Boolean(policy.clean) && policy.shouldAttemptSingleFile && policy.clean.length <= maxChars;
 }
 
 export function buildSpokenSummary(summary: string, written: string): string {
@@ -189,6 +272,13 @@ function shortenSpokenSummary(input: string): string {
 
   return `${shortened.trim()}.`;
 }
+
+export type QuinnVoiceSpeechPlan = {
+  clean: string;
+  chunks: string[];
+  prosody: QuinnVoiceProsodyInference;
+  ttsHint: QuinnVoiceTtsHint;
+};
 
 function finalizeSpeechChunk(input: string) {
   return String(input || '')
@@ -505,4 +595,99 @@ export function buildRealtimeSpeechChunks(input: string) {
   return splitTextForSpeech(input, 205, 160)
     .map((chunk) => finalizeSpeechChunk(chunk))
     .filter(Boolean);
+}
+
+function softenSpeechLanding(input: string) {
+  return String(input || '')
+    .replace(/!+(?=(?:\s*$|\n))/g, '.')
+    .replace(/\?+(?=(?:\s*$|\n))/g, '?');
+}
+
+function applyHeldSpeechTransitions(input: string) {
+  return String(input || '').replace(
+    /\.\s+(but|and|so|because|though|which)\b/gi,
+    ', $1'
+  );
+}
+
+function applyFirmSpeechTransitions(input: string) {
+  return String(input || '')
+    .replace(/,\s+(but|and|so|because)\b/gi, '. $1')
+    .replace(/[;:]\s+/g, '. ');
+}
+
+function applyLightSpeechTransitions(input: string) {
+  return String(input || '').replace(/\.\s+(but|and|so)\b/gi, ', $1');
+}
+
+function applyMagnetizedSpeechTransitions(input: string) {
+  return String(input || '').replace(
+    /\.\s+(and|but|so|because|which)\b/gi,
+    ', $1'
+  );
+}
+
+function applyQuinnVoiceProsodyTextShape(
+  input: string,
+  prosody: QuinnVoiceProsodyInference
+) {
+  let shaped = String(input || '');
+
+  switch (prosody.id) {
+    case 'heldSoft':
+      shaped = softenSpeechLanding(applyHeldSpeechTransitions(shaped));
+      break;
+    case 'tightFirm':
+      shaped = applyFirmSpeechTransitions(shaped).replace(/\.\.\.\s*/g, '. ');
+      break;
+    case 'lightCurl':
+      shaped = applyLightSpeechTransitions(shaped);
+      break;
+    case 'magnetized':
+      shaped = applyMagnetizedSpeechTransitions(shaped);
+      break;
+    case 'settledWarm':
+      shaped = softenSpeechLanding(applyHeldSpeechTransitions(shaped));
+      break;
+    default:
+      break;
+  }
+
+  return shaped;
+}
+
+export function prepareQuinnVoiceSpeech({
+  text,
+  stateSeedText = '',
+  sessionArc = null,
+  lensMode = 'adaptive',
+}: {
+  text: string;
+  stateSeedText?: string;
+  sessionArc?: SessionArc | null;
+  lensMode?: string;
+}): QuinnVoiceSpeechPlan {
+  const normalized = normalizeSpeechChunkSource(text);
+  const prosody = inferQuinnVoiceProsody({
+    spokenText: normalized,
+    stateSeedText,
+    sessionArc,
+    lensMode,
+  });
+  const shaped = normalizeSpeechChunkSource(
+    applyQuinnVoiceProsodyTextShape(normalized, prosody)
+  );
+
+  return {
+    clean: shaped,
+    chunks: splitTextForSpeech(
+      shaped,
+      prosody.chunkMaxChars,
+      prosody.firstChunkMaxChars
+    )
+      .map((chunk) => finalizeSpeechChunk(chunk))
+      .filter(Boolean),
+    prosody,
+    ttsHint: prosody.ttsHint,
+  };
 }

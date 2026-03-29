@@ -12,6 +12,7 @@ import {
   prepareQuinnLocalVoiceSpeakUrl,
   VOICE_POST_SPEAK_ENDPOINT,
 } from './quinnLocalVoice.shared';
+import type { QuinnVoiceTtsHint } from './quinnVoiceProsody';
 
 const LOCAL_VOICE_PLAYBACK_DIR = new Directory(Paths.cache, 'quinn-voice-playback');
 const LOCAL_VOICE_FILE_TTL_MS = 15 * 60 * 1000;
@@ -119,14 +120,17 @@ export async function prepareQuinnLocalVoicePlaybackSource(
   {
     previousText = '',
     nextText = '',
+    prosodyHint = null,
   }: {
     previousText?: string;
     nextText?: string;
+    prosodyHint?: QuinnVoiceTtsHint | null;
   } = {}
 ): Promise<string> {
   const payload = buildVoiceSpeakPayload(text, {
     previousText,
     nextText,
+    prosodyHint,
   });
 
   if (!payload.text) {
@@ -138,6 +142,7 @@ export async function prepareQuinnLocalVoicePlaybackSource(
   const requestKey = getQuinnLocalVoiceSpeakRequestKey(text, {
     previousText,
     nextText,
+    prosodyHint,
   });
   const cachedUri = getCachedLocalVoicePlaybackSource(requestKey);
 
@@ -164,6 +169,7 @@ export async function prepareQuinnLocalVoicePlaybackSource(
       return prepareQuinnLocalVoiceSpeakUrl(text, {
         previousText,
         nextText,
+        prosodyHint,
       });
     }
 

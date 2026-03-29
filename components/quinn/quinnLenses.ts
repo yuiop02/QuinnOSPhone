@@ -1,4 +1,13 @@
 import type { SessionArc } from './quinnTypes';
+import { buildQuinnAskPacketContext } from './quinnAskState';
+import { buildQuinnChallengePacketContext } from './quinnChallengeState';
+import { buildQuinnConductorPacketContext } from './quinnConductorState';
+import { buildQuinnEnergyPacketContext } from './quinnEnergyState';
+import { buildQuinnEndingPacketContext } from './quinnEndingState';
+import { buildQuinnMemoryExpressionPacketContext } from './quinnMemoryExpressionState';
+import { buildQuinnPolishPacketContext } from './quinnPolishState';
+import { buildQuinnRiffPacketContext } from './quinnRiffState';
+import { buildQuinnTexturePacketContext } from './quinnTextureState';
 import { buildSessionArcPacketContext } from './quinnSessionArc';
 
 export type QuinnLensId = 'open' | 'read' | 'strategy' | 'write' | 'reality';
@@ -29,16 +38,16 @@ const QUINN_LENSES: QuinnLens[] = [
     label: 'Open',
     blurb: 'Let Quinn decide the strongest shape.',
     mode: 'adaptive',
-    ask: 'Text back the way I would when I already know what this really is. First decide whether this wants riffing, pressure-testing, honesty, or actual advice. React first. Do not tidy it into advice unless the note clearly wants that shape, and do not sneak a helpful ending in just because it sounds neat.',
-    output: 'A real reply with instinct and point of view. Exploratory when the thought is exploratory, structured only when it truly needs to be, and not quietly turned into guidance by the last line.',
+    ask: 'Text back the way I would when I already know what this really is. First decide whether this wants riffing, pressure-testing, honesty, or actual advice. React first. If the thought is still discovering itself, build with it instead of forcing closure. Do not tidy it into advice unless the note clearly wants that shape, and do not sneak a helpful ending in just because it sounds neat. If the note is dressing something up and the signal is strong, be willing to challenge the framing cleanly instead of rewarding it. Use known context as already-known terrain, not as callback bait.',
+    output: 'A real reply with instinct and point of view. Exploratory when the thought is exploratory, structured only when it truly needs to be, and not quietly turned into guidance by the last line. Challenge spin when the note actually earns it, co-build the thought when it is still alive, let familiarity stay metabolized instead of quoted back, and let the same Quinn voice show a little more texture when the moment invites it.',
   },
   {
     id: 'read',
     label: 'Read',
     blurb: 'Interpret the real pattern underneath it.',
     mode: 'interpretation',
-    ask: 'Say what is actually going on here without stepping outside it and turning it into distant analysis. If the tension matters more than the answer, name the tension instead of rushing to wrap it up or pivoting into what to do about it.',
-    output: 'The real subtext, said plainly and personally, without flattening the tension or automatically resolving it.',
+    ask: 'Say what is actually going on here without stepping outside it and turning it into distant analysis. If the tension matters more than the answer, name the tension instead of rushing to wrap it up or pivoting into what to do about it. If the thought is still forming, help name the shape in progress instead of pretending it is already settled. If the note is making something prettier, vaguer, or nobler than it is, say the plainer version.',
+    output: 'The real subtext, said plainly and personally, without flattening the tension or automatically resolving it. More truth-contact than polish, and more pattern-building than forced closure when the thought is still moving.',
   },
   {
     id: 'strategy',
@@ -103,6 +112,49 @@ export function buildQuinnPacket({
   const safeTitle = cleanPacketValue(packetTitle) || 'Untitled packet';
   const safeText = String(packetText || '').trim();
   const sessionArcContext = buildSessionArcPacketContext(sessionArc);
+  const memoryExpressionContext = buildQuinnMemoryExpressionPacketContext({
+    packetText: safeText,
+    sessionArc,
+    lensMode: lens.mode,
+  });
+  const textureContext = buildQuinnTexturePacketContext({
+    packetText: safeText,
+    sessionArc,
+    lensMode: lens.mode,
+  });
+  const riffContext = buildQuinnRiffPacketContext({
+    packetText: safeText,
+    sessionArc,
+    lensMode: lens.mode,
+  });
+  const endingContext = buildQuinnEndingPacketContext({
+    packetText: safeText,
+    sessionArc,
+    lensMode: lens.mode,
+  });
+  const challengeContext = buildQuinnChallengePacketContext({
+    packetText: safeText,
+    sessionArc,
+  });
+  const conductorContext = buildQuinnConductorPacketContext({
+    packetText: safeText,
+    sessionArc,
+    lensMode: lens.mode,
+  });
+  const askContext = buildQuinnAskPacketContext({
+    packetText: safeText,
+    sessionArc,
+    lensMode: lens.mode,
+  });
+  const polishContext = buildQuinnPolishPacketContext({
+    packetText: safeText,
+    sessionArc,
+    lensMode: lens.mode,
+  });
+  const energyContext = buildQuinnEnergyPacketContext({
+    packetText: safeText,
+    sessionArc,
+  });
 
   return [
     listPacketSection('TITLE', safeTitle),
@@ -111,8 +163,17 @@ export function buildQuinnPacket({
     listPacketSection('OUTPUT', lens.output),
     listPacketSection(
       'CONTEXT',
-      'Treat the packet below like the thing I just said out loud. Stay inside what is actually meant. First notice whether this is exploratory, conversational, or solution-seeking. React before you organize, and only bring structure in if the note clearly needs it. If the note is just talking, just talk back. Do not tack on options, next steps, or what might help unless the note clearly asks for that.'
+      'Treat the packet below like the thing I just said out loud. Stay inside what is actually meant. First notice whether this is exploratory, conversational, or solution-seeking. React before you organize, and only bring structure in if the note clearly needs it. If the note is just talking, just talk back. If the thought is still forming, build with it before you try to settle it. Use already-known context as already-known and let it quietly shape what you assume, skip, or sharpen. Let the same Quinn voice show more surface texture when it fits the moment, without turning into a different persona. If cues pull in different directions, let the conductor decide how much edge, space, question-restraint, and structural noticing the reply actually needs. Let the polish cue handle final taste: candidate framings, repetition restraint, warmth precision, micro-turn handling, aftertaste, and bounded surprise. Do not tack on options, next steps, or what might help unless the note clearly asks for that. If a question would only decorate the ending or keep the thread moving, do not ask it.'
     ),
+    listPacketSection('MEMORY EXPRESSION', memoryExpressionContext.context),
+    listPacketSection('PERSONALITY TEXTURE', textureContext.context),
+    listPacketSection('RIFF STANCE', riffContext.context),
+    listPacketSection('CHALLENGE STANCE', challengeContext.context),
+    listPacketSection('ASK POLICY', askContext.context),
+    listPacketSection('ENERGY MATCH', energyContext.context),
+    listPacketSection('ENDING SHAPE', endingContext.context),
+    listPacketSection('CONDUCTOR', conductorContext.context),
+    listPacketSection('POLISH', polishContext.context),
     sessionArcContext,
     listPacketSection('PACKET', safeText),
   ]
