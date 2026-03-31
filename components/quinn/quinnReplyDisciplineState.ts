@@ -4,6 +4,8 @@ export type QuinnAssistantPersonaLiteralnessId = 'low' | 'medium' | 'high';
 export type QuinnConcreteSelfClaimSuppressionId = 'none' | 'soften' | 'strong';
 export type QuinnSelfStatusSpecificityRiskId = 'none' | 'light' | 'strong';
 export type QuinnReplyPresentationModeId = 'singleBest' | 'paired' | 'menu';
+export type QuinnCasualStatusRestraintId = 'low' | 'medium' | 'high';
+export type QuinnDraftCommentaryAllowanceId = 'low' | 'medium' | 'high';
 
 type QuinnSignalPattern = {
   pattern: RegExp;
@@ -22,7 +24,10 @@ export type QuinnReplyDisciplineInference = {
   assistantPersonaLiteralness: QuinnSignalBucket<QuinnAssistantPersonaLiteralnessId>;
   concreteSelfClaimSuppression: QuinnSignalBucket<QuinnConcreteSelfClaimSuppressionId>;
   selfStatusSpecificityRisk: QuinnSignalBucket<QuinnSelfStatusSpecificityRiskId>;
+  casualStatusRestraint: QuinnSignalBucket<QuinnCasualStatusRestraintId>;
+  draftCommentaryAllowance: QuinnSignalBucket<QuinnDraftCommentaryAllowanceId>;
   explicitMultiOptionAsk: boolean;
+  explicitPlayfulInvite: boolean;
   singleLineDraftRequest: boolean;
   optionMenuSuppression: boolean;
   replyPresentationMode: {
@@ -40,6 +45,10 @@ export const QUINN_REPLY_DISCIPLINE_TUNING = {
   concreteSelfClaimSuppression: {
     softenThreshold: 0.9,
     strongThreshold: 1.85,
+  },
+  casualStatusRestraint: {
+    mediumThreshold: 0.9,
+    highThreshold: 1.6,
   },
   replyPresentationMode: {
     pairedThreshold: 1.15,
@@ -98,6 +107,15 @@ const ROLEPLAY_ALLOWANCE_PATTERNS: readonly QuinnSignalPattern[] = [
       /\b(?:pretend|imagine|in character|roleplay|as if you were|if you were|fictional bit|play along)\b/i,
     label: 'the note explicitly allows more fictional framing',
     score: 1.2,
+  },
+];
+
+const PLAYFUL_INVITE_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:funny|playful|cute|flirty|snarky|sassy|with attitude|with some attitude|teasing|a little joke)\b/i,
+    label: 'the note explicitly invites extra playful seasoning',
+    score: 1.05,
   },
 ];
 
@@ -164,8 +182,10 @@ export function inferQuinnReplyDiscipline({
   const writeHits = collectPatternHits(lower, WRITE_LINE_PATTERNS);
   const multiOptionHits = collectPatternHits(lower, MULTI_OPTION_PATTERNS);
   const roleplayHits = collectPatternHits(lower, ROLEPLAY_ALLOWANCE_PATTERNS);
+  const playfulInviteHits = collectPatternHits(lower, PLAYFUL_INVITE_PATTERNS);
 
   const explicitMultiOptionAsk = multiOptionHits.score >= 1;
+  const explicitPlayfulInvite = playfulInviteHits.score >= 1;
   const singleLineDraftRequest = writeHits.score >= 1 && !explicitMultiOptionAsk;
   const selfStatusSpecificityScore =
     statusHits.score +
@@ -195,14 +215,36 @@ export function inferQuinnReplyDiscipline({
         ? 'soften'
         : 'none';
 
+  const casualStatusRestraintScore =
+    statusHits.score +
+    (wordCount > 0 && wordCount <= 8 && statusHits.score > 0 ? 0.45 : 0) +
+    (beatText.includes('status') || beatText.includes('greeting') ? 0.2 : 0) -
+    roleplayHits.score * 1.05 -
+    playfulInviteHits.score * 0.5;
+  const casualStatusRestraintId: QuinnCasualStatusRestraintId =
+    casualStatusRestraintScore >= QUINN_REPLY_DISCIPLINE_TUNING.casualStatusRestraint.highThreshold
+      ? 'high'
+      : casualStatusRestraintScore >=
+            QUINN_REPLY_DISCIPLINE_TUNING.casualStatusRestraint.mediumThreshold
+        ? 'medium'
+        : 'low';
   const assistantPersonaLiteralnessId: QuinnAssistantPersonaLiteralnessId =
     roleplayHits.score >= 1
       ? 'high'
-      : concreteSelfClaimSuppressionId === 'strong'
+      : concreteSelfClaimSuppressionId === 'strong' ||
+          casualStatusRestraintId === 'high'
         ? 'low'
         : concreteSelfClaimSuppressionId === 'soften'
           ? 'medium'
           : 'medium';
+  const draftCommentaryAllowanceId: QuinnDraftCommentaryAllowanceId =
+    singleLineDraftRequest
+      ? explicitPlayfulInvite
+        ? 'medium'
+        : 'low'
+      : explicitPlayfulInvite
+        ? 'high'
+        : 'medium';
 
   const replyPresentationModeId: QuinnReplyPresentationModeId =
     explicitMultiOptionAsk
@@ -234,6 +276,18 @@ export function inferQuinnReplyDiscipline({
       : assistantPersonaLiteralnessId === 'high'
         ? 'The framing explicitly allows a more literal persona bit.'
         : 'Keep persona texture moderate and grounded.';
+  const casualStatusRestraintPromptGuidance =
+    casualStatusRestraintId === 'high'
+      ? 'This is an ordinary check-in. Keep Quinn lightly alive and clean, not metaphorized or self-dramatized. Avoid lines that imply a quasi-human offscreen situation.'
+      : casualStatusRestraintId === 'medium'
+        ? 'Keep casual status replies lighter and less performative than a full persona bit.'
+        : 'No extra casual-status restraint is active.';
+  const draftCommentaryAllowancePromptGuidance =
+    draftCommentaryAllowanceId === 'low'
+      ? 'Return the requested line cleanly. Do not add grammar asides, winky side jokes, or commentary around it unless the user clearly invited that.'
+      : draftCommentaryAllowanceId === 'medium'
+        ? 'Keep draft commentary restrained. Favor the usable line over extra seasoning.'
+        : 'Playful commentary is more allowed here because the user invited extra flavor.';
   const replyPresentationModePromptGuidance =
     replyPresentationModeId === 'menu'
       ? 'The user explicitly wants multiple versions. You may give a small set of options, but keep them concise and clean.'
@@ -260,7 +314,20 @@ export function inferQuinnReplyDiscipline({
       signals: uniqueItems(statusHits.signals),
       promptGuidance: selfStatusSpecificityPromptGuidance,
     },
+    casualStatusRestraint: {
+      id: casualStatusRestraintId,
+      score: casualStatusRestraintScore,
+      signals: uniqueItems([...statusHits.signals, ...playfulInviteHits.signals]),
+      promptGuidance: casualStatusRestraintPromptGuidance,
+    },
+    draftCommentaryAllowance: {
+      id: draftCommentaryAllowanceId,
+      score: explicitPlayfulInvite ? playfulInviteHits.score : 0,
+      signals: uniqueItems([...writeHits.signals, ...playfulInviteHits.signals]),
+      promptGuidance: draftCommentaryAllowancePromptGuidance,
+    },
     explicitMultiOptionAsk,
+    explicitPlayfulInvite,
     singleLineDraftRequest,
     optionMenuSuppression,
     replyPresentationMode: {
@@ -271,10 +338,15 @@ export function inferQuinnReplyDiscipline({
       `Assistant persona literalness: ${assistantPersonaLiteralnessId}. ${assistantPersonaLiteralnessPromptGuidance}`,
       `Concrete self-claim suppression: ${concreteSelfClaimSuppressionId}. ${concreteSelfClaimSuppressionPromptGuidance}`,
       `Self-status specificity risk: ${selfStatusSpecificityRiskId}. ${selfStatusSpecificityPromptGuidance}`,
+      `Casual status restraint: ${casualStatusRestraintId}. ${casualStatusRestraintPromptGuidance}`,
+      `Draft commentary allowance: ${draftCommentaryAllowanceId}. ${draftCommentaryAllowancePromptGuidance}`,
       `Reply presentation mode: ${replyPresentationModeId}. ${replyPresentationModePromptGuidance}`,
       explicitMultiOptionAsk
         ? 'An explicit multi-option ask is active.'
         : 'No explicit multi-option ask is active.',
+      explicitPlayfulInvite
+        ? 'An explicit playful invite is active.'
+        : 'No explicit playful invite is active.',
       singleLineDraftRequest
         ? 'This is a direct write-the-line prompt. Give one strong line, not a menu.'
         : 'This is not a direct single-line drafting prompt.',

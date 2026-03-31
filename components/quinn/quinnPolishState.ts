@@ -619,12 +619,14 @@ function inferAftertaste({
   scores.assistantResidue += conductor.finalMemoryExpression !== 'implicit' ? 0.25 : 0;
   scores.assistantResidue += signatureGuard.id === 'high' ? 0.25 : 0;
   scores.assistantResidue += conductor.replyDiscipline.optionMenuSuppression ? 0.3 : 0;
+  scores.assistantResidue += conductor.replyDiscipline.draftCommentaryAllowance.id === 'low' ? 0.45 : 0;
 
   scores.explanationResidue += conductor.elasticity.id === 'expanded' ? 0.7 : 0;
   scores.explanationResidue += conductor.elasticity.id === 'medium' ? 0.35 : 0;
   scores.explanationResidue += conductor.riffBlend.primary.id === 'resolve' ? 0.45 : 0;
   scores.explanationResidue += conductor.structural.id === 'none' ? 0.25 : 0;
   scores.explanationResidue += conductor.replyDiscipline.singleLineDraftRequest ? 0.45 : 0;
+  scores.explanationResidue += conductor.replyDiscipline.casualStatusRestraint.id === 'high' ? 0.2 : 0;
 
   scores.neatnessResidue += conductor.endingBlend.primary.id === 'softLanding' ? 0.65 : 0;
   scores.neatnessResidue += conductor.endingBlend.primary.id === 'nudge' ? 0.55 : 0;

@@ -642,6 +642,7 @@ function resolveFinalMemoryExpression({
 function inferElasticity({
   packetText,
   correction,
+  replyDiscipline,
   threadContinuity,
   turnRole,
   energy,
@@ -654,6 +655,7 @@ function inferElasticity({
 }: {
   packetText: string;
   correction: QuinnCorrectionInference;
+  replyDiscipline: QuinnReplyDisciplineInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
   energy: QuinnEnergyInference;
@@ -689,6 +691,8 @@ function inferElasticity({
   scores.micro += correction.correctionLatch.id === 'hard' ? 1.15 : 0;
   scores.micro += correction.constraintPriority.id === 'dominant' ? 0.85 : 0;
   scores.micro += correction.repeatGuard.id !== 'none' ? 0.75 : 0;
+  scores.micro += replyDiscipline.singleLineDraftRequest ? 1.05 : 0;
+  scores.micro += replyDiscipline.draftCommentaryAllowance.id === 'low' ? 0.45 : 0;
   scores.micro +=
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
       ? 0.8
@@ -714,6 +718,8 @@ function inferElasticity({
       ? 0.25
       : 0;
   scores.short += turnRole.turnRoleAnchor.id === 'userReply' ? 0.2 : 0;
+  scores.short += replyDiscipline.casualStatusRestraint.id === 'high' ? 0.25 : 0;
+  scores.short += replyDiscipline.draftCommentaryAllowance.id === 'low' ? 0.2 : 0;
 
   scores.medium += riff.id === 'coBuild' ? 0.8 : 0;
   scores.medium += energy.id === 'tenderSoft' ? 0.55 : 0;
@@ -730,6 +736,8 @@ function inferElasticity({
   scores.medium -= correction.clarificationOverride.id === 'partial' ? 0.25 : 0;
   scores.medium -= correction.correctionLatch.id === 'hard' ? 0.7 : 0;
   scores.medium -= correction.repeatGuard.id !== 'none' ? 0.4 : 0;
+  scores.medium -= replyDiscipline.singleLineDraftRequest ? 0.95 : 0;
+  scores.medium -= replyDiscipline.casualStatusRestraint.id === 'high' ? 0.35 : 0;
   scores.medium -=
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
       ? 0.55
@@ -747,6 +755,8 @@ function inferElasticity({
   scores.expanded -= correction.correctionLatch.id === 'hard' ? 1.1 : 0;
   scores.expanded -= correction.constraintPriority.id === 'dominant' ? 0.8 : 0;
   scores.expanded -= correction.repeatGuard.id !== 'none' ? 0.75 : 0;
+  scores.expanded -= replyDiscipline.singleLineDraftRequest ? 1.2 : 0;
+  scores.expanded -= replyDiscipline.casualStatusRestraint.id === 'high' ? 0.5 : 0;
   scores.expanded -=
     threadContinuity.hasActiveThread && threadContinuity.staleFrameRisk.id === 'strong'
       ? 0.45
@@ -896,6 +906,12 @@ function buildArbitrationNotes({
     notes.push('If Quinn needs to sound busy, stretched, or alive, keep it more like tone than biography.');
   }
 
+  if (replyDiscipline.casualStatusRestraint.id === 'high') {
+    notes.push('This is an ordinary check-in. Keep Quinn alive and human, but lighter and cleaner than a self-dramatized persona bit.');
+  } else if (replyDiscipline.casualStatusRestraint.id === 'medium') {
+    notes.push('Keep the casual status reply lightly textured, not over-performed.');
+  }
+
   if (replyDiscipline.singleLineDraftRequest) {
     notes.push('This is a write-the-line turn. Give one strong natural line, not options, versions, or framing commentary.');
   } else if (
@@ -903,6 +919,10 @@ function buildArbitrationNotes({
     replyDiscipline.replyPresentationMode.id === 'singleBest'
   ) {
     notes.push('Default to one best natural reply. Do not optionize the answer into a menu.');
+  }
+
+  if (replyDiscipline.draftCommentaryAllowance.id === 'low') {
+    notes.push('On this drafting turn, return the usable line cleanly. Skip grammar asides, side jokes, and extra commentary around it.');
   }
 
   if (finalMemoryExpression === 'implicit') {
@@ -1062,6 +1082,7 @@ export function inferQuinnConductor({
   const elasticity = inferElasticity({
     packetText,
     correction,
+    replyDiscipline,
     threadContinuity,
     turnRole,
     energy,

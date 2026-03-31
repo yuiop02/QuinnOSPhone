@@ -214,12 +214,24 @@ export function buildQuinnPacket({
       conductorContext.conductor.replyDiscipline.selfStatusSpecificityRisk.id
     ),
     listPacketSection(
+      'CASUAL STATUS RESTRAINT',
+      conductorContext.conductor.replyDiscipline.casualStatusRestraint.id
+    ),
+    listPacketSection(
+      'DRAFT COMMENTARY ALLOWANCE',
+      conductorContext.conductor.replyDiscipline.draftCommentaryAllowance.id
+    ),
+    listPacketSection(
       'REPLY PRESENTATION MODE',
       conductorContext.conductor.replyDiscipline.replyPresentationMode.id
     ),
     listPacketSection(
       'EXPLICIT MULTI-OPTION ASK',
       conductorContext.conductor.replyDiscipline.explicitMultiOptionAsk ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'EXPLICIT PLAYFUL INVITE',
+      conductorContext.conductor.replyDiscipline.explicitPlayfulInvite ? 'true' : 'false'
     ),
     listPacketSection(
       'SINGLE-LINE DRAFT REQUEST',
