@@ -5,6 +5,10 @@ import {
   type QuinnAskStanceId,
 } from './quinnAskState';
 import {
+  inferQuinnCorrectionState,
+  type QuinnCorrectionInference,
+} from './quinnCorrectionState';
+import {
   inferQuinnChallengeStance,
   type QuinnChallengeInference,
   type QuinnChallengeStanceId,
@@ -77,6 +81,7 @@ export type QuinnStructuralInference = {
 };
 
 export type QuinnConductorInference = {
+  correction: QuinnCorrectionInference;
   energyBlend: {
     primary: WeightedState<QuinnEnergyStateId>;
     secondary: WeightedState<QuinnEnergyStateId> | null;
@@ -498,12 +503,14 @@ function inferStructuralNoticing(packetText: string, sessionArc: SessionArc | nu
 
 function resolveFinalAskStance({
   ask,
+  correction,
   ending,
   challenge,
   energy,
   riff,
 }: {
   ask: QuinnAskInference;
+  correction: QuinnCorrectionInference;
   ending: QuinnEndingStyleInference;
   challenge: QuinnChallengeInference;
   energy: QuinnEnergyInference;
@@ -519,6 +526,14 @@ function resolveFinalAskStance({
     resolved = 'noAsk';
   }
 
+  if (
+    correction.correctionLatch.id === 'hard' ||
+    correction.constraintPriority.id === 'dominant' ||
+    correction.repeatGuard.id !== 'none'
+  ) {
+    resolved = 'noAsk';
+  }
+
   if ((energy.id === 'tenderSoft' || riff.id === 'deepRiff') && resolved === 'ask') {
     resolved = 'optionalAsk';
   }
@@ -528,13 +543,22 @@ function resolveFinalAskStance({
 
 function resolveFinalMemoryExpression({
   memoryExpression,
+  correction,
   energy,
   riff,
 }: {
   memoryExpression: QuinnMemoryExpressionInference;
+  correction: QuinnCorrectionInference;
   energy: QuinnEnergyInference;
   riff: QuinnRiffInference;
 }): QuinnMemoryExpressionId {
+  if (
+    correction.correctionLatch.id === 'hard' ||
+    correction.repeatGuard.id !== 'none'
+  ) {
+    return 'implicit';
+  }
+
   if (
     memoryExpression.id === 'explicit' &&
     (energy.id === 'tenderSoft' || riff.id === 'deepRiff')
@@ -554,6 +578,7 @@ function resolveFinalMemoryExpression({
 
 function inferElasticity({
   packetText,
+  correction,
   energy,
   challenge,
   riff,
@@ -563,6 +588,7 @@ function inferElasticity({
   motifs,
 }: {
   packetText: string;
+  correction: QuinnCorrectionInference;
   energy: QuinnEnergyInference;
   challenge: QuinnChallengeInference;
   riff: QuinnRiffInference;
@@ -588,6 +614,9 @@ function inferElasticity({
   scores.micro += ending.id === 'sharp' || ending.id === 'cleanStop' ? 0.95 : 0;
   scores.micro += ask === 'noAsk' ? 0.5 : 0;
   scores.micro += challenge.id === 'directChallenge' ? 0.7 : 0;
+  scores.micro += correction.correctionLatch.id === 'hard' ? 1.15 : 0;
+  scores.micro += correction.constraintPriority.id === 'dominant' ? 0.85 : 0;
+  scores.micro += correction.repeatGuard.id !== 'none' ? 0.75 : 0;
   scores.micro -= riff.id === 'coBuild' ? 0.55 : 0;
   scores.micro -= riff.id === 'deepRiff' ? 0.95 : 0;
   scores.micro -= energy.id === 'tenderSoft' ? 0.25 : 0;
@@ -595,6 +624,8 @@ function inferElasticity({
   scores.short += ask === 'noAsk' ? 0.25 : 0;
   scores.short += resolveAskCount > 0 ? 0.25 : 0;
   scores.short += wordCount > 0 && wordCount <= 42 ? 0.2 : 0;
+  scores.short += correction.correctionLatch.id === 'soft' ? 0.35 : 0;
+  scores.short += correction.constraintPriority.id === 'elevated' ? 0.25 : 0;
 
   scores.medium += riff.id === 'coBuild' ? 0.8 : 0;
   scores.medium += energy.id === 'tenderSoft' ? 0.55 : 0;
@@ -602,12 +633,17 @@ function inferElasticity({
   scores.medium += motifs.length > 0 ? 0.35 : 0;
   scores.medium += resolveAskCount > 0 ? 0.3 : 0;
   scores.medium += wordCount > 42 ? 0.2 : 0;
+  scores.medium -= correction.correctionLatch.id === 'hard' ? 0.7 : 0;
+  scores.medium -= correction.repeatGuard.id !== 'none' ? 0.4 : 0;
 
   scores.expanded += riff.id === 'deepRiff' ? 1.35 : 0;
   scores.expanded += structural.id === 'strongNotice' ? 0.7 : 0;
   scores.expanded += motifs.length > 1 ? 0.55 : 0;
   scores.expanded += energy.id === 'hypedIntense' && riff.id !== 'resolve' ? 0.25 : 0;
   scores.expanded += resolveAskCount >= 2 ? 0.35 : 0;
+  scores.expanded -= correction.correctionLatch.id === 'hard' ? 1.1 : 0;
+  scores.expanded -= correction.constraintPriority.id === 'dominant' ? 0.8 : 0;
+  scores.expanded -= correction.repeatGuard.id !== 'none' ? 0.75 : 0;
 
   const winner =
     scores.expanded >= QUINN_CONDUCTOR_TUNING.elasticity.threshold.expanded
@@ -628,6 +664,7 @@ function inferElasticity({
 }
 
 function buildArbitrationNotes({
+  correction,
   energyBlend,
   textureBlend,
   challengeBlend,
@@ -638,6 +675,7 @@ function buildArbitrationNotes({
   structural,
   motifs,
 }: {
+  correction: QuinnCorrectionInference;
   energyBlend: {
     primary: WeightedState<QuinnEnergyStateId>;
     secondary: WeightedState<QuinnEnergyStateId> | null;
@@ -709,6 +747,22 @@ function buildArbitrationNotes({
     notes.push('Let motif resonance steer what feels load-bearing, but keep it mostly implicit unless naming it truly helps.');
   }
 
+  if (correction.correctionLatch.id === 'hard') {
+    notes.push('The prior frame was just invalidated. Acknowledge that quickly and pivot instead of defending or extending it.');
+  } else if (correction.correctionLatch.id === 'soft') {
+    notes.push('A local frame update is active. Keep the reply responsive to the correction instead of coasting on older momentum.');
+  }
+
+  if (correction.constraintPriority.id === 'dominant') {
+    notes.push('A blocker is now the live fact. Answer feasibility first and let the earlier desire or hype drop into the background.');
+  } else if (correction.constraintPriority.id === 'elevated') {
+    notes.push('A practical constraint is in play. Keep it visible while you respond instead of acting like it is a side note.');
+  }
+
+  if (correction.repeatGuard.id !== 'none') {
+    notes.push('The last move got called repetitive. Replace it with materially different content, not the same move in lightly shuffled words.');
+  }
+
   return notes;
 }
 
@@ -732,6 +786,10 @@ export function inferQuinnConductor({
   sessionArc?: SessionArc | null;
   lensMode?: string;
 }): QuinnConductorInference {
+  const correction = inferQuinnCorrectionState({
+    packetText,
+    sessionArc,
+  });
   const energy = inferQuinnEnergyState({
     packetText,
     sessionArc,
@@ -794,6 +852,7 @@ export function inferQuinnConductor({
   const structural = inferStructuralNoticing(packetText, sessionArc);
   const finalAsk = resolveFinalAskStance({
     ask,
+    correction,
     ending,
     challenge,
     energy,
@@ -801,11 +860,13 @@ export function inferQuinnConductor({
   });
   const finalMemoryExpression = resolveFinalMemoryExpression({
     memoryExpression,
+    correction,
     energy,
     riff,
   });
   const elasticity = inferElasticity({
     packetText,
+    correction,
     energy,
     challenge,
     riff,
@@ -815,6 +876,7 @@ export function inferQuinnConductor({
     motifs,
   });
   const arbitrationNotes = buildArbitrationNotes({
+    correction,
     energyBlend,
     textureBlend,
     challengeBlend,
@@ -827,6 +889,7 @@ export function inferQuinnConductor({
   });
 
   return {
+    correction,
     energyBlend,
     textureBlend,
     challengeBlend,
@@ -839,6 +902,7 @@ export function inferQuinnConductor({
     motifs,
     arbitrationNotes,
     promptGuidance: [
+      ...correction.promptGuidance,
       describeBlend('Energy blend', energyBlend),
       describeBlend('Texture blend', textureBlend),
       describeBlend('Challenge blend', challengeBlend),

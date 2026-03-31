@@ -1,4 +1,5 @@
 import type { SessionArc } from './quinnTypes';
+import type { QuinnRepeatGuardId } from './quinnCorrectionState';
 import { inferQuinnConductor, type QuinnConductorInference, type QuinnMotifId } from './quinnConductorState';
 
 export type QuinnCandidateFramingId = 'single' | 'paired' | 'triad';
@@ -51,6 +52,8 @@ export type QuinnSignatureGuard = {
   repeatedOpeners: string[];
   repeatedLandings: string[];
   repeatedGestures: string[];
+  immediateRepeatGuard: QuinnRepeatGuardId;
+  blockedRecentText: string;
   promptGuidance: string;
 };
 
@@ -370,16 +373,35 @@ function collectRepeatedChunks(chunks: string[]) {
     .map(([chunk]) => chunk);
 }
 
-function inferSignatureGuard(sessionArc: SessionArc | null | undefined): QuinnSignatureGuard {
+function inferSignatureGuard(
+  sessionArc: SessionArc | null | undefined,
+  conductor: QuinnConductorInference
+): QuinnSignatureGuard {
   const beats = getBeatSummaries(sessionArc);
+  const blockedRecentText = conductor.correction.repeatGuard.blockedRecentText;
 
   if (!beats.length) {
+    const immediateRepeatGuard = conductor.correction.repeatGuard.id;
+    const promptGuidance =
+      immediateRepeatGuard === 'avoidExact'
+        ? `The user just called repetition out. Do not reuse the same joke, line, or suggestion${blockedRecentText ? ` (${blockedRecentText})` : ''}.`
+        : immediateRepeatGuard === 'avoidNearRepeat'
+          ? 'The user is calling this too samey. Replace the move with materially different phrasing or content.'
+          : 'No strong repetition risk. Keep Quinn recognizable without forcing novelty.';
+
     return {
-      id: 'low' as QuinnRepetitionRiskId,
+      id:
+        immediateRepeatGuard === 'avoidExact'
+          ? 'high'
+          : immediateRepeatGuard === 'avoidNearRepeat'
+            ? 'medium'
+            : ('low' as QuinnRepetitionRiskId),
       repeatedOpeners: [],
       repeatedLandings: [],
       repeatedGestures: [],
-      promptGuidance: 'No strong repetition risk. Keep Quinn recognizable without forcing novelty.',
+      immediateRepeatGuard,
+      blockedRecentText,
+      promptGuidance,
     };
   }
 
@@ -395,12 +417,23 @@ function inferSignatureGuard(sessionArc: SessionArc | null | undefined): QuinnSi
   const riskScore =
     repeatedOpeners.length * 0.8 +
     repeatedLandings.length * 0.95 +
-    repeatedGestures.length * 0.7;
+    repeatedGestures.length * 0.7 +
+    (conductor.correction.repeatGuard.id === 'avoidExact'
+      ? 1.45
+      : conductor.correction.repeatGuard.id === 'avoidNearRepeat'
+        ? 0.8
+        : 0);
 
   const id: QuinnRepetitionRiskId =
     riskScore >= 2.2 ? 'high' : riskScore >= 1.05 ? 'medium' : 'low';
 
   const guidanceBits = [
+    conductor.correction.repeatGuard.id === 'avoidExact'
+      ? `The user just called repetition out. Do not reuse the same joke, line, or suggestion${blockedRecentText ? ` (${blockedRecentText})` : ''}.`
+      : '',
+    conductor.correction.repeatGuard.id === 'avoidNearRepeat'
+      ? 'The user is calling this too samey. Replace the move with materially different phrasing or content.'
+      : '',
     repeatedOpeners.length ? `Vary away from recent opener shapes like "${repeatedOpeners[0]}".` : '',
     repeatedLandings.length ? `Do not reuse the same landing shape again.` : '',
     repeatedGestures.length
@@ -413,6 +446,8 @@ function inferSignatureGuard(sessionArc: SessionArc | null | undefined): QuinnSi
     repeatedOpeners,
     repeatedLandings,
     repeatedGestures: [...repeatedGestures],
+    immediateRepeatGuard: conductor.correction.repeatGuard.id,
+    blockedRecentText,
     promptGuidance:
       guidanceBits.join(' ') ||
       'No strong repetition risk. Keep Quinn recognizable without forcing novelty.',
@@ -695,7 +730,7 @@ export function inferQuinnPolishState({
     packetText,
     microTurn: microTurn.id,
   });
-  const signatureGuard = inferSignatureGuard(sessionArc);
+  const signatureGuard = inferSignatureGuard(sessionArc, conductor);
   const warmth = inferWarmth({
     conductor,
     packetText,
@@ -728,6 +763,9 @@ export function inferQuinnPolishState({
       `Signature drift guard: ${signatureGuard.id}. ${signatureGuard.promptGuidance}`,
       `Aftertaste check: ${aftertaste.id}. ${aftertaste.promptGuidance}`,
       `Controlled unpredictability: ${surpriseAllowance.label}. ${surpriseAllowance.promptGuidance}`,
+      conductor.correction.acknowledgmentStyle.id !== 'none'
+        ? `Correction handling: ${conductor.correction.acknowledgmentStyle.id}. ${conductor.correction.acknowledgmentStyle.promptGuidance}`
+        : 'No explicit correction beat is needed beyond the main reply motion.',
       conductor.motifs.length
         ? `Recurring motifs are present (${motifNames}). Let them inform the framing quietly, not as named literary analysis.`
         : 'No strong motif surfacing needed. Keep the reply natural instead of trying to make one.',
