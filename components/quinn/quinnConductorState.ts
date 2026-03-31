@@ -527,6 +527,7 @@ function resolveFinalAskStance({
   }
 
   if (
+    correction.clarificationOverride.id !== 'none' ||
     correction.correctionLatch.id !== 'none' ||
     correction.constraintPriority.id !== 'none' ||
     correction.repeatGuard.id !== 'none'
@@ -553,6 +554,7 @@ function resolveFinalMemoryExpression({
   riff: QuinnRiffInference;
 }): QuinnMemoryExpressionId {
   if (
+    correction.clarificationOverride.id !== 'none' ||
     correction.correctionLatch.id !== 'none' ||
     correction.constraintPriority.id !== 'none' ||
     correction.repeatGuard.id !== 'none'
@@ -615,6 +617,8 @@ function inferElasticity({
   scores.micro += ending.id === 'sharp' || ending.id === 'cleanStop' ? 0.95 : 0;
   scores.micro += ask === 'noAsk' ? 0.5 : 0;
   scores.micro += challenge.id === 'directChallenge' ? 0.7 : 0;
+  scores.micro += correction.clarificationOverride.id === 'dominant' ? 1.05 : 0;
+  scores.micro += correction.clarificationOverride.id === 'partial' ? 0.45 : 0;
   scores.micro += correction.correctionLatch.id === 'hard' ? 1.15 : 0;
   scores.micro += correction.constraintPriority.id === 'dominant' ? 0.85 : 0;
   scores.micro += correction.repeatGuard.id !== 'none' ? 0.75 : 0;
@@ -625,6 +629,7 @@ function inferElasticity({
   scores.short += ask === 'noAsk' ? 0.25 : 0;
   scores.short += resolveAskCount > 0 ? 0.25 : 0;
   scores.short += wordCount > 0 && wordCount <= 42 ? 0.2 : 0;
+  scores.short += correction.clarificationOverride.id === 'partial' ? 0.35 : 0;
   scores.short += correction.correctionLatch.id === 'soft' ? 0.35 : 0;
   scores.short += correction.constraintPriority.id === 'elevated' ? 0.25 : 0;
 
@@ -634,6 +639,8 @@ function inferElasticity({
   scores.medium += motifs.length > 0 ? 0.35 : 0;
   scores.medium += resolveAskCount > 0 ? 0.3 : 0;
   scores.medium += wordCount > 42 ? 0.2 : 0;
+  scores.medium -= correction.clarificationOverride.id === 'dominant' ? 0.85 : 0;
+  scores.medium -= correction.clarificationOverride.id === 'partial' ? 0.25 : 0;
   scores.medium -= correction.correctionLatch.id === 'hard' ? 0.7 : 0;
   scores.medium -= correction.repeatGuard.id !== 'none' ? 0.4 : 0;
 
@@ -642,6 +649,8 @@ function inferElasticity({
   scores.expanded += motifs.length > 1 ? 0.55 : 0;
   scores.expanded += energy.id === 'hypedIntense' && riff.id !== 'resolve' ? 0.25 : 0;
   scores.expanded += resolveAskCount >= 2 ? 0.35 : 0;
+  scores.expanded -= correction.clarificationOverride.id === 'dominant' ? 1.15 : 0;
+  scores.expanded -= correction.clarificationOverride.id === 'partial' ? 0.4 : 0;
   scores.expanded -= correction.correctionLatch.id === 'hard' ? 1.1 : 0;
   scores.expanded -= correction.constraintPriority.id === 'dominant' ? 0.8 : 0;
   scores.expanded -= correction.repeatGuard.id !== 'none' ? 0.75 : 0;
@@ -730,6 +739,14 @@ function buildArbitrationNotes({
 
   if (finalAsk === 'noAsk') {
     notes.push('Let the moment breathe. If the line lands, stop there instead of pulling for more.');
+  }
+
+  if (correction.clarificationOverride.id !== 'none') {
+    notes.push(
+      correction.clarificationOverride.interpretationReplacement
+        ? 'An explicit meaning clarification is active. Drop the older interpretation and answer from the corrected sense.'
+        : 'A semantic clarification is active. Let the clarified sense outrank stale thread momentum.'
+    );
   }
 
   if (finalMemoryExpression === 'implicit') {

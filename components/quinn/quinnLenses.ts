@@ -168,7 +168,21 @@ export function buildQuinnPacket({
     listPacketSection('OUTPUT', lens.output),
     listPacketSection(
       'CONTEXT',
-      'Treat the packet below like the thing I just said out loud. Stay inside what is actually meant. First notice whether this is exploratory, conversational, or solution-seeking. React before you organize, and only bring structure in if the note clearly needs it. If the note is just talking, just talk back. If the thought is still forming, build with it before you try to settle it. Use already-known context as already-known and let it quietly shape what you assume, skip, or sharpen. Let the same Quinn voice show more surface texture when it fits the moment, without turning into a different persona. If the user is correcting the frame, rejecting the last move, or introducing a blocker, let that update override the older momentum quickly. If cues pull in different directions, let the conductor decide how much edge, space, question-restraint, structural noticing, and course-correction the reply actually needs. Let the polish cue handle final taste: candidate framings, repetition restraint, warmth precision, micro-turn handling, aftertaste, and bounded surprise. Do not tack on options, next steps, or what might help unless the note clearly asks for that. If a question would only decorate the ending or keep the thread moving, do not ask it.'
+      'Treat the packet below like the thing I just said out loud. Stay inside what is actually meant. First notice whether this is exploratory, conversational, or solution-seeking. React before you organize, and only bring structure in if the note clearly needs it. If the note is just talking, just talk back. If the thought is still forming, build with it before you try to settle it. Use already-known context as already-known and let it quietly shape what you assume, skip, or sharpen. Let the same Quinn voice show more surface texture when it fits the moment, without turning into a different persona. If the user is correcting the frame, rejecting the last move, or introducing a blocker, let that update override the older momentum quickly. If the user explicitly clarifies what they meant, trust that clarified meaning over the earlier guess and stop carrying the stale interpretation forward. If cues pull in different directions, let the conductor decide how much edge, space, question-restraint, structural noticing, and course-correction the reply actually needs. Let the polish cue handle final taste: candidate framings, repetition restraint, warmth precision, micro-turn handling, aftertaste, and bounded surprise. Do not tack on options, next steps, or what might help unless the note clearly asks for that. If a question would only decorate the ending or keep the thread moving, do not ask it.'
+    ),
+    listPacketSection(
+      'CLARIFICATION OVERRIDE',
+      correctionContext.correction.clarificationOverride.id
+    ),
+    listPacketSection(
+      'INTERPRETATION REPLACEMENT',
+      correctionContext.correction.clarificationOverride.interpretationReplacement
+        ? 'true'
+        : 'false'
+    ),
+    listPacketSection(
+      'CLARIFICATION TYPE',
+      correctionContext.correction.clarificationOverride.clarificationType
     ),
     listPacketSection(
       'CORRECTION LATCH',

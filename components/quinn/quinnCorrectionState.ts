@@ -3,12 +3,25 @@ import type { SessionArc } from './quinnTypes';
 export type QuinnCorrectionLatchId = 'none' | 'soft' | 'hard';
 export type QuinnConstraintPriorityId = 'none' | 'elevated' | 'dominant';
 export type QuinnRepeatGuardId = 'none' | 'avoidExact' | 'avoidNearRepeat';
+export type QuinnClarificationOverrideId = 'none' | 'partial' | 'dominant';
+export type QuinnClarificationTypeId =
+  | 'none'
+  | 'reference'
+  | 'subject'
+  | 'meaning'
+  | 'category'
+  | 'tone';
 export type QuinnAcknowledgmentStyleId = 'none' | 'briefPivot' | 'briefOwnIt';
 
 type QuinnSignalPattern = {
   pattern: RegExp;
   label: string;
   score: number;
+};
+
+type QuinnClarificationPattern = QuinnSignalPattern & {
+  clarificationType: Exclude<QuinnClarificationTypeId, 'none'>;
+  replacementSummary: string;
 };
 
 type QuinnSignalBucket<T extends string> = {
@@ -24,6 +37,11 @@ export type QuinnCorrectionInference = {
   repeatGuard: QuinnSignalBucket<QuinnRepeatGuardId> & {
     blockedRecentText: string;
   };
+  clarificationOverride: QuinnSignalBucket<QuinnClarificationOverrideId> & {
+    clarificationType: QuinnClarificationTypeId;
+    interpretationReplacement: boolean;
+    replacementSummary: string;
+  };
   acknowledgmentStyle: {
     id: QuinnAcknowledgmentStyleId;
     promptGuidance: string;
@@ -36,6 +54,12 @@ export const QUINN_CORRECTION_TUNING = {
   correctionLatch: {
     softThreshold: 1.05,
     hardThreshold: 2.05,
+  },
+  clarificationOverride: {
+    partialThreshold: 0.95,
+    dominantThreshold: 1.8,
+    explicitReplacementBoost: 0.35,
+    subjectReferenceBoost: 0.35,
   },
   constraintPriority: {
     elevatedThreshold: 1.1,
@@ -64,7 +88,8 @@ const HARD_CORRECTION_PATTERNS: readonly QuinnSignalPattern[] = [
     score: 1.15,
   },
   {
-    pattern: /\b(?:that(?:'s| is) not what i meant|that(?:'s| is) not what i was saying)\b/i,
+    pattern:
+      /\b(?:that(?:'s| is)\s+(?:definitely\s+|really\s+|clearly\s+|just\s+)?not what i meant|that(?:'s| is)\s+(?:definitely\s+|really\s+|clearly\s+|just\s+)?not what i was saying)\b/i,
     label: 'user rejects the previous interpretation',
     score: 1.25,
   },
@@ -115,6 +140,80 @@ const SOFT_CORRECTION_PATTERNS: readonly QuinnSignalPattern[] = [
     pattern: /\b(?:why are you coming for me|easy there|dial it back)\b/i,
     label: 'user objects to the tone of the last reply',
     score: 1,
+  },
+];
+
+const DOMINANT_CLARIFICATION_PATTERNS: readonly QuinnClarificationPattern[] = [
+  {
+    pattern:
+      /\b(?:i (?:used|was using|meant))\b[\s\S]{0,90}\b(?:as|like)\b[\s\S]{0,90}\b(?:a |an )?(?:nickname|pet name|term of endearment|way of referring to you|way i was referring to you|way i was talking to you)\b/i,
+    label: 'user says the disputed phrase was a nickname or way of referring to Quinn',
+    score: 1.55,
+    clarificationType: 'reference',
+    replacementSummary:
+      'Treat the disputed phrase as a nickname or way of addressing Quinn, not as the topic itself.',
+  },
+  {
+    pattern:
+      /\b(?:the )?subject\b[\s,:-]{0,20}\byou\b|\b(?:i meant you|i was talking to you|i was saying hi to you)\b/i,
+    label: 'user says Quinn was the subject or addressee',
+    score: 1.25,
+    clarificationType: 'subject',
+    replacementSummary:
+      'Treat Quinn as the subject or addressee of the phrase, not as an external topic guess.',
+  },
+  {
+    pattern:
+      /\bnot as\b[\s\S]{0,60}\b(?:the )?(?:topic|genre|music|category|label)\b[\s\S]{0,60}\bbut as\b/i,
+    label: 'user replaces a topical or category reading with a different meaning',
+    score: 1.35,
+    clarificationType: 'category',
+    replacementSummary:
+      'Drop the earlier category or topic reading. Use the corrected sense the user just supplied instead.',
+  },
+];
+
+const PARTIAL_CLARIFICATION_PATTERNS: readonly QuinnClarificationPattern[] = [
+  {
+    pattern: /\bi meant\b[\s\S]{0,70}\bas\b/i,
+    label: 'user is explicitly restating the intended meaning',
+    score: 1.05,
+    clarificationType: 'meaning',
+    replacementSummary:
+      'The user is explicitly restating what they meant. Answer from that clarified meaning.',
+  },
+  {
+    pattern: /\bi was using\b[\s\S]{0,70}\bas\b/i,
+    label: 'user is explaining how the disputed term was being used',
+    score: 1.05,
+    clarificationType: 'meaning',
+    replacementSummary:
+      'The user is explaining how the disputed term was being used. Trust that intended sense over the earlier guess.',
+  },
+  {
+    pattern: /\b(?:not what i meant by|what i meant by)\b/i,
+    label: 'user is clarifying the meaning of a specific phrase',
+    score: 0.95,
+    clarificationType: 'meaning',
+    replacementSummary:
+      'A phrase-level meaning clarification is active. Drop the older interpretation and use the corrected one.',
+  },
+  {
+    pattern: /\bnot as\b[\s\S]{0,60}\bbut as\b/i,
+    label: 'user contrasts the old interpretation with the intended one',
+    score: 1.1,
+    clarificationType: 'meaning',
+    replacementSummary:
+      'The user contrasted the old interpretation with the intended one. Use the intended meaning now.',
+  },
+  {
+    pattern:
+      /\b(?:referring to you|calling you|addressing you|using that for you|used that for you)\b/i,
+    label: 'user says the phrase was directed at Quinn',
+    score: 1.05,
+    clarificationType: 'reference',
+    replacementSummary:
+      'Treat the phrase as directed at Quinn, not as a topic or category under discussion.',
   },
 ];
 
@@ -256,6 +355,31 @@ function collectPatternHits(text: string, patterns: readonly QuinnSignalPattern[
   };
 }
 
+function collectClarificationHits(
+  text: string,
+  patterns: readonly QuinnClarificationPattern[]
+) {
+  let score = 0;
+  const signals: string[] = [];
+  const hits: QuinnClarificationPattern[] = [];
+
+  for (const pattern of patterns) {
+    if (!pattern.pattern.test(text)) {
+      continue;
+    }
+
+    score += pattern.score;
+    signals.push(pattern.label);
+    hits.push(pattern);
+  }
+
+  return {
+    score,
+    signals,
+    hits,
+  };
+}
+
 function hasAnyPattern(text: string, patterns: readonly RegExp[]) {
   return patterns.some((pattern) => pattern.test(text));
 }
@@ -283,9 +407,50 @@ export function inferQuinnCorrectionState({
   const elevatedConstraint = collectPatternHits(lower, ELEVATED_CONSTRAINT_PATTERNS);
   const exactRepeat = collectPatternHits(lower, EXACT_REPEAT_PATTERNS);
   const nearRepeat = collectPatternHits(lower, NEAR_REPEAT_PATTERNS);
+  const dominantClarification = collectClarificationHits(
+    clean,
+    DOMINANT_CLARIFICATION_PATTERNS
+  );
+  const partialClarification = collectClarificationHits(
+    clean,
+    PARTIAL_CLARIFICATION_PATTERNS
+  );
+  const clarificationHits = [
+    ...dominantClarification.hits,
+    ...partialClarification.hits,
+  ].sort((a, b) => b.score - a.score);
+  const topClarificationHit = clarificationHits[0] || null;
 
   const desireActive = hasAnyPattern(lower, DESIRE_PATTERNS) || hasAnyPattern(momentumText, DESIRE_PATTERNS);
   const iKnowButActive = /\b(?:i know|yeah|yes|right|true|okay|ok),?\s+but\b/i.test(clean);
+  const clarificationScore =
+    dominantClarification.score +
+    partialClarification.score +
+    (hardCorrection.score > 0 && clarificationHits.length
+      ? QUINN_CORRECTION_TUNING.clarificationOverride.explicitReplacementBoost
+      : 0) +
+    (topClarificationHit &&
+    (topClarificationHit.clarificationType === 'reference' ||
+      topClarificationHit.clarificationType === 'subject')
+      ? QUINN_CORRECTION_TUNING.clarificationOverride.subjectReferenceBoost
+      : 0);
+  const clarificationOverrideId: QuinnClarificationOverrideId =
+    clarificationScore >= QUINN_CORRECTION_TUNING.clarificationOverride.dominantThreshold
+      ? 'dominant'
+      : clarificationScore >=
+            QUINN_CORRECTION_TUNING.clarificationOverride.partialThreshold
+        ? 'partial'
+        : 'none';
+  const interpretationReplacement =
+    clarificationOverrideId === 'dominant' ||
+    /\bi meant\b[\s\S]{0,70}\bnot\b/i.test(clean) ||
+    /\bnot as\b[\s\S]{0,60}\bbut as\b/i.test(clean);
+  const clarificationType = topClarificationHit?.clarificationType || 'none';
+  const replacementSummary =
+    clarificationOverrideId !== 'none'
+      ? topClarificationHit?.replacementSummary ||
+        'The user explicitly clarified what they meant. Replace the older interpretation with that clarified meaning.'
+      : '';
 
   const dominantConstraintScore =
     dominantConstraint.score +
@@ -304,13 +469,20 @@ export function inferQuinnCorrectionState({
   const correctionLatchScore =
     hardCorrection.score +
     softCorrection.score +
-    (exactRepeatScore >= QUINN_CORRECTION_TUNING.repeatGuard.exactThreshold ? 0.45 : 0);
+    (exactRepeatScore >= QUINN_CORRECTION_TUNING.repeatGuard.exactThreshold ? 0.45 : 0) +
+    (clarificationOverrideId === 'dominant'
+      ? 0.9
+      : clarificationOverrideId === 'partial'
+        ? 0.35
+        : 0);
 
   const correctionLatchId: QuinnCorrectionLatchId =
+    clarificationOverrideId === 'dominant' ||
     exactRepeatScore >= QUINN_CORRECTION_TUNING.repeatGuard.exactThreshold ||
     correctionLatchScore >= QUINN_CORRECTION_TUNING.correctionLatch.hardThreshold
       ? 'hard'
-      : correctionLatchScore >= QUINN_CORRECTION_TUNING.correctionLatch.softThreshold ||
+      : clarificationOverrideId === 'partial' ||
+          correctionLatchScore >= QUINN_CORRECTION_TUNING.correctionLatch.softThreshold ||
           dominantConstraintScore >= QUINN_CORRECTION_TUNING.constraintPriority.dominantThreshold
         ? 'soft'
         : 'none';
@@ -332,6 +504,8 @@ export function inferQuinnCorrectionState({
   const correctionSignals = uniqueItems([
     ...hardCorrection.signals,
     ...softCorrection.signals,
+    ...dominantClarification.signals,
+    ...partialClarification.signals,
     ...(repeatGuardId !== 'none' ? ['the user is rejecting a just-used line or joke'] : []),
   ]);
   const constraintSignals = uniqueItems([
@@ -350,6 +524,7 @@ export function inferQuinnCorrectionState({
   const invalidatedTargets = uniqueItems([
     constraintPriorityId !== 'none' ? 'prior suggestion or desire momentum' : '',
     correctionLatchId !== 'none' ? 'prior frame' : '',
+    clarificationOverrideId !== 'none' ? 'older interpretation or meaning guess' : '',
     repeatGuardId !== 'none'
       ? REPEAT_OBJECT_PATTERNS.some((pattern) => pattern.test(clean))
         ? 'prior joke or line'
@@ -360,11 +535,20 @@ export function inferQuinnCorrectionState({
   const acknowledgmentStyleId: QuinnAcknowledgmentStyleId =
     repeatGuardId !== 'none'
       ? 'briefOwnIt'
-      : correctionLatchId === 'hard' || constraintPriorityId === 'dominant'
+      : clarificationOverrideId !== 'none' ||
+          correctionLatchId === 'hard' ||
+          constraintPriorityId === 'dominant'
         ? 'briefPivot'
-        : correctionLatchId === 'soft' || constraintPriorityId === 'elevated'
+      : correctionLatchId === 'soft' || constraintPriorityId === 'elevated'
           ? 'briefPivot'
           : 'none';
+
+  const clarificationPromptGuidance =
+    clarificationOverrideId === 'dominant'
+      ? `${replacementSummary} The clarified meaning replaces the older interpretation for this run. Do not keep both meanings alive.`
+      : clarificationOverrideId === 'partial'
+        ? `${replacementSummary} Lean toward the clarified sense over the earlier guess.`
+        : 'No explicit semantic clarification override is active.';
 
   const correctionPromptGuidance =
     correctionLatchId === 'hard'
@@ -417,12 +601,25 @@ export function inferQuinnCorrectionState({
       blockedRecentText,
       promptGuidance: repeatPromptGuidance,
     },
+    clarificationOverride: {
+      id: clarificationOverrideId,
+      score: clarificationScore,
+      signals: uniqueItems([
+        ...dominantClarification.signals,
+        ...partialClarification.signals,
+      ]),
+      clarificationType,
+      interpretationReplacement,
+      replacementSummary,
+      promptGuidance: clarificationPromptGuidance,
+    },
     acknowledgmentStyle: {
       id: acknowledgmentStyleId,
       promptGuidance: acknowledgmentPromptGuidance,
     },
     invalidatedTargets,
     promptGuidance: [
+      `Clarification override: ${clarificationOverrideId}. ${clarificationPromptGuidance}`,
       `Correction latch: ${correctionLatchId}. ${correctionPromptGuidance}`,
       `Constraint priority: ${constraintPriorityId}. ${constraintPromptGuidance}`,
       `Repeat guard: ${repeatGuardId}. ${repeatPromptGuidance}`,
@@ -447,6 +644,9 @@ export function buildQuinnCorrectionPacketContext({
   });
 
   const activeGuidance = [
+    correction.clarificationOverride.id !== 'none'
+      ? correction.clarificationOverride.promptGuidance
+      : '',
     correction.correctionLatch.id !== 'none' ? correction.correctionLatch.promptGuidance : '',
     correction.constraintPriority.id !== 'none' ? correction.constraintPriority.promptGuidance : '',
     correction.repeatGuard.id !== 'none' ? correction.repeatGuard.promptGuidance : '',
@@ -459,6 +659,6 @@ export function buildQuinnCorrectionPacketContext({
     correction,
     context:
       activeGuidance.join(' ') ||
-      'No local correction override is active. Keep following the live note, but only carry old momentum forward if the new note is actually continuing it.',
+      'No local correction or clarification override is active. Keep following the live note, but only carry old momentum forward if the new note is actually continuing it.',
   };
 }
