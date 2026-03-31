@@ -201,6 +201,19 @@ export function buildQuinnPacket({
       'SUPPRESS CONCRETE SELF-STATUS',
       correctionContext.correction.suppressConcreteSelfStatus ? 'true' : 'false'
     ),
+    listPacketSection('FRAME REJECTION', correctionContext.correction.frameRejection.id),
+    listPacketSection(
+      'SOCIAL FRAME MODE',
+      correctionContext.correction.socialFrameMode.id
+    ),
+    listPacketSection(
+      'USER REQUESTS REALIGNMENT',
+      correctionContext.correction.userRequestsRealignment ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'SUPPRESS ESCALATED BOUNCEBACK',
+      correctionContext.correction.suppressEscalatedBounceback ? 'true' : 'false'
+    ),
     listPacketSection(
       'ASSISTANT PERSONA LITERALNESS',
       conductorContext.conductor.replyDiscipline.assistantPersonaLiteralness.id

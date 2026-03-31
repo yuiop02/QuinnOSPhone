@@ -546,6 +546,8 @@ function resolveFinalAskStance({
   }
 
   if (
+    correction.socialFrameMode.id === 'drop' ||
+    correction.suppressEscalatedBounceback ||
     correction.realityAnchorMode.id === 'repairFrame' ||
     correction.premiseChallenge.id === 'strong'
   ) {
@@ -605,6 +607,8 @@ function resolveFinalMemoryExpression({
 }): QuinnMemoryExpressionId {
   if (
     replyDiscipline.concreteSelfClaimSuppression.id === 'strong' ||
+    correction.socialFrameMode.id !== 'continue' ||
+    correction.suppressEscalatedBounceback ||
     correction.realityAnchorMode.id !== 'normal' ||
     correction.premiseChallenge.id !== 'none' ||
     correction.clarificationOverride.id !== 'none' ||
@@ -687,6 +691,9 @@ function inferElasticity({
   scores.micro += correction.clarificationOverride.id === 'partial' ? 0.45 : 0;
   scores.micro += correction.premiseChallenge.id === 'strong' ? 1.15 : 0;
   scores.micro += correction.premiseChallenge.id === 'light' ? 0.45 : 0;
+  scores.micro += correction.frameRejection.id === 'strong' ? 1.05 : 0;
+  scores.micro += correction.frameRejection.id === 'light' ? 0.35 : 0;
+  scores.micro += correction.suppressEscalatedBounceback ? 0.65 : 0;
   scores.micro += correction.realityAnchorMode.id === 'repairFrame' ? 0.7 : 0;
   scores.micro += correction.correctionLatch.id === 'hard' ? 1.15 : 0;
   scores.micro += correction.constraintPriority.id === 'dominant' ? 0.85 : 0;
@@ -711,6 +718,7 @@ function inferElasticity({
   scores.short += wordCount > 0 && wordCount <= 42 ? 0.2 : 0;
   scores.short += correction.clarificationOverride.id === 'partial' ? 0.35 : 0;
   scores.short += correction.premiseChallenge.id === 'light' ? 0.35 : 0;
+  scores.short += correction.frameRejection.id === 'light' ? 0.35 : 0;
   scores.short += correction.correctionLatch.id === 'soft' ? 0.35 : 0;
   scores.short += correction.constraintPriority.id === 'elevated' ? 0.25 : 0;
   scores.short +=
@@ -732,6 +740,8 @@ function inferElasticity({
   scores.medium -= turnRole.turnRoleAnchor.id === 'userReply' ? 0.4 : 0;
   scores.medium -= correction.premiseChallenge.id === 'strong' ? 0.85 : 0;
   scores.medium -= correction.premiseChallenge.id === 'light' ? 0.25 : 0;
+  scores.medium -= correction.frameRejection.id === 'strong' ? 0.9 : 0;
+  scores.medium -= correction.frameRejection.id === 'light' ? 0.35 : 0;
   scores.medium -= correction.clarificationOverride.id === 'dominant' ? 0.85 : 0;
   scores.medium -= correction.clarificationOverride.id === 'partial' ? 0.25 : 0;
   scores.medium -= correction.correctionLatch.id === 'hard' ? 0.7 : 0;
@@ -750,6 +760,8 @@ function inferElasticity({
   scores.expanded += resolveAskCount >= 2 ? 0.35 : 0;
   scores.expanded -= correction.premiseChallenge.id === 'strong' ? 1.15 : 0;
   scores.expanded -= correction.premiseChallenge.id === 'light' ? 0.35 : 0;
+  scores.expanded -= correction.frameRejection.id === 'strong' ? 1.1 : 0;
+  scores.expanded -= correction.frameRejection.id === 'light' ? 0.4 : 0;
   scores.expanded -= correction.clarificationOverride.id === 'dominant' ? 1.15 : 0;
   scores.expanded -= correction.clarificationOverride.id === 'partial' ? 0.4 : 0;
   scores.expanded -= correction.correctionLatch.id === 'hard' ? 1.1 : 0;
@@ -882,6 +894,22 @@ function buildArbitrationNotes({
         ? 'An explicit meaning clarification is active. Drop the older interpretation and answer from the corrected sense.'
         : 'A semantic clarification is active. Let the clarified sense outrank stale thread momentum.'
     );
+  }
+
+  if (correction.frameRejection.id === 'strong') {
+    notes.push('The user explicitly rejected Quinn’s spicy social read. Drop that frame and reset instead of treating the correction like more banter fuel.');
+  } else if (correction.frameRejection.id === 'light') {
+    notes.push('There is a tone/frame rejection signal here. Soften the social posture and answer from the corrected read.');
+  }
+
+  if (correction.socialFrameMode.id === 'drop') {
+    notes.push('Do not keep flirt, trouble, or combative-posture energy live. Reset to plain directness for this turn.');
+  } else if (correction.socialFrameMode.id === 'soften') {
+    notes.push('Keep the tone lighter and less sparring than the earlier opener.');
+  }
+
+  if (correction.suppressEscalatedBounceback) {
+    notes.push('Do not bounce back with another sharpened self-status line or another spicy read of the user.');
   }
 
   if (correction.premiseChallenge.id === 'strong') {

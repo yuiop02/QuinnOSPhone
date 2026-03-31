@@ -7,6 +7,8 @@ export type QuinnClarificationOverrideId = 'none' | 'partial' | 'dominant';
 export type QuinnPremiseChallengeId = 'none' | 'light' | 'strong';
 export type QuinnRealityAnchorModeId = 'normal' | 'softenPersona' | 'repairFrame';
 export type QuinnAssistantSelfClaimRiskId = 'none' | 'light' | 'strong';
+export type QuinnFrameRejectionId = 'none' | 'light' | 'strong';
+export type QuinnSocialFrameModeId = 'continue' | 'soften' | 'drop';
 export type QuinnClarificationTypeId =
   | 'none'
   | 'reference'
@@ -40,8 +42,15 @@ export type QuinnCorrectionInference = {
   repeatGuard: QuinnSignalBucket<QuinnRepeatGuardId> & {
     blockedRecentText: string;
   };
+  frameRejection: QuinnSignalBucket<QuinnFrameRejectionId>;
   premiseChallenge: QuinnSignalBucket<QuinnPremiseChallengeId>;
   assistantSelfClaimRisk: QuinnSignalBucket<QuinnAssistantSelfClaimRiskId>;
+  socialFrameMode: {
+    id: QuinnSocialFrameModeId;
+    promptGuidance: string;
+  };
+  userRequestsRealignment: boolean;
+  suppressEscalatedBounceback: boolean;
   realityAnchorMode: {
     id: QuinnRealityAnchorModeId;
     promptGuidance: string;
@@ -79,6 +88,12 @@ export const QUINN_CORRECTION_TUNING = {
   assistantSelfClaimRisk: {
     lightThreshold: 0.8,
     strongThreshold: 1.65,
+  },
+  frameRejection: {
+    lightThreshold: 0.95,
+    strongThreshold: 1.9,
+    priorSocialFrameBoost: 0.45,
+    realignmentBoost: 0.35,
   },
   constraintPriority: {
     elevatedThreshold: 1.1,
@@ -175,6 +190,75 @@ const LIGHT_ASSISTANT_SELF_CLAIM_PATTERNS: readonly QuinnSignalPattern[] = [
       /\b(?:my (?:day|week|life|calendar|schedule|inbox)|breakfast|lunch|dinner|coffee|vendor|deadline|calendar|schedule|swamped|slammed|busy)\b/i,
     label: 'the prior Quinn reply carried everyday-life detail as if it were literal',
     score: 0.7,
+  },
+];
+
+const STRONG_FRAME_REJECTION_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:i (?:wasn['’]?t|was not) (?:calling to do|doing|on) (?:that|none of that)|i(?:'m| am) not (?:doing|on) (?:that|none of that)|that(?:'s| is) not what this is)\b/i,
+    label: 'user explicitly rejects the social frame Quinn just imposed',
+    score: 1.35,
+  },
+  {
+    pattern:
+      /\b(?:i was testing (?:the )?app|just testing (?:the )?app|i(?:'m| am) testing (?:the )?app)\b/i,
+    label: 'user says this is app testing, not the social bit Quinn assumed',
+    score: 1.2,
+  },
+  {
+    pattern: /\b(?:be (?:so )?for real|be real|be serious)\b/i,
+    label: 'user asks Quinn to drop the bit and be real',
+    score: 1.2,
+  },
+  {
+    pattern:
+      /\b(?:i(?:'m| am) not flirting|not flirting|i(?:'m| am) not (?:trying to )?(?:start|do) anything|i(?:'m| am) not trying to flirt)\b/i,
+    label: 'user rejects a flirt or trouble reading',
+    score: 1.2,
+  },
+];
+
+const LIGHT_FRAME_REJECTION_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern: /\b(?:all i said was|all i did was)\b/i,
+    label: 'user says Quinn overread a small opener',
+    score: 0.95,
+  },
+  {
+    pattern:
+      /\b(?:why are you being rude|why are you so rude|i wasn['’]?t calling to do all that|not like that|not that deep)\b/i,
+    label: 'user pushes back on Quinn escalating the tone read',
+    score: 0.9,
+  },
+  {
+    pattern: /\b(?:dial it back|easy|relax)\b/i,
+    label: 'user asks Quinn to de-escalate the posture',
+    score: 0.7,
+  },
+];
+
+const STRONG_ASSISTANT_SOCIAL_FRAME_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:calling to flirt|calling to confess|calling to cause trouble|flirt|confess|cause trouble|stirring the pot|actually useful)\b/i,
+    label: 'the prior Quinn reply pushed a spicy social read',
+    score: 1.15,
+  },
+  {
+    pattern:
+      /\b(?:mildly dangerous|low on patience|you[—-]\s*(?:stirring the pot|actually useful))\b/i,
+    label: 'the prior Quinn reply sharpened the attitude posture',
+    score: 0.95,
+  },
+];
+
+const LIGHT_ASSISTANT_SOCIAL_FRAME_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:trouble|attitude|useful|dangerous|confession|flirting)\b/i,
+    label: 'the prior Quinn reply carried a social-frame read',
+    score: 0.55,
   },
 ];
 
@@ -494,6 +578,8 @@ export function inferQuinnCorrectionState({
   );
   const strongPremiseChallenge = collectPatternHits(lower, STRONG_PREMISE_CHALLENGE_PATTERNS);
   const lightPremiseChallenge = collectPatternHits(lower, LIGHT_PREMISE_CHALLENGE_PATTERNS);
+  const strongFrameRejection = collectPatternHits(lower, STRONG_FRAME_REJECTION_PATTERNS);
+  const lightFrameRejection = collectPatternHits(lower, LIGHT_FRAME_REJECTION_PATTERNS);
   const strongAssistantSelfClaim = collectPatternHits(
     selfClaimSourceText,
     STRONG_ASSISTANT_SELF_CLAIM_PATTERNS
@@ -501,6 +587,14 @@ export function inferQuinnCorrectionState({
   const lightAssistantSelfClaim = collectPatternHits(
     selfClaimSourceText,
     LIGHT_ASSISTANT_SELF_CLAIM_PATTERNS
+  );
+  const strongAssistantSocialFrame = collectPatternHits(
+    selfClaimSourceText,
+    STRONG_ASSISTANT_SOCIAL_FRAME_PATTERNS
+  );
+  const lightAssistantSocialFrame = collectPatternHits(
+    selfClaimSourceText,
+    LIGHT_ASSISTANT_SOCIAL_FRAME_PATTERNS
   );
   const clarificationHits = [
     ...dominantClarification.hits,
@@ -560,6 +654,37 @@ export function inferQuinnCorrectionState({
       : premiseChallengeScore >= QUINN_CORRECTION_TUNING.premiseChallenge.lightThreshold
         ? 'light'
         : 'none';
+  const assistantSocialFrameScore =
+    strongAssistantSocialFrame.score + lightAssistantSocialFrame.score;
+  const userRequestsRealignment =
+    /\b(?:be (?:so )?for real|be real|be serious|i was testing (?:the )?app|just testing (?:the )?app|all i said was|that(?:'s| is) not what this is)\b/i.test(
+      clean
+    );
+  const frameRejectionScore =
+    strongFrameRejection.score +
+    lightFrameRejection.score +
+    ((strongFrameRejection.score > 0 || lightFrameRejection.score > 0) &&
+    assistantSocialFrameScore > 0
+      ? QUINN_CORRECTION_TUNING.frameRejection.priorSocialFrameBoost
+      : 0) +
+    (userRequestsRealignment
+      ? QUINN_CORRECTION_TUNING.frameRejection.realignmentBoost
+      : 0);
+  const frameRejectionId: QuinnFrameRejectionId =
+    frameRejectionScore >= QUINN_CORRECTION_TUNING.frameRejection.strongThreshold
+      ? 'strong'
+      : frameRejectionScore >= QUINN_CORRECTION_TUNING.frameRejection.lightThreshold
+        ? 'light'
+        : 'none';
+  const socialFrameModeId: QuinnSocialFrameModeId =
+    frameRejectionId === 'strong'
+      ? 'drop'
+      : frameRejectionId === 'light'
+        ? 'soften'
+        : 'continue';
+  const suppressEscalatedBounceback =
+    frameRejectionId !== 'none' &&
+    (assistantSocialFrameScore > 0 || userRequestsRealignment);
   const realityAnchorModeId: QuinnRealityAnchorModeId =
     premiseChallengeId === 'strong'
       ? 'repairFrame'
@@ -589,6 +714,11 @@ export function inferQuinnCorrectionState({
     hardCorrection.score +
     softCorrection.score +
     (exactRepeatScore >= QUINN_CORRECTION_TUNING.repeatGuard.exactThreshold ? 0.45 : 0) +
+    (frameRejectionId === 'strong'
+      ? 0.9
+      : frameRejectionId === 'light'
+        ? 0.35
+        : 0) +
     (clarificationOverrideId === 'dominant'
       ? 0.9
       : clarificationOverrideId === 'partial'
@@ -602,11 +732,13 @@ export function inferQuinnCorrectionState({
 
   const correctionLatchId: QuinnCorrectionLatchId =
     clarificationOverrideId === 'dominant' ||
+    frameRejectionId === 'strong' ||
     premiseChallengeId === 'strong' ||
     exactRepeatScore >= QUINN_CORRECTION_TUNING.repeatGuard.exactThreshold ||
     correctionLatchScore >= QUINN_CORRECTION_TUNING.correctionLatch.hardThreshold
       ? 'hard'
       : clarificationOverrideId === 'partial' ||
+          frameRejectionId === 'light' ||
           premiseChallengeId === 'light' ||
           correctionLatchScore >= QUINN_CORRECTION_TUNING.correctionLatch.softThreshold ||
           dominantConstraintScore >= QUINN_CORRECTION_TUNING.constraintPriority.dominantThreshold
@@ -630,6 +762,8 @@ export function inferQuinnCorrectionState({
   const correctionSignals = uniqueItems([
     ...hardCorrection.signals,
     ...softCorrection.signals,
+    ...strongFrameRejection.signals,
+    ...lightFrameRejection.signals,
     ...strongPremiseChallenge.signals,
     ...lightPremiseChallenge.signals,
     ...dominantClarification.signals,
@@ -652,6 +786,7 @@ export function inferQuinnCorrectionState({
   const invalidatedTargets = uniqueItems([
     constraintPriorityId !== 'none' ? 'prior suggestion or desire momentum' : '',
     correctionLatchId !== 'none' ? 'prior frame' : '',
+    frameRejectionId !== 'none' ? 'spicy or combative social frame' : '',
     clarificationOverrideId !== 'none' ? 'older interpretation or meaning guess' : '',
     premiseChallengeId !== 'none' ? 'literal assistant self-status premise' : '',
     repeatGuardId !== 'none'
@@ -666,6 +801,7 @@ export function inferQuinnCorrectionState({
   if (repeatGuardId !== 'none' || premiseChallengeId === 'strong') {
     acknowledgmentStyleId = 'briefOwnIt';
   } else if (
+    frameRejectionId !== 'none' ||
     premiseChallengeId === 'light' ||
     clarificationOverrideId !== 'none' ||
     correctionLatchId === 'hard' ||
@@ -682,6 +818,20 @@ export function inferQuinnCorrectionState({
       : premiseChallengeId === 'light'
         ? "The user is questioning whether Quinn's human-style framing is literal. Keep the personality, but stop leaning harder into offscreen life claims."
         : 'No explicit premise challenge is active.';
+
+  const frameRejectionPromptGuidance =
+    frameRejectionId === 'strong'
+      ? 'The user explicitly rejected Quinn’s spicy, flirty, or combative read. Drop that social frame and reset instead of sharpening it.'
+      : frameRejectionId === 'light'
+        ? 'There is a social-frame rejection signal here. Soften the posture and stop treating the earlier bit as live banter fuel.'
+        : 'No explicit social-frame rejection is active.';
+
+  const socialFrameModePromptGuidance =
+    socialFrameModeId === 'drop'
+      ? 'Drop the earlier spicy social frame. Keep Quinn direct and alive, but reset to the corrected reading.'
+      : socialFrameModeId === 'soften'
+        ? 'Soften the earlier social read. Do not keep pushing flirt, trouble, or rude-posture energy after the user pushed back.'
+        : 'No special social-frame de-escalation is active.';
 
   const assistantSelfClaimPromptGuidance =
     assistantSelfClaimRiskId === 'strong'
@@ -755,6 +905,15 @@ export function inferQuinnCorrectionState({
       blockedRecentText,
       promptGuidance: repeatPromptGuidance,
     },
+    frameRejection: {
+      id: frameRejectionId,
+      score: frameRejectionScore,
+      signals: uniqueItems([
+        ...strongFrameRejection.signals,
+        ...lightFrameRejection.signals,
+      ]),
+      promptGuidance: frameRejectionPromptGuidance,
+    },
     premiseChallenge: {
       id: premiseChallengeId,
       score: premiseChallengeScore,
@@ -773,6 +932,12 @@ export function inferQuinnCorrectionState({
       ]),
       promptGuidance: assistantSelfClaimPromptGuidance,
     },
+    socialFrameMode: {
+      id: socialFrameModeId,
+      promptGuidance: socialFrameModePromptGuidance,
+    },
+    userRequestsRealignment,
+    suppressEscalatedBounceback,
     realityAnchorMode: {
       id: realityAnchorModeId,
       promptGuidance: realityAnchorPromptGuidance,
@@ -796,8 +961,10 @@ export function inferQuinnCorrectionState({
     },
     invalidatedTargets,
     promptGuidance: [
+      `Frame rejection: ${frameRejectionId}. ${frameRejectionPromptGuidance}`,
       `Premise challenge: ${premiseChallengeId}. ${premiseChallengePromptGuidance}`,
       `Assistant self-claim risk: ${assistantSelfClaimRiskId}. ${assistantSelfClaimPromptGuidance}`,
+      `Social frame mode: ${socialFrameModeId}. ${socialFrameModePromptGuidance}`,
       `Reality anchor mode: ${realityAnchorModeId}. ${realityAnchorPromptGuidance}`,
       `Clarification override: ${clarificationOverrideId}. ${clarificationPromptGuidance}`,
       `Correction latch: ${correctionLatchId}. ${correctionPromptGuidance}`,
@@ -807,6 +974,12 @@ export function inferQuinnCorrectionState({
       suppressConcreteSelfStatus
         ? 'Suppress concrete assistant self-status continuation for this run.'
         : 'No explicit concrete assistant self-status suppression is active.',
+      suppressEscalatedBounceback
+        ? 'Suppress escalated bounce-backs into the same spicy social frame for this run.'
+        : 'No explicit spicy-frame bounce-back suppression is active.',
+      userRequestsRealignment
+        ? 'The user explicitly asked Quinn to reset or be real.'
+        : 'No explicit user realignment request is active.',
       invalidatedTargets.length
         ? `Treat these as invalidated or secondary now: ${invalidatedTargets.join(', ')}.`
         : 'No specific prior target needs to be actively invalidated.',
@@ -830,7 +1003,11 @@ export function buildQuinnCorrectionPacketContext({
   });
 
   const activeGuidance = [
+    correction.frameRejection.id !== 'none' ? correction.frameRejection.promptGuidance : '',
     correction.premiseChallenge.id !== 'none' ? correction.premiseChallenge.promptGuidance : '',
+    correction.socialFrameMode.id !== 'continue'
+      ? correction.socialFrameMode.promptGuidance
+      : '',
     correction.realityAnchorMode.id !== 'normal'
       ? correction.realityAnchorMode.promptGuidance
       : '',
