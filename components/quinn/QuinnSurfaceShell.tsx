@@ -85,8 +85,15 @@ export default function QuinnSurfaceShell({
       </View>
 
       <View style={styles.heroCard}>
+        <View pointerEvents="none" style={styles.heroHalo} />
         <View pointerEvents="none" style={styles.heroGlow} />
+        <View pointerEvents="none" style={styles.heroGlowRose} />
         <View pointerEvents="none" style={styles.heroGlowWarm} />
+        <View pointerEvents="none" style={styles.heroCoreBloom} />
+        <View pointerEvents="none" style={styles.heroOrbitalArc} />
+        <View pointerEvents="none" style={styles.heroPortalRing} />
+        <View pointerEvents="none" style={styles.heroOrbitalArcSecondary} />
+        <View pointerEvents="none" style={styles.heroSheen} />
         <Text style={styles.heroTitle}>{title}</Text>
         <Text style={styles.heroDescription}>{description}</Text>
 
@@ -123,12 +130,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: SURFACE_THEME.border,
-    backgroundColor: SURFACE_THEME.panelSoft,
+    borderColor: SURFACE_THEME.borderStrong,
+    backgroundColor: 'rgba(29, 12, 42, 0.74)',
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 9,
     gap: 7,
+    shadowColor: SURFACE_THEME.shadow,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 20,
   },
 
   backText: {
@@ -142,36 +153,112 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: SURFACE_THEME.panel,
     borderWidth: 1,
-    borderColor: SURFACE_THEME.border,
-    borderRadius: 30,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
+    borderColor: SURFACE_THEME.borderStrong,
+    borderRadius: 34,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
     marginBottom: 14,
     shadowColor: SURFACE_THEME.shadow,
-    shadowOpacity: 0.4,
-    shadowOffset: { width: 0, height: 18 },
-    shadowRadius: 40,
+    shadowOpacity: 0.6,
+    shadowOffset: { width: 0, height: 22 },
+    shadowRadius: 50,
     elevation: 10,
+  },
+
+  heroHalo: {
+    position: 'absolute',
+    top: -78,
+    left: -44,
+    width: 330,
+    height: 238,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.roseGlow,
   },
 
   heroGlow: {
     position: 'absolute',
-    top: -42,
-    left: -18,
-    width: 240,
-    height: 200,
+    top: -56,
+    left: -16,
+    width: 276,
+    height: 220,
     borderRadius: 999,
     backgroundColor: SURFACE_THEME.plumGlow,
   },
 
+  heroGlowRose: {
+    position: 'absolute',
+    top: -34,
+    right: 26,
+    width: 184,
+    height: 144,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.roseGlow,
+  },
+
   heroGlowWarm: {
     position: 'absolute',
-    right: -24,
-    bottom: -76,
-    width: 220,
-    height: 180,
+    right: -18,
+    bottom: -84,
+    width: 236,
+    height: 190,
     borderRadius: 999,
-    backgroundColor: 'rgba(226, 201, 131, 0.08)',
+    backgroundColor: SURFACE_THEME.peachGlow,
+  },
+
+  heroCoreBloom: {
+    position: 'absolute',
+    top: 6,
+    left: 110,
+    width: 186,
+    height: 126,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.portalWarm,
+  },
+
+  heroOrbitalArc: {
+    position: 'absolute',
+    top: -8,
+    right: -44,
+    width: 220,
+    height: 110,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.orbital,
+    transform: [{ rotate: '-12deg' }],
+  },
+
+  heroPortalRing: {
+    position: 'absolute',
+    top: 18,
+    right: 36,
+    width: 152,
+    height: 152,
+    borderRadius: 76,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 233, 244, 0.18)',
+    transform: [{ scaleX: 1.08 }, { rotate: '-24deg' }],
+  },
+
+  heroOrbitalArcSecondary: {
+    position: 'absolute',
+    bottom: -48,
+    right: 34,
+    width: 188,
+    height: 92,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 222, 200, 0.12)',
+    transform: [{ rotate: '12deg' }],
+  },
+
+  heroSheen: {
+    position: 'absolute',
+    top: 6,
+    left: 12,
+    right: 12,
+    height: 24,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.glassHighlight,
   },
 
   heroTitle: {
@@ -182,6 +269,9 @@ const styles = StyleSheet.create({
     letterSpacing: -1.15,
     marginBottom: 10,
     maxWidth: SURFACE_COPY.heroMaxWidth,
+    textShadowColor: 'rgba(255, 183, 226, 0.22)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
   },
 
   heroDescription: {

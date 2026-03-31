@@ -365,12 +365,12 @@ const TopFadeWall = React.memo(function TopFadeWall() {
       <Svg width={WINDOW_WIDTH} height={FADE_WALL_HEIGHT}>
         <Defs>
           <SvgLinearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor="#04050A" stopOpacity="1" />
-            <Stop offset="22%" stopColor="#04050A" stopOpacity="0.985" />
-            <Stop offset="46%" stopColor="#04050A" stopOpacity="0.90" />
-            <Stop offset="68%" stopColor="#04050A" stopOpacity="0.62" />
-            <Stop offset="84%" stopColor="#04050A" stopOpacity="0.22" />
-            <Stop offset="100%" stopColor="#04050A" stopOpacity="0" />
+            <Stop offset="0%" stopColor="#020008" stopOpacity="1" />
+            <Stop offset="22%" stopColor="#020008" stopOpacity="0.99" />
+            <Stop offset="46%" stopColor="#020008" stopOpacity="0.93" />
+            <Stop offset="68%" stopColor="#020008" stopOpacity="0.68" />
+            <Stop offset="84%" stopColor="#020008" stopOpacity="0.26" />
+            <Stop offset="100%" stopColor="#020008" stopOpacity="0" />
           </SvgLinearGradient>
         </Defs>
         <Rect width={WINDOW_WIDTH} height={FADE_WALL_HEIGHT} fill="url(#topFade)" />
@@ -663,32 +663,54 @@ const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
         <Svg width={WINDOW_WIDTH} height={height + 180}>
           <Defs>
             <SvgRadialGradient id="spaceGlowViolet" cx="80%" cy="16%" r="52%">
-              <Stop offset="0%" stopColor="#6E52E8" stopOpacity="0.22" />
-              <Stop offset="38%" stopColor="#25153E" stopOpacity="0.14" />
-              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+              <Stop offset="0%" stopColor="#D164FF" stopOpacity="0.34" />
+              <Stop offset="38%" stopColor="#320846" stopOpacity="0.26" />
+              <Stop offset="100%" stopColor="#020008" stopOpacity="0" />
             </SvgRadialGradient>
             <SvgRadialGradient id="spaceGlowRose" cx="88%" cy="56%" r="44%">
-              <Stop offset="0%" stopColor="#FF7EBE" stopOpacity="0.11" />
-              <Stop offset="46%" stopColor="#35111F" stopOpacity="0.07" />
-              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+              <Stop offset="0%" stopColor="#FF7AD3" stopOpacity="0.22" />
+              <Stop offset="46%" stopColor="#4A0F28" stopOpacity="0.14" />
+              <Stop offset="100%" stopColor="#020008" stopOpacity="0" />
             </SvgRadialGradient>
             <SvgRadialGradient id="spaceGlowCyan" cx="10%" cy="42%" r="42%">
-              <Stop offset="0%" stopColor="#59D8FF" stopOpacity="0.09" />
-              <Stop offset="44%" stopColor="#0E2634" stopOpacity="0.05" />
-              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+              <Stop offset="0%" stopColor="#8A6BFF" stopOpacity="0.12" />
+              <Stop offset="44%" stopColor="#12123D" stopOpacity="0.08" />
+              <Stop offset="100%" stopColor="#020008" stopOpacity="0" />
             </SvgRadialGradient>
+            <SvgRadialGradient id="spaceGlowPeach" cx="54%" cy="10%" r="34%">
+              <Stop offset="0%" stopColor="#FFE5CF" stopOpacity="0.15" />
+              <Stop offset="42%" stopColor="#5C1730" stopOpacity="0.08" />
+              <Stop offset="100%" stopColor="#020008" stopOpacity="0" />
+            </SvgRadialGradient>
+            <SvgRadialGradient id="portalCoreGlow" cx="50%" cy="50%" r="62%">
+              <Stop offset="0%" stopColor="#FFF0E2" stopOpacity="0.22" />
+              <Stop offset="28%" stopColor="#FFB6E2" stopOpacity="0.20" />
+              <Stop offset="56%" stopColor="#B45EFF" stopOpacity="0.14" />
+              <Stop offset="100%" stopColor="#020008" stopOpacity="0" />
+            </SvgRadialGradient>
+            <SvgLinearGradient id="portalArcHot" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#FFEDD8" stopOpacity="0.9" />
+              <Stop offset="32%" stopColor="#FFB3E4" stopOpacity="0.9" />
+              <Stop offset="72%" stopColor="#C869FF" stopOpacity="0.82" />
+              <Stop offset="100%" stopColor="#6F27A4" stopOpacity="0.12" />
+            </SvgLinearGradient>
+            <SvgLinearGradient id="portalArcSoft" x1="1" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#FFE3CA" stopOpacity="0.22" />
+              <Stop offset="44%" stopColor="#FF89D5" stopOpacity="0.28" />
+              <Stop offset="100%" stopColor="#7A38C5" stopOpacity="0.08" />
+            </SvgLinearGradient>
 
             <SvgRadialGradient id="planetAtmos" cx="34%" cy="28%" r="72%">
-              <Stop offset="0%" stopColor="#FFD7ED" stopOpacity="0.16" />
-              <Stop offset="22%" stopColor="#A79DFF" stopOpacity="0.11" />
-              <Stop offset="56%" stopColor="#4B5B92" stopOpacity="0.05" />
-              <Stop offset="100%" stopColor="#02030A" stopOpacity="0" />
+              <Stop offset="0%" stopColor="#FFD8E7" stopOpacity="0.24" />
+              <Stop offset="22%" stopColor="#C892FF" stopOpacity="0.16" />
+              <Stop offset="56%" stopColor="#4B2763" stopOpacity="0.07" />
+              <Stop offset="100%" stopColor="#04010A" stopOpacity="0" />
             </SvgRadialGradient>
             <SvgRadialGradient id="planetSurface" cx="28%" cy="28%" r="76%">
-              <Stop offset="0%" stopColor="#8A6B9F" stopOpacity="1" />
-              <Stop offset="20%" stopColor="#5A4F7F" stopOpacity="1" />
-              <Stop offset="54%" stopColor="#232B4C" stopOpacity="1" />
-              <Stop offset="100%" stopColor="#0A101D" stopOpacity="1" />
+              <Stop offset="0%" stopColor="#8C5398" stopOpacity="1" />
+              <Stop offset="20%" stopColor="#5A2F73" stopOpacity="1" />
+              <Stop offset="54%" stopColor="#251435" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#09030F" stopOpacity="1" />
             </SvgRadialGradient>
 
             <SvgRadialGradient id="moonAtmos" cx="32%" cy="30%" r="70%">
@@ -704,23 +726,24 @@ const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
             </SvgRadialGradient>
 
             <SvgLinearGradient id="vignette" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#02030A" stopOpacity="0.02" />
-              <Stop offset="72%" stopColor="#02030A" stopOpacity="0" />
-              <Stop offset="100%" stopColor="#02030A" stopOpacity="0.58" />
+              <Stop offset="0%" stopColor="#04010A" stopOpacity="0.02" />
+              <Stop offset="72%" stopColor="#04010A" stopOpacity="0" />
+              <Stop offset="100%" stopColor="#020008" stopOpacity="0.74" />
             </SvgLinearGradient>
           </Defs>
 
-          <Rect width={WINDOW_WIDTH} height={height + 180} fill="#02030A" />
+          <Rect width={WINDOW_WIDTH} height={height + 180} fill="#020008" />
           <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#spaceGlowViolet)" />
           <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#spaceGlowRose)" />
           <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#spaceGlowCyan)" />
+          <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#spaceGlowPeach)" />
 
           <Ellipse
             cx={WINDOW_WIDTH * 0.58}
             cy={height * 0.30}
             rx={178}
             ry={78}
-            fill="rgba(128, 92, 214, 0.05)"
+            fill="rgba(177, 97, 255, 0.07)"
             transform={`rotate(-16 ${WINDOW_WIDTH * 0.58} ${height * 0.30})`}
           />
           <Ellipse
@@ -728,7 +751,7 @@ const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
             cy={height * 0.62}
             rx={166}
             ry={72}
-            fill="rgba(76, 196, 255, 0.04)"
+            fill="rgba(121, 101, 255, 0.045)"
             transform={`rotate(18 ${WINDOW_WIDTH * 0.26} ${height * 0.62})`}
           />
           <Ellipse
@@ -736,8 +759,54 @@ const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
             cy={height * 0.80}
             rx={142}
             ry={62}
-            fill="rgba(255, 132, 186, 0.035)"
+            fill="rgba(255, 127, 203, 0.05)"
             transform={`rotate(-18 ${WINDOW_WIDTH * 0.88} ${height * 0.80})`}
+          />
+          <Ellipse
+            cx={WINDOW_WIDTH * 0.54}
+            cy={height * 0.16}
+            rx={152}
+            ry={52}
+            fill="rgba(255, 223, 197, 0.038)"
+            transform={`rotate(-8 ${WINDOW_WIDTH * 0.54} ${height * 0.16})`}
+          />
+          <Ellipse
+            cx={WINDOW_WIDTH * 0.57}
+            cy={height * 0.26}
+            rx={124}
+            ry={90}
+            fill="url(#portalCoreGlow)"
+            transform={`rotate(-18 ${WINDOW_WIDTH * 0.57} ${height * 0.26})`}
+          />
+          <Ellipse
+            cx={WINDOW_WIDTH * 0.57}
+            cy={height * 0.26}
+            rx={120}
+            ry={84}
+            fill="none"
+            stroke="url(#portalArcHot)"
+            strokeWidth="2.6"
+            opacity={0.94}
+            transform={`rotate(-20 ${WINDOW_WIDTH * 0.57} ${height * 0.26})`}
+          />
+          <Ellipse
+            cx={WINDOW_WIDTH * 0.59}
+            cy={height * 0.28}
+            rx={154}
+            ry={108}
+            fill="none"
+            stroke="url(#portalArcSoft)"
+            strokeWidth="1.4"
+            opacity={0.44}
+            transform={`rotate(-24 ${WINDOW_WIDTH * 0.59} ${height * 0.28})`}
+          />
+          <Path
+            d={`M ${WINDOW_WIDTH * 0.55} ${height * 0.34} C ${WINDOW_WIDTH * 0.63} ${height * 0.35}, ${WINDOW_WIDTH * 0.76} ${height * 0.45}, ${WINDOW_WIDTH * 0.88} ${height * 0.5}`}
+            fill="none"
+            stroke="url(#portalArcHot)"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            opacity={0.52}
           />
 
           <Rect width={WINDOW_WIDTH} height={height + 180} fill="url(#vignette)" />
@@ -755,14 +824,14 @@ const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
         <Svg width={WINDOW_WIDTH} height={height + 180}>
           <Circle cx={WINDOW_WIDTH + 112} cy={160} r={222} fill="url(#planetAtmos)" />
           <Circle cx={WINDOW_WIDTH + 112} cy={160} r={184} fill="url(#planetSurface)" />
-          <Circle cx={WINDOW_WIDTH + 202} cy={126} r={188} fill="rgba(4, 6, 14, 0.60)" />
+          <Circle cx={WINDOW_WIDTH + 202} cy={126} r={188} fill="rgba(2, 1, 7, 0.68)" />
 
           <Ellipse
             cx={WINDOW_WIDTH + 6}
             cy={118}
             rx={108}
             ry={18}
-            fill="rgba(255,255,255,0.055)"
+            fill="rgba(255, 229, 214, 0.09)"
             transform={`rotate(-14 ${WINDOW_WIDTH + 6} 118)`}
           />
           <Ellipse
@@ -770,7 +839,7 @@ const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
             cy={190}
             rx={132}
             ry={24}
-            fill="rgba(110, 134, 194, 0.10)"
+            fill="rgba(180, 107, 255, 0.11)"
             transform={`rotate(-10 ${WINDOW_WIDTH - 2} 190)`}
           />
         </Svg>
@@ -1987,16 +2056,26 @@ function QuinnConversationSurface({
               },
             ]}
           >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.cardOrbGlowCool,
-                {
-                  opacity: composerGlowOpacity,
-                  transform: [{ translateX: orbShiftX }, { translateY: orbShiftY }],
-                },
-              ]}
-            />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.cardOrbGlowCool,
+              {
+                opacity: composerGlowOpacity,
+                transform: [{ translateX: orbShiftX }, { translateY: orbShiftY }],
+              },
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.cardOrbGlowPurple,
+              {
+                opacity: composerGlowOpacity,
+                transform: [{ translateX: sparkleDriftX }, { translateY: orbShiftY }],
+              },
+            ]}
+          />
             <Animated.View
               pointerEvents="none"
               style={[
@@ -2026,6 +2105,8 @@ function QuinnConversationSurface({
                 },
               ]}
             />
+            <View pointerEvents="none" style={styles.cardOrbitArcPrimary} />
+            <View pointerEvents="none" style={styles.cardOrbitArcSecondary} />
             <Animated.View
               pointerEvents="none"
               style={[
@@ -2201,7 +2282,7 @@ function QuinnConversationSurface({
                     onFocus={() => setInputFocused(true)}
                     onBlur={() => setInputFocused(false)}
                     placeholder="Type what's actually going on..."
-                    placeholderTextColor="rgba(214, 221, 236, 0.44)"
+                    placeholderTextColor="rgba(232, 220, 236, 0.32)"
                     style={styles.composerInput}
                     textAlignVertical="top"
                   />
@@ -2285,6 +2366,16 @@ function QuinnConversationSurface({
               },
             ]}
           />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.cardOrbGlowPurple,
+              {
+                opacity: responseGlowOpacity,
+                transform: [{ translateX: sparkleDriftX }, { translateY: sparkleDriftY }],
+              },
+            ]}
+          />
           <View pointerEvents="none" style={styles.cardTopSheen} />
           <Animated.View
             pointerEvents="none"
@@ -2295,6 +2386,8 @@ function QuinnConversationSurface({
               },
             ]}
           />
+          <View pointerEvents="none" style={styles.cardOrbitArcPrimary} />
+          <View pointerEvents="none" style={styles.cardOrbitArcSecondary} />
           <Animated.View
             pointerEvents="none"
             style={[
@@ -3392,10 +3485,16 @@ export default function App() {
             <View style={styles.appGlowA} />
             <View style={styles.appGlowB} />
             <View style={styles.appGlowC} />
+            <View style={styles.appGlowD} />
+            <View style={styles.appOrbitRingA} />
+            <View style={styles.appOrbitRingB} />
           </View>
 
           <View style={styles.topBar}>
             <View style={styles.systemBrandChip}>
+              <View pointerEvents="none" style={styles.systemBrandGlow} />
+              <View pointerEvents="none" style={styles.systemBrandWarmGlow} />
+              <View pointerEvents="none" style={styles.systemBrandRing} />
               <Text style={styles.systemBrandOverline}>QUINNOS SYSTEM</Text>
               <Text style={styles.brand}>
                 Quinn <Text style={styles.brandVersion}>2.0</Text>
@@ -3426,7 +3525,7 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#02030A',
+    backgroundColor: SURFACE_THEME.bg,
   },
 
   quinnConversationViewport: {
@@ -3560,37 +3659,71 @@ galaxyHazeC: {
 
   appBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#04060F',
+    backgroundColor: SURFACE_THEME.bg,
   },
 
   appGlowA: {
   position: 'absolute',
-  top: -190,
-  right: -120,
-  width: 420,
-  height: 420,
-  borderRadius: 210,
-  backgroundColor: 'rgba(122, 102, 194, 0.18)',
+  top: -220,
+  right: -138,
+  width: 480,
+  height: 480,
+  borderRadius: 240,
+  backgroundColor: SURFACE_THEME.plumGlow,
 },
 
 appGlowB: {
   position: 'absolute',
-  top: 240,
-  left: -120,
-  width: 300,
-  height: 300,
-  borderRadius: 150,
-  backgroundColor: 'rgba(85, 149, 255, 0.08)',
+  top: 210,
+  left: -134,
+  width: 330,
+  height: 330,
+  borderRadius: 165,
+  backgroundColor: 'rgba(132, 86, 255, 0.16)',
 },
 
 appGlowC: {
   position: 'absolute',
-  bottom: -140,
-  right: -30,
-  width: 280,
-  height: 280,
-  borderRadius: 140,
-  backgroundColor: 'rgba(255, 178, 141, 0.08)',
+  bottom: -150,
+  right: -26,
+  width: 310,
+  height: 310,
+  borderRadius: 155,
+  backgroundColor: SURFACE_THEME.roseGlow,
+},
+
+appGlowD: {
+  position: 'absolute',
+  top: 58,
+  left: 26,
+  width: 250,
+  height: 184,
+  borderRadius: 999,
+  backgroundColor: SURFACE_THEME.portalWarm,
+},
+
+appOrbitRingA: {
+  position: 'absolute',
+  top: 86,
+  right: -42,
+  width: 236,
+  height: 132,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: SURFACE_THEME.orbital,
+  transform: [{ rotate: '-14deg' }],
+},
+
+appOrbitRingB: {
+  position: 'absolute',
+  bottom: 64,
+  left: -56,
+  width: 204,
+  height: 112,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 230, 202, 0.12)',
+  transform: [{ rotate: '16deg' }],
 },
 
   fixedHeaderShell: {
@@ -3606,33 +3739,33 @@ appGlowC: {
 
   headerAuraLarge: {
   position: 'absolute',
-  top: -42,
-  right: 8,
-  width: 220,
-  height: 220,
-  borderRadius: 110,
-  backgroundColor: 'rgba(140, 102, 214, 0.18)',
+  top: -52,
+  right: -2,
+  width: 260,
+  height: 260,
+  borderRadius: 130,
+  backgroundColor: 'rgba(187, 90, 255, 0.24)',
 },
 
 headerAuraSmall: {
   position: 'absolute',
-  top: 46,
-  right: 86,
-  width: 96,
-  height: 96,
-  borderRadius: 48,
-  backgroundColor: 'rgba(255, 138, 200, 0.10)',
+  top: 42,
+  right: 80,
+  width: 118,
+  height: 118,
+  borderRadius: 59,
+  backgroundColor: 'rgba(255, 164, 220, 0.16)',
 },
 
   headerNebulaRing: {
     position: 'absolute',
-    top: 28,
-    right: 34,
-    width: 170,
-    height: 170,
-    borderRadius: 85,
+    top: 20,
+    right: 26,
+    width: 196,
+    height: 196,
+    borderRadius: 98,
     borderWidth: 1,
-    borderColor: 'rgba(202, 216, 255, 0.10)',
+    borderColor: 'rgba(248, 194, 246, 0.16)',
     transform: [{ scaleX: 1.18 }, { rotate: '-18deg' }],
   },
 
@@ -3712,11 +3845,11 @@ headerAuraSmall: {
   marginLeft: 2,
   marginBottom: 10,
   borderWidth: 1,
-  borderColor: 'rgba(255, 214, 236, 0.34)',
-  backgroundColor: 'rgba(56, 20, 56, 0.78)',
-  shadowColor: '#FF8FD1',
-  shadowOpacity: 0.34,
-  shadowRadius: 14,
+  borderColor: 'rgba(255, 226, 239, 0.40)',
+  backgroundColor: 'rgba(78, 24, 71, 0.82)',
+  shadowColor: '#FF9AE0',
+  shadowOpacity: 0.42,
+  shadowRadius: 18,
   shadowOffset: { width: 0, height: 6 },
   elevation: 8,
 },
@@ -3746,13 +3879,50 @@ headerVersionText: {
   },
 
   systemBrandChip: {
+    overflow: 'hidden',
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: SURFACE_THEME.border,
-    backgroundColor: 'rgba(7, 10, 18, 0.82)',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderColor: SURFACE_THEME.borderStrong,
+    backgroundColor: 'rgba(16, 6, 27, 0.84)',
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    shadowColor: SURFACE_THEME.shadow,
+    shadowOpacity: 0.46,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 12 },
+  },
+
+  systemBrandGlow: {
+    position: 'absolute',
+    top: -44,
+    left: -22,
+    width: 188,
+    height: 124,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.portalGlow,
+  },
+
+  systemBrandWarmGlow: {
+    position: 'absolute',
+    top: 12,
+    right: -26,
+    width: 126,
+    height: 92,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.portalWarm,
+  },
+
+  systemBrandRing: {
+    position: 'absolute',
+    top: -12,
+    right: -28,
+    width: 132,
+    height: 74,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 228, 241, 0.18)',
+    transform: [{ rotate: '-12deg' }],
   },
 
   systemBrandOverline: {
@@ -3770,6 +3940,9 @@ headerVersionText: {
     lineHeight: 40,
     fontWeight: '700',
     letterSpacing: -2.2,
+    textShadowColor: 'rgba(255, 188, 229, 0.34)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 18,
   },
 
   brandVersion: {
@@ -3797,22 +3970,22 @@ headerVersionText: {
 
 titleGlowBlobA: {
   position: 'absolute',
-  left: 0,
-  top: 8,
-  width: 170,
-  height: 58,
+  left: -4,
+  top: 4,
+  width: 194,
+  height: 68,
   borderRadius: 30,
-  backgroundColor: 'rgba(255, 118, 198, 0.09)',
+  backgroundColor: 'rgba(255, 120, 214, 0.14)',
 },
 
 titleGlowBlobB: {
   position: 'absolute',
-  left: 78,
-  top: -8,
-  width: 120,
-  height: 62,
+  left: 88,
+  top: -10,
+  width: 136,
+  height: 72,
   borderRadius: 31,
-  backgroundColor: 'rgba(136, 108, 255, 0.11)',
+  backgroundColor: 'rgba(179, 104, 255, 0.16)',
 },
 
 headerQuinnGlow: {
@@ -3823,24 +3996,24 @@ headerQuinnGlow: {
   lineHeight: 70,
   fontWeight: '900',
   letterSpacing: -4,
-  color: 'rgba(255, 164, 216, 0.14)',
-  textShadowColor: 'rgba(255, 154, 210, 0.52)',
+  color: 'rgba(255, 207, 232, 0.22)',
+  textShadowColor: 'rgba(255, 170, 224, 0.74)',
   textShadowOffset: { width: 0, height: 0 },
-  textShadowRadius: 18,
+  textShadowRadius: 24,
 },
 
 headerQuinnQ: {
-  color: '#FFB1DF',
-  textShadowColor: 'rgba(255, 146, 206, 0.72)',
+  color: '#FFD2EA',
+  textShadowColor: 'rgba(255, 184, 227, 0.86)',
   textShadowOffset: { width: 0, height: 0 },
-  textShadowRadius: 12,
+  textShadowRadius: 16,
 },
 
 headerQuinnRest: {
-  color: '#F7ECFF',
-  textShadowColor: 'rgba(173, 138, 255, 0.62)',
+  color: '#FEF4FF',
+  textShadowColor: 'rgba(206, 159, 255, 0.78)',
   textShadowOffset: { width: 0, height: 0 },
-  textShadowRadius: 12,
+  textShadowRadius: 16,
 },
 
 headerVersionShine: {
@@ -3854,7 +4027,7 @@ headerVersionShine: {
 },
 
   fixedIntroText: {
-  color: 'rgba(236, 231, 245, 0.84)',
+  color: 'rgba(244, 236, 246, 0.86)',
   fontSize: 14,
   lineHeight: 22,
   fontWeight: '500',
@@ -3971,13 +4144,13 @@ headerVersionShine: {
   minHeight: 128,
   borderRadius: 36,
   borderWidth: 1,
-  borderColor: 'rgba(240, 223, 245, 0.20)',
-  backgroundColor: 'rgba(72, 56, 108, 0.92)',
+  borderColor: 'rgba(255, 221, 243, 0.28)',
+  backgroundColor: 'rgba(104, 34, 129, 0.92)',
   padding: 2,
-  shadowColor: '#9EA8FF',
-  shadowOpacity: 0.28,
-  shadowRadius: 30,
-  shadowOffset: { width: 0, height: 16 },
+  shadowColor: '#1B031F',
+  shadowOpacity: 0.48,
+  shadowRadius: 40,
+  shadowOffset: { width: 0, height: 18 },
   elevation: 12,
 },
 
@@ -3987,8 +4160,8 @@ headerVersionShine: {
   minHeight: 118,
   borderRadius: 34,
   borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.10)',
-  backgroundColor: 'rgba(8, 12, 24, 0.985)',
+  borderColor: 'rgba(255, 241, 247, 0.10)',
+  backgroundColor: 'rgba(10, 4, 18, 0.986)',
   paddingLeft: 24,
   paddingRight: 24,
   paddingTop: 22,
@@ -4041,18 +4214,18 @@ headerVersionShine: {
     paddingVertical: 8.5,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(206, 214, 255, 0.08)',
-    backgroundColor: 'rgba(9, 13, 24, 0.72)',
+    borderColor: 'rgba(249, 221, 244, 0.10)',
+    backgroundColor: 'rgba(15, 7, 25, 0.76)',
     marginRight: 8,
     marginBottom: 8,
   },
 
   lensChipActive: {
-    borderColor: 'rgba(244, 214, 255, 0.18)',
-    backgroundColor: 'rgba(62, 46, 90, 0.82)',
-    shadowColor: '#D4C1FF',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
+    borderColor: 'rgba(255, 224, 243, 0.20)',
+    backgroundColor: 'rgba(84, 40, 104, 0.84)',
+    shadowColor: '#C65BFF',
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
   },
 
@@ -4081,8 +4254,8 @@ headerVersionShine: {
     paddingVertical: 9,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(204, 214, 255, 0.07)',
-    backgroundColor: 'rgba(7, 11, 20, 0.44)',
+    borderColor: 'rgba(248, 212, 243, 0.14)',
+    backgroundColor: 'rgba(20, 8, 29, 0.54)',
   },
 
   threadManagerRow: {
@@ -4133,8 +4306,8 @@ headerVersionShine: {
     alignItems: 'center',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(214, 222, 255, 0.09)',
-    backgroundColor: 'rgba(10, 14, 24, 0.62)',
+    borderColor: 'rgba(249, 221, 244, 0.12)',
+    backgroundColor: 'rgba(17, 8, 26, 0.68)',
     paddingHorizontal: 10,
     paddingVertical: 7,
     marginRight: 7,
@@ -4151,8 +4324,8 @@ headerVersionShine: {
   threadManagerResetChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(214, 222, 255, 0.07)',
-    backgroundColor: 'rgba(8, 12, 21, 0.48)',
+    borderColor: 'rgba(255, 229, 207, 0.12)',
+    backgroundColor: 'rgba(24, 10, 20, 0.58)',
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
@@ -4168,15 +4341,16 @@ headerVersionShine: {
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(204, 214, 255, 0.06)',
+    borderTopColor: 'rgba(255, 228, 238, 0.08)',
   },
 
   composerFieldShell: {
+    overflow: 'hidden',
     position: 'relative',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(215, 224, 255, 0.10)',
-    backgroundColor: 'rgba(9, 13, 24, 0.82)',
+    borderColor: 'rgba(253, 226, 244, 0.13)',
+    backgroundColor: 'rgba(14, 6, 23, 0.84)',
     paddingLeft: 16,
     paddingRight: 12,
     paddingTop: 14,
@@ -4293,7 +4467,7 @@ headerVersionShine: {
     width: 184,
     height: 184,
     borderRadius: 92,
-    backgroundColor: 'rgba(110, 158, 255, 0.14)',
+    backgroundColor: 'rgba(209, 89, 255, 0.20)',
   },
 
   cardTopSheen: {
@@ -4303,7 +4477,7 @@ headerVersionShine: {
   right: 7,
   height: 20,
   borderRadius: 18,
-  backgroundColor: 'rgba(255,255,255,0.08)',
+  backgroundColor: 'rgba(255, 247, 251, 0.12)',
 },
 
   cardTopSheenSoft: {
@@ -4313,7 +4487,7 @@ headerVersionShine: {
   right: 22,
   height: 92,
   borderRadius: 34,
-  backgroundColor: 'rgba(220, 232, 255, 0.045)',
+  backgroundColor: 'rgba(255, 210, 242, 0.06)',
 },
 
   cardSideShine: {
@@ -4323,7 +4497,31 @@ headerVersionShine: {
   width: 128,
   height: 128,
   borderRadius: 64,
-  backgroundColor: 'rgba(255,255,255,0.04)',
+  backgroundColor: 'rgba(255, 232, 241, 0.06)',
+},
+
+  cardOrbitArcPrimary: {
+  position: 'absolute',
+  top: -20,
+  right: -42,
+  width: 214,
+  height: 120,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 215, 243, 0.18)',
+  transform: [{ rotate: '-15deg' }],
+},
+
+  cardOrbitArcSecondary: {
+  position: 'absolute',
+  bottom: -44,
+  left: -34,
+  width: 184,
+  height: 98,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 227, 205, 0.14)',
+  transform: [{ rotate: '15deg' }],
 },
 
   cardGlitterSweep: {
@@ -4333,7 +4531,7 @@ headerVersionShine: {
   width: 110,
   height: 240,
   borderRadius: 55,
-  backgroundColor: 'rgba(255,255,255,0.08)',
+  backgroundColor: 'rgba(255, 227, 244, 0.10)',
 },
 
   cardGlitterSweepCore: {
@@ -4343,7 +4541,7 @@ headerVersionShine: {
   width: 42,
   height: 240,
   borderRadius: 21,
-  backgroundColor: 'rgba(255,255,255,0.14)',
+  backgroundColor: 'rgba(255, 236, 246, 0.18)',
 },
 
   cardGlitterSweepWarm: {
@@ -4353,7 +4551,7 @@ headerVersionShine: {
     width: 120,
     height: 240,
     borderRadius: 60,
-    backgroundColor: 'rgba(255, 235, 212, 0.08)',
+    backgroundColor: 'rgba(255, 228, 212, 0.12)',
   },
 
   cardGlitterSweepCoreWarm: {
@@ -4363,7 +4561,7 @@ headerVersionShine: {
     width: 52,
     height: 240,
     borderRadius: 26,
-    backgroundColor: 'rgba(255, 241, 220, 0.14)',
+    backgroundColor: 'rgba(255, 242, 222, 0.18)',
   },
 
   cardBottomFog: {
@@ -4373,7 +4571,7 @@ headerVersionShine: {
   bottom: -10,
   height: 112,
   borderRadius: 40,
-  backgroundColor: 'rgba(116, 132, 214, 0.05)',
+  backgroundColor: 'rgba(214, 93, 255, 0.12)',
 },
 
   cardOrbGlowCool: {
@@ -4383,17 +4581,17 @@ headerVersionShine: {
   width: 152,
   height: 152,
   borderRadius: 76,
-  backgroundColor: 'rgba(86, 224, 255, 0.14)',
+  backgroundColor: 'rgba(183, 108, 255, 0.20)',
 },
 
 cardOrbGlowPurple: {
   position: 'absolute',
-  top: -62,
-  right: -26,
-  width: 176,
-  height: 176,
-  borderRadius: 88,
-  backgroundColor: 'rgba(198, 96, 255, 0.18)',
+  top: -72,
+  right: 32,
+  width: 210,
+  height: 210,
+  borderRadius: 105,
+  backgroundColor: 'rgba(202, 82, 255, 0.18)',
 },
 
 cardOrbGlowWarm: {
@@ -4403,7 +4601,7 @@ cardOrbGlowWarm: {
   width: 150,
   height: 150,
   borderRadius: 75,
-  backgroundColor: 'rgba(236, 140, 180, 0.12)',
+  backgroundColor: 'rgba(255, 146, 204, 0.16)',
 },
 
   sparkleLayer: {
@@ -4529,7 +4727,7 @@ cardOrbGlowWarm: {
   composerInput: {
   flex: 1,
   minHeight: 72,
-  color: 'rgba(247, 249, 255, 0.96)',
+  color: 'rgba(251, 246, 255, 0.96)',
   fontSize: 15.5,
   lineHeight: 24,
   fontWeight: '500',
@@ -4544,10 +4742,10 @@ cardOrbGlowWarm: {
   position: 'absolute',
   right: 12,
   bottom: 12,
-  width: 100,
-  height: 52,
-  borderRadius: 26,
-  backgroundColor: 'rgba(214, 152, 216, 0.10)',
+  width: 110,
+  height: 56,
+  borderRadius: 28,
+  backgroundColor: 'rgba(255, 133, 214, 0.18)',
 },
 
   composerActionDock: {
@@ -4556,11 +4754,11 @@ cardOrbGlowWarm: {
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(238, 241, 255, 0.10)',
-    backgroundColor: 'rgba(6, 10, 19, 0.88)',
-    shadowColor: '#98A7D8',
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
+    borderColor: 'rgba(255, 226, 244, 0.14)',
+    backgroundColor: 'rgba(13, 6, 22, 0.90)',
+    shadowColor: '#2A0428',
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
     shadowOffset: { width: 0, height: 8 },
   },
 
@@ -4580,11 +4778,11 @@ cardOrbGlowWarm: {
   },
 
   inlineHeartButton: {
-  backgroundColor: 'rgba(124, 70, 118, 0.52)',
-  borderColor: 'rgba(255, 208, 232, 0.18)',
-  shadowColor: '#D5B4E4',
-  shadowOpacity: 0.10,
-  shadowRadius: 12,
+  backgroundColor: 'rgba(152, 57, 139, 0.68)',
+  borderColor: 'rgba(255, 224, 240, 0.24)',
+  shadowColor: '#701267',
+  shadowOpacity: 0.24,
+  shadowRadius: 18,
   shadowOffset: { width: 0, height: 6 },
 },
 
@@ -4594,8 +4792,8 @@ cardOrbGlowWarm: {
   },
 
   inlineMicButton: {
-    backgroundColor: 'rgba(10, 14, 24, 0.98)',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(16, 8, 25, 0.98)',
+    borderColor: 'rgba(255, 244, 248, 0.14)',
   },
 
   inlineMicButtonActive: {
@@ -4689,16 +4887,16 @@ cardOrbGlowWarm: {
   marginBottom: 14,
   borderRadius: 34,
   borderWidth: 1,
-  borderColor: 'rgba(222, 226, 255, 0.10)',
-  backgroundColor: 'rgba(28, 31, 44, 0.88)',
+  borderColor: 'rgba(255, 223, 243, 0.18)',
+  backgroundColor: 'rgba(44, 15, 47, 0.92)',
   padding: 2,
   width: '100%',
   maxWidth: 1560,
   alignSelf: 'center',
-  shadowColor: '#070A14',
-  shadowOpacity: 0.42,
-  shadowRadius: 26,
-  shadowOffset: { width: 0, height: 14 },
+  shadowColor: '#120015',
+  shadowOpacity: 0.60,
+  shadowRadius: 38,
+  shadowOffset: { width: 0, height: 18 },
   elevation: 13,
 },
 
@@ -4722,8 +4920,8 @@ cardOrbGlowWarm: {
   overflow: 'hidden',
   borderRadius: 32,
   borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.08)',
-  backgroundColor: 'rgba(7, 10, 18, 0.985)',
+  borderColor: 'rgba(255, 244, 247, 0.10)',
+  backgroundColor: 'rgba(12, 4, 19, 0.986)',
   paddingHorizontal: 30,
   paddingTop: 22,
   paddingBottom: 22,
@@ -4865,7 +5063,7 @@ cardOrbGlowWarm: {
 },
 
   responseMetaLine: {
-  color: 'rgba(190, 198, 224, 0.56)',
+  color: 'rgba(210, 198, 226, 0.58)',
   fontSize: 11.5,
   lineHeight: 16,
   fontWeight: '600',
@@ -4878,8 +5076,8 @@ cardOrbGlowWarm: {
     alignSelf: 'flex-start',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(212, 220, 255, 0.08)',
-    backgroundColor: 'rgba(10, 13, 22, 0.72)',
+    borderColor: 'rgba(252, 220, 243, 0.12)',
+    backgroundColor: 'rgba(17, 8, 25, 0.76)',
     paddingHorizontal: 10,
     paddingVertical: 7,
     marginLeft: 12,
@@ -4900,8 +5098,8 @@ cardOrbGlowWarm: {
     paddingVertical: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(206, 214, 255, 0.08)',
-    backgroundColor: 'rgba(9, 12, 21, 0.70)',
+    borderColor: 'rgba(251, 215, 242, 0.12)',
+    backgroundColor: 'rgba(16, 7, 24, 0.76)',
   },
 
   responseDetailsEyebrow: {
@@ -4983,8 +5181,8 @@ cardOrbGlowWarm: {
   responseActionChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(212, 220, 255, 0.10)',
-    backgroundColor: 'rgba(9, 12, 21, 0.82)',
+    borderColor: 'rgba(255, 222, 242, 0.14)',
+    backgroundColor: 'rgba(18, 7, 26, 0.84)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     maxWidth: '72%',
@@ -5018,7 +5216,7 @@ cardOrbGlowWarm: {
   width: 42,
   height: 42,
   borderRadius: 21,
-  backgroundColor: 'rgba(210, 154, 206, 0.10)',
+  backgroundColor: 'rgba(255, 130, 214, 0.16)',
 },
 
 responseReplayButton: {
@@ -5028,11 +5226,11 @@ responseReplayButton: {
   alignItems: 'center',
   justifyContent: 'center',
   borderWidth: 1,
-  borderColor: 'rgba(232, 221, 255, 0.10)',
-  backgroundColor: 'rgba(52, 42, 72, 0.56)',
-  shadowColor: '#AAB4E0',
-  shadowOpacity: 0.08,
-  shadowRadius: 10,
+  borderColor: 'rgba(255, 226, 244, 0.14)',
+  backgroundColor: 'rgba(83, 36, 88, 0.68)',
+  shadowColor: '#360631',
+  shadowOpacity: 0.18,
+  shadowRadius: 14,
   shadowOffset: { width: 0, height: 6 },
 },
 
@@ -5052,19 +5250,19 @@ responseReplayButton: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(7, 10, 18, 0.94)',
-    shadowColor: '#090D17',
-    shadowOpacity: 0.36,
-    shadowRadius: 18,
+    borderColor: 'rgba(255, 221, 244, 0.14)',
+    backgroundColor: 'rgba(17, 7, 27, 0.94)',
+    shadowColor: '#170118',
+    shadowOpacity: 0.48,
+    shadowRadius: 24,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
     zIndex: 10,
   },
 
   floatingSettingsButtonActive: {
-    borderColor: 'rgba(190, 198, 255, 0.18)',
-    backgroundColor: 'rgba(10, 13, 24, 0.98)',
+    borderColor: 'rgba(255, 225, 244, 0.18)',
+    backgroundColor: 'rgba(21, 8, 31, 0.98)',
   },
 
   floatingSettingsIcon: {
