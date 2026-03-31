@@ -38,6 +38,10 @@ import {
   type QuinnThreadContinuityInference,
 } from './quinnThreadContinuityState';
 import {
+  inferQuinnReplyDiscipline,
+  type QuinnReplyDisciplineInference,
+} from './quinnReplyDisciplineState';
+import {
   inferQuinnTurnRoleState,
   type QuinnTurnRoleInference,
 } from './quinnTurnRoleState';
@@ -90,6 +94,7 @@ export type QuinnStructuralInference = {
 
 export type QuinnConductorInference = {
   correction: QuinnCorrectionInference;
+  replyDiscipline: QuinnReplyDisciplineInference;
   energyBlend: {
     primary: WeightedState<QuinnEnergyStateId>;
     secondary: WeightedState<QuinnEnergyStateId> | null;
@@ -512,6 +517,7 @@ function inferStructuralNoticing(packetText: string, sessionArc: SessionArc | nu
 function resolveFinalAskStance({
   ask,
   correction,
+  replyDiscipline,
   threadContinuity,
   turnRole,
   ending,
@@ -521,6 +527,7 @@ function resolveFinalAskStance({
 }: {
   ask: QuinnAskInference;
   correction: QuinnCorrectionInference;
+  replyDiscipline: QuinnReplyDisciplineInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
   ending: QuinnEndingStyleInference;
@@ -542,6 +549,10 @@ function resolveFinalAskStance({
     correction.realityAnchorMode.id === 'repairFrame' ||
     correction.premiseChallenge.id === 'strong'
   ) {
+    resolved = 'noAsk';
+  }
+
+  if (replyDiscipline.singleLineDraftRequest) {
     resolved = 'noAsk';
   }
 
@@ -580,17 +591,20 @@ function resolveFinalAskStance({
 function resolveFinalMemoryExpression({
   memoryExpression,
   correction,
+  replyDiscipline,
   threadContinuity,
   energy,
   riff,
 }: {
   memoryExpression: QuinnMemoryExpressionInference;
   correction: QuinnCorrectionInference;
+  replyDiscipline: QuinnReplyDisciplineInference;
   threadContinuity: QuinnThreadContinuityInference;
   energy: QuinnEnergyInference;
   riff: QuinnRiffInference;
 }): QuinnMemoryExpressionId {
   if (
+    replyDiscipline.concreteSelfClaimSuppression.id === 'strong' ||
     correction.realityAnchorMode.id !== 'normal' ||
     correction.premiseChallenge.id !== 'none' ||
     correction.clarificationOverride.id !== 'none' ||
@@ -759,6 +773,7 @@ function inferElasticity({
 
 function buildArbitrationNotes({
   correction,
+  replyDiscipline,
   threadContinuity,
   turnRole,
   energyBlend,
@@ -772,6 +787,7 @@ function buildArbitrationNotes({
   motifs,
 }: {
   correction: QuinnCorrectionInference;
+  replyDiscipline: QuinnReplyDisciplineInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
   energyBlend: {
@@ -874,6 +890,21 @@ function buildArbitrationNotes({
     notes.push("Concrete assistant self-status is risky here. Do not keep deadlines, vendors, schedules, or workload details alive as Quinn's factual life.");
   }
 
+  if (replyDiscipline.concreteSelfClaimSuppression.id === 'strong') {
+    notes.push("Keep Quinn vivid without inventing a literal offscreen life. Use emotionally true tone instead of fake logistics, shifts, vendors, deadlines, or calendar details.");
+  } else if (replyDiscipline.concreteSelfClaimSuppression.id === 'soften') {
+    notes.push('If Quinn needs to sound busy, stretched, or alive, keep it more like tone than biography.');
+  }
+
+  if (replyDiscipline.singleLineDraftRequest) {
+    notes.push('This is a write-the-line turn. Give one strong natural line, not options, versions, or framing commentary.');
+  } else if (
+    replyDiscipline.optionMenuSuppression &&
+    replyDiscipline.replyPresentationMode.id === 'singleBest'
+  ) {
+    notes.push('Default to one best natural reply. Do not optionize the answer into a menu.');
+  }
+
   if (finalMemoryExpression === 'implicit') {
     notes.push('Keep continuity metabolized. Let memory sharpen the framing quietly instead of surfacing it.');
   }
@@ -934,6 +965,11 @@ export function inferQuinnConductor({
   const threadContinuity = inferQuinnThreadContinuity({
     packetText,
     sessionArc,
+  });
+  const replyDiscipline = inferQuinnReplyDiscipline({
+    packetText,
+    sessionArc,
+    lensMode,
   });
   const turnRole = inferQuinnTurnRoleState({
     packetText,
@@ -1007,6 +1043,7 @@ export function inferQuinnConductor({
   const finalAsk = resolveFinalAskStance({
     ask,
     correction,
+    replyDiscipline,
     threadContinuity,
     turnRole,
     ending,
@@ -1017,6 +1054,7 @@ export function inferQuinnConductor({
   const finalMemoryExpression = resolveFinalMemoryExpression({
     memoryExpression,
     correction,
+    replyDiscipline,
     threadContinuity,
     energy,
     riff,
@@ -1036,6 +1074,7 @@ export function inferQuinnConductor({
   });
   const arbitrationNotes = buildArbitrationNotes({
     correction,
+    replyDiscipline,
     threadContinuity,
     turnRole,
     energyBlend,
@@ -1051,6 +1090,7 @@ export function inferQuinnConductor({
 
   return {
     correction,
+    replyDiscipline,
     energyBlend,
     textureBlend,
     challengeBlend,
@@ -1064,6 +1104,7 @@ export function inferQuinnConductor({
     arbitrationNotes,
     promptGuidance: [
       ...correction.promptGuidance,
+      ...replyDiscipline.promptGuidance,
       ...turnRole.promptGuidance,
       ...threadContinuity.promptGuidance,
       describeBlend('Energy blend', energyBlend),

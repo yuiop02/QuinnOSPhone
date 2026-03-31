@@ -322,6 +322,25 @@ function inferCandidateFraming({
   microTurn: QuinnMicroTurnId;
 }) {
   const clean = cleanText(packetText);
+  const replyDiscipline = conductor.replyDiscipline;
+
+  if (replyDiscipline.singleLineDraftRequest) {
+    return {
+      ...CANDIDATE_FRAMING_PROFILES.single,
+      score: 0,
+    };
+  }
+
+  if (
+    replyDiscipline.optionMenuSuppression &&
+    replyDiscipline.replyPresentationMode.id === 'singleBest'
+  ) {
+    return {
+      ...CANDIDATE_FRAMING_PROFILES.single,
+      score: 0,
+    };
+  }
+
   const branchingSignals =
     countRegex(clean, /\bor\b/gi) +
     countRegex(clean, /\b(?:two versions|two things|two different|on the one hand|on the other hand)\b/gi) +
@@ -599,11 +618,13 @@ function inferAftertaste({
   scores.assistantResidue += conductor.endingBlend.primary.id === 'softLanding' ? 0.35 : 0;
   scores.assistantResidue += conductor.finalMemoryExpression !== 'implicit' ? 0.25 : 0;
   scores.assistantResidue += signatureGuard.id === 'high' ? 0.25 : 0;
+  scores.assistantResidue += conductor.replyDiscipline.optionMenuSuppression ? 0.3 : 0;
 
   scores.explanationResidue += conductor.elasticity.id === 'expanded' ? 0.7 : 0;
   scores.explanationResidue += conductor.elasticity.id === 'medium' ? 0.35 : 0;
   scores.explanationResidue += conductor.riffBlend.primary.id === 'resolve' ? 0.45 : 0;
   scores.explanationResidue += conductor.structural.id === 'none' ? 0.25 : 0;
+  scores.explanationResidue += conductor.replyDiscipline.singleLineDraftRequest ? 0.45 : 0;
 
   scores.neatnessResidue += conductor.endingBlend.primary.id === 'softLanding' ? 0.65 : 0;
   scores.neatnessResidue += conductor.endingBlend.primary.id === 'nudge' ? 0.55 : 0;

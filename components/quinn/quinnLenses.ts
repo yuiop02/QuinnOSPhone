@@ -202,6 +202,34 @@ export function buildQuinnPacket({
       correctionContext.correction.suppressConcreteSelfStatus ? 'true' : 'false'
     ),
     listPacketSection(
+      'ASSISTANT PERSONA LITERALNESS',
+      conductorContext.conductor.replyDiscipline.assistantPersonaLiteralness.id
+    ),
+    listPacketSection(
+      'CONCRETE SELF-CLAIM SUPPRESSION',
+      conductorContext.conductor.replyDiscipline.concreteSelfClaimSuppression.id
+    ),
+    listPacketSection(
+      'SELF-STATUS SPECIFICITY RISK',
+      conductorContext.conductor.replyDiscipline.selfStatusSpecificityRisk.id
+    ),
+    listPacketSection(
+      'REPLY PRESENTATION MODE',
+      conductorContext.conductor.replyDiscipline.replyPresentationMode.id
+    ),
+    listPacketSection(
+      'EXPLICIT MULTI-OPTION ASK',
+      conductorContext.conductor.replyDiscipline.explicitMultiOptionAsk ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'SINGLE-LINE DRAFT REQUEST',
+      conductorContext.conductor.replyDiscipline.singleLineDraftRequest ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'OPTION MENU SUPPRESSION',
+      conductorContext.conductor.replyDiscipline.optionMenuSuppression ? 'true' : 'false'
+    ),
+    listPacketSection(
       'CLARIFICATION OVERRIDE',
       correctionContext.correction.clarificationOverride.id
     ),
