@@ -75,7 +75,19 @@ const INTERNAL_REPLY_SECTION_LABELS = new Set([
   'constraint priority',
   'repeat guard',
   'acknowledgment style',
+  'active thread continuity',
+  'live subject dominance',
+  'thread carryover mode',
+  'stale frame risk',
+  'frame continuation',
+  'turn role anchor',
+  'previous assistant asked question',
+  'adjacency mode',
+  'suppress assistant status pattern',
   'local course correction',
+  'thread continuity policy',
+  'thread continuity control',
+  'turn role policy',
 ]);
 
 function joinCleanParts(parts: string[], separator = '\n\n') {
@@ -351,6 +363,7 @@ export async function runQuinnPacket({
     packetText,
     lensId,
     sessionArc,
+    previousAssistantReply,
   });
   const cleanPreviousAssistantReply = sanitizeQuinnVisibleReplyText(
     previousAssistantReply
