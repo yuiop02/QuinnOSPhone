@@ -46,6 +46,80 @@ export const INITIAL_VOICE_SETTINGS: VoiceSettings = {
   autoTranscribeOnStop: false,
 };
 
+function formatOptionalText(value: string, fallback = '(none yet)') {
+  const clean = String(value || '').trim();
+  return clean || fallback;
+}
+
+function formatComposerText(value: string) {
+  const clean = String(value || '').trim();
+  return clean || '(blank; no draft is currently staged in the composer)';
+}
+
+function formatRunTimestamp(value: string | null | undefined) {
+  const clean = String(value || '').trim();
+  return clean || '(none yet)';
+}
+
+function buildActiveThreadState({
+  packetTitle,
+  writtenResult,
+  compressedSummary,
+  currentMemoryResonance,
+  currentSessionArc,
+  lastRunAt,
+  latestCompletedRun,
+}: {
+  packetTitle: string;
+  writtenResult: string;
+  compressedSummary: string;
+  currentMemoryResonance: MemoryResonanceItem[];
+  currentSessionArc: SessionArc | null;
+  lastRunAt: string | null;
+  latestCompletedRun: RunHistoryItem | null;
+}) {
+  const hasVisibleThreadState = Boolean(
+    currentSessionArc ||
+      String(writtenResult || '').trim() ||
+      String(compressedSummary || '').trim() ||
+      currentMemoryResonance.length ||
+      latestCompletedRun
+  );
+  const source = currentSessionArc
+    ? 'session-arc'
+    : latestCompletedRun
+      ? 'latest-run'
+      : hasVisibleThreadState
+        ? 'live-output'
+        : 'none';
+  const title =
+    String(currentSessionArc?.title || '').trim() ||
+    String(latestCompletedRun?.sessionArcTitle || '').trim() ||
+    String(latestCompletedRun?.packetTitle || '').trim() ||
+    String(packetTitle || '').trim();
+
+  return {
+    source,
+    id:
+      String(currentSessionArc?.id || '').trim() ||
+      String(latestCompletedRun?.sessionArcId || '').trim() ||
+      null,
+    title,
+    hasActiveThread: source !== 'none',
+    lastRunAt: lastRunAt || latestCompletedRun?.timestamp || null,
+    compressedSummary: String(compressedSummary || '').trim()
+      ? compressedSummary
+      : latestCompletedRun?.compressedSummary || '',
+    writtenResult: String(writtenResult || '').trim()
+      ? writtenResult
+      : latestCompletedRun?.writtenResult || '',
+    memoryResonance: currentMemoryResonance.length
+      ? currentMemoryResonance
+      : latestCompletedRun?.memoryResonance || [],
+    sessionArc: currentSessionArc,
+  } as const;
+}
+
 export function buildExportBundle({
   packetTitle,
   packetText,
@@ -76,6 +150,26 @@ export function buildExportBundle({
   voiceSettings: VoiceSettings;
 }): ExportBundle {
   const generatedAt = new Date().toISOString();
+  const latestCompletedRun = recentRuns[0] || null;
+  const currentComposer = {
+    title: packetTitle,
+    text: packetText,
+    isBlank: !String(packetText || '').trim(),
+  };
+  const activeThread = buildActiveThreadState({
+    packetTitle,
+    writtenResult,
+    compressedSummary,
+    currentMemoryResonance,
+    currentSessionArc,
+    lastRunAt,
+    latestCompletedRun,
+  });
+  const exportTitle =
+    String(activeThread.title || '').trim() ||
+    String(latestCompletedRun?.packetTitle || '').trim() ||
+    String(packetTitle || '').trim() ||
+    'QuinnOS Export';
 
   const snapshot = {
     meta: {
@@ -95,6 +189,9 @@ export function buildExportBundle({
       sessionArc: currentSessionArc,
       lastRunAt,
     },
+    currentComposer,
+    activeThread,
+    latestCompletedRun,
     settings,
     voiceSettings,
     recentRuns,
@@ -111,21 +208,34 @@ export function buildExportBundle({
     `Generated: ${generatedAt}`,
     `Run endpoint: ${RUN_ENDPOINT}`,
     '',
-    '## Current Packet',
+    '## Current Composer',
     '',
-    `Title: ${packetTitle || 'Untitled packet'}`,
+    `Title: ${formatOptionalText(currentComposer.title, 'Untitled composer draft')}`,
+    `State: ${currentComposer.isBlank ? 'blank composer' : 'draft staged in composer'}`,
     '',
-    packetText || '(blank)',
+    formatComposerText(currentComposer.text),
     '',
-    '## Latest Compression',
+    '## Active Thread',
     '',
-    compressedSummary || '(none yet)',
+    ...(activeThread.hasActiveThread
+      ? [
+          `Title: ${formatOptionalText(activeThread.title, 'Untitled thread')}`,
+          `Source: ${activeThread.source}`,
+          `Last run: ${formatRunTimestamp(activeThread.lastRunAt)}`,
+          '',
+          '### Current visible summary',
+          formatOptionalText(activeThread.compressedSummary),
+          '',
+          '### Current visible output',
+          formatOptionalText(activeThread.writtenResult),
+        ]
+      : ['(no active thread state)']),
     '',
-    '## Memory Resonance',
+    '## Active Thread Memory Resonance',
     '',
     ...(
-      currentMemoryResonance.length
-        ? currentMemoryResonance.flatMap((item, index) => [
+      activeThread.memoryResonance.length
+        ? activeThread.memoryResonance.flatMap((item, index) => [
             `### ${index + 1}. ${item.label}`,
             item.preview || '(no preview)',
             '',
@@ -133,21 +243,34 @@ export function buildExportBundle({
         : ['(none yet)']
     ),
     '',
-    '## Session Arc',
+    '## Active Thread Session Arc',
     '',
-    ...(currentSessionArc
+    ...(activeThread.sessionArc
       ? [
-          `Title: ${currentSessionArc.title}`,
-          `Steps: ${currentSessionArc.stepCount}`,
-          ...currentSessionArc.beats.flatMap((beat, index) => [
+          `Title: ${activeThread.sessionArc.title}`,
+          `Steps: ${activeThread.sessionArc.stepCount}`,
+          ...activeThread.sessionArc.beats.flatMap((beat, index) => [
             `- Beat ${index + 1} (${beat.lensLabel}): ${beat.summary}`,
           ]),
         ]
       : ['(none yet)']),
     '',
-    '## Latest Written Result',
+    '## Latest Completed Run',
     '',
-    writtenResult || '(none yet)',
+    ...(latestCompletedRun
+      ? [
+          `Title: ${formatOptionalText(latestCompletedRun.packetTitle, 'Untitled packet')}`,
+          `Time: ${formatRunTimestamp(latestCompletedRun.timestamp)}`,
+          `Session arc: ${formatOptionalText(latestCompletedRun.sessionArcTitle || '', '(none)')}`,
+          `Summary: ${formatOptionalText(latestCompletedRun.compressedSummary)}`,
+          '',
+          '### Latest completed run packet',
+          formatOptionalText(latestCompletedRun.packetText),
+          '',
+          '### Latest completed run output',
+          formatOptionalText(latestCompletedRun.writtenResult),
+        ]
+      : ['(none yet)']),
     '',
     '## Settings',
     '',
@@ -234,29 +357,52 @@ export function buildExportBundle({
     `Generated: ${generatedAt}`,
     `Run endpoint: ${RUN_ENDPOINT}`,
     '',
-    `Current packet title: ${packetTitle || 'Untitled packet'}`,
+    `Current composer title: ${formatOptionalText(currentComposer.title, 'Untitled composer draft')}`,
+    `Current composer state: ${currentComposer.isBlank ? 'blank composer' : 'draft staged in composer'}`,
     '',
-    'Current packet:',
-    packetText || '(blank)',
+    'Current composer:',
+    formatComposerText(currentComposer.text),
     '',
-    'Latest compression:',
-    compressedSummary || '(none yet)',
+    `Active thread title: ${activeThread.hasActiveThread ? formatOptionalText(activeThread.title, 'Untitled thread') : '(none yet)'}`,
+    `Active thread source: ${activeThread.source}`,
+    `Active thread last run: ${formatRunTimestamp(activeThread.lastRunAt)}`,
     '',
-    'Memory resonance:',
-    ...(currentMemoryResonance.length
-      ? currentMemoryResonance.map((item) => `- ${item.label}: ${item.preview || '(no preview)'}`)
+    'Active thread summary:',
+    formatOptionalText(activeThread.compressedSummary),
+    '',
+    'Active thread visible output:',
+    formatOptionalText(activeThread.writtenResult),
+    '',
+    'Active thread memory resonance:',
+    ...(activeThread.memoryResonance.length
+      ? activeThread.memoryResonance.map(
+          (item) => `- ${item.label}: ${item.preview || '(no preview)'}`
+        )
       : ['(none yet)']),
     '',
-    'Session arc:',
-    ...(currentSessionArc
+    'Active thread session arc:',
+    ...(activeThread.sessionArc
       ? [
-          `- ${currentSessionArc.title} (${currentSessionArc.stepCount} steps)`,
-          ...currentSessionArc.beats.map((beat) => `- ${beat.lensLabel}: ${beat.summary}`),
+          `- ${activeThread.sessionArc.title} (${activeThread.sessionArc.stepCount} steps)`,
+          ...activeThread.sessionArc.beats.map(
+            (beat) => `- ${beat.lensLabel}: ${beat.summary}`
+          ),
         ]
       : ['(none yet)']),
     '',
-    'Latest written result:',
-    writtenResult || '(none yet)',
+    'Latest completed run:',
+    ...(latestCompletedRun
+      ? [
+          `- Title: ${formatOptionalText(latestCompletedRun.packetTitle, 'Untitled packet')}`,
+          `- Time: ${formatRunTimestamp(latestCompletedRun.timestamp)}`,
+          `- Session arc: ${formatOptionalText(latestCompletedRun.sessionArcTitle || '', '(none)')}`,
+          `- Summary: ${formatOptionalText(latestCompletedRun.compressedSummary)}`,
+          '- Packet:',
+          formatOptionalText(latestCompletedRun.packetText),
+          '- Output:',
+          formatOptionalText(latestCompletedRun.writtenResult),
+        ]
+      : ['(none yet)']),
     '',
     `Recent runs kept: ${recentRuns.length}`,
     `Memory items kept: ${memories.length}`,
@@ -274,6 +420,8 @@ export function buildExportBundle({
 
   return {
     generatedAt,
+    title: exportTitle,
+    snapshot,
     json,
     markdown,
     text,

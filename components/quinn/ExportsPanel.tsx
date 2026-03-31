@@ -103,8 +103,26 @@ export default function ExportsPanel({
         ]}
       />
 
-      <SectionCard eyebrow="SNAPSHOT" title={packetTitle.trim() || 'Untitled packet'}>
+      <SectionCard
+        eyebrow="SNAPSHOT"
+        title={exportBundle.title.trim() || packetTitle.trim() || 'QuinnOS Export'}
+      >
         <Text style={styles.bodyLine}>Generated: {formatTimestamp(exportBundle.generatedAt)}</Text>
+        <Text style={styles.bodyLine}>
+          Composer: {exportBundle.snapshot.currentComposer.isBlank ? 'blank' : 'draft staged'}
+        </Text>
+        <Text style={styles.bodyLine}>
+          Active thread:{' '}
+          {exportBundle.snapshot.activeThread.hasActiveThread
+            ? exportBundle.snapshot.activeThread.title || 'Untitled thread'
+            : 'none'}
+        </Text>
+        <Text style={styles.bodyLine}>
+          Latest completed run:{' '}
+          {exportBundle.snapshot.latestCompletedRun
+            ? formatTimestamp(exportBundle.snapshot.latestCompletedRun.timestamp)
+            : 'none'}
+        </Text>
         <Text style={styles.bodyLine}>Runs included: {recentRunsCount}</Text>
         <Text style={styles.bodyLine}>Memory items included: {memoryCount}</Text>
 

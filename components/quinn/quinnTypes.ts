@@ -123,8 +123,57 @@ export type VoiceSession = {
   errorMessage: string | null;
 };
 
+export type ExportComposerState = {
+  title: string;
+  text: string;
+  isBlank: boolean;
+};
+
+export type ExportActiveThreadState = {
+  source: 'session-arc' | 'latest-run' | 'live-output' | 'none';
+  id: string | null;
+  title: string;
+  hasActiveThread: boolean;
+  lastRunAt: string | null;
+  compressedSummary: string;
+  writtenResult: string;
+  memoryResonance: MemoryResonanceItem[];
+  sessionArc: SessionArc | null;
+};
+
+export type ExportSnapshot = {
+  meta: {
+    app: string;
+    theme: string;
+    generatedAt: string;
+    runEndpoint: string;
+  };
+  currentPacket: {
+    title: string;
+    text: string;
+  };
+  latestOutput: {
+    writtenResult: string;
+    compressedSummary: string;
+    memoryResonance: MemoryResonanceItem[];
+    sessionArc: SessionArc | null;
+    lastRunAt: string | null;
+  };
+  currentComposer: ExportComposerState;
+  activeThread: ExportActiveThreadState;
+  latestCompletedRun: RunHistoryItem | null;
+  settings: QuinnSettings;
+  voiceSettings: VoiceSettings;
+  recentRuns: RunHistoryItem[];
+  memories: MemoryItem[];
+  notifications: NotificationItem[];
+  voiceSessions: VoiceSession[];
+};
+
 export type ExportBundle = {
   generatedAt: string;
+  title: string;
+  snapshot: ExportSnapshot;
   json: string;
   markdown: string;
   text: string;
