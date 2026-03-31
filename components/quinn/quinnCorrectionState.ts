@@ -4,6 +4,9 @@ export type QuinnCorrectionLatchId = 'none' | 'soft' | 'hard';
 export type QuinnConstraintPriorityId = 'none' | 'elevated' | 'dominant';
 export type QuinnRepeatGuardId = 'none' | 'avoidExact' | 'avoidNearRepeat';
 export type QuinnClarificationOverrideId = 'none' | 'partial' | 'dominant';
+export type QuinnPremiseChallengeId = 'none' | 'light' | 'strong';
+export type QuinnRealityAnchorModeId = 'normal' | 'softenPersona' | 'repairFrame';
+export type QuinnAssistantSelfClaimRiskId = 'none' | 'light' | 'strong';
 export type QuinnClarificationTypeId =
   | 'none'
   | 'reference'
@@ -37,6 +40,13 @@ export type QuinnCorrectionInference = {
   repeatGuard: QuinnSignalBucket<QuinnRepeatGuardId> & {
     blockedRecentText: string;
   };
+  premiseChallenge: QuinnSignalBucket<QuinnPremiseChallengeId>;
+  assistantSelfClaimRisk: QuinnSignalBucket<QuinnAssistantSelfClaimRiskId>;
+  realityAnchorMode: {
+    id: QuinnRealityAnchorModeId;
+    promptGuidance: string;
+  };
+  suppressConcreteSelfStatus: boolean;
   clarificationOverride: QuinnSignalBucket<QuinnClarificationOverrideId> & {
     clarificationType: QuinnClarificationTypeId;
     interpretationReplacement: boolean;
@@ -60,6 +70,15 @@ export const QUINN_CORRECTION_TUNING = {
     dominantThreshold: 1.8,
     explicitReplacementBoost: 0.35,
     subjectReferenceBoost: 0.35,
+  },
+  premiseChallenge: {
+    lightThreshold: 0.95,
+    strongThreshold: 1.85,
+    priorSelfClaimBoost: 0.45,
+  },
+  assistantSelfClaimRisk: {
+    lightThreshold: 0.8,
+    strongThreshold: 1.65,
   },
   constraintPriority: {
     elevatedThreshold: 1.1,
@@ -102,6 +121,60 @@ const HARD_CORRECTION_PATTERNS: readonly QuinnSignalPattern[] = [
     pattern: /\bnot that[, ]+(?:this|the|it)\b/i,
     label: 'user explicitly redirects away from the previous target',
     score: 1.2,
+  },
+];
+
+const STRONG_PREMISE_CHALLENGE_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:you(?:'re| are)\s+(?:not real|not a real person|not even real|just part of (?:an|the) app|an app(?: that i made)?|part of (?:an|the) app)|if you(?:'re| are) not (?:real|a real person|human)|how (?:are|do) you(?: even)?[\s\S]{0,80}\bif\b[\s\S]{0,80}\b(?:not real|not even real|an app|not a real person))\b/i,
+    label: "user directly questions Quinn's literal reality or premise",
+    score: 1.45,
+  },
+  {
+    pattern:
+      /\b(?:how (?:are|do) you(?: even)? have\b|how are you so\b|how do you have those things\b)[\s\S]{0,80}\b(?:if you(?:'re| are) not|when you(?:'re| are) not)\b/i,
+    label: "user says Quinn's self-claim does not make literal sense",
+    score: 1.2,
+  },
+];
+
+const LIGHT_PREMISE_CHALLENGE_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:not real|not a real person|not even real|just an app|part of an app|inside an app|in an app that i made)\b/i,
+    label: "user is pushing on Quinn's literal reality",
+    score: 0.85,
+  },
+  {
+    pattern:
+      /\b(?:that(?:'s| is) not literal|not literally|bit outrunning the truth|that doesn't make sense if you're not real)\b/i,
+    label: 'user says the bit is outrunning the truth',
+    score: 0.8,
+  },
+];
+
+const STRONG_ASSISTANT_SELF_CLAIM_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:deadline|vendor|meeting|calendar|schedule|inbox|commute|rent|landlord|boss|shift|errand|vendor ghosted|deadline tomorrow)\b/i,
+    label: 'the prior Quinn reply leaned on concrete offscreen logistics',
+    score: 1.05,
+  },
+  {
+    pattern:
+      /\b(?:i(?:'m| am)\s+(?:slammed|swamped|buried|running behind|late|fried|exhausted|busy|scattered|caffeinated)|coffee(?:'s| is)\s+doing)\b/i,
+    label: 'the prior Quinn reply used a human self-status frame',
+    score: 0.95,
+  },
+];
+
+const LIGHT_ASSISTANT_SELF_CLAIM_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:my (?:day|week|life|calendar|schedule|inbox)|breakfast|lunch|dinner|coffee|vendor|deadline|calendar|schedule|swamped|slammed|busy)\b/i,
+    label: 'the prior Quinn reply carried everyday-life detail as if it were literal',
+    score: 0.7,
   },
 ];
 
@@ -391,13 +464,17 @@ function uniqueItems(items: string[]) {
 export function inferQuinnCorrectionState({
   packetText,
   sessionArc = null,
+  previousAssistantReply = '',
 }: {
   packetText: string;
   sessionArc?: SessionArc | null;
+  previousAssistantReply?: string;
 }): QuinnCorrectionInference {
   const clean = cleanText(packetText);
   const lower = clean.toLowerCase();
   const momentumText = buildRecentBeatText(sessionArc).toLowerCase();
+  const previousAssistantText = cleanText(previousAssistantReply).toLowerCase();
+  const selfClaimSourceText = [previousAssistantText, momentumText].filter(Boolean).join(' ');
   const blockedRecentText = getLatestBeatSummary(sessionArc);
   const playfulMarkerPresent = /\b(?:lol|lmao|haha|hehe)\b/i.test(clean);
 
@@ -414,6 +491,16 @@ export function inferQuinnCorrectionState({
   const partialClarification = collectClarificationHits(
     clean,
     PARTIAL_CLARIFICATION_PATTERNS
+  );
+  const strongPremiseChallenge = collectPatternHits(lower, STRONG_PREMISE_CHALLENGE_PATTERNS);
+  const lightPremiseChallenge = collectPatternHits(lower, LIGHT_PREMISE_CHALLENGE_PATTERNS);
+  const strongAssistantSelfClaim = collectPatternHits(
+    selfClaimSourceText,
+    STRONG_ASSISTANT_SELF_CLAIM_PATTERNS
+  );
+  const lightAssistantSelfClaim = collectPatternHits(
+    selfClaimSourceText,
+    LIGHT_ASSISTANT_SELF_CLAIM_PATTERNS
   );
   const clarificationHits = [
     ...dominantClarification.hits,
@@ -451,6 +538,38 @@ export function inferQuinnCorrectionState({
       ? topClarificationHit?.replacementSummary ||
         'The user explicitly clarified what they meant. Replace the older interpretation with that clarified meaning.'
       : '';
+  const assistantSelfClaimScore =
+    strongAssistantSelfClaim.score + lightAssistantSelfClaim.score;
+  const assistantSelfClaimRiskId: QuinnAssistantSelfClaimRiskId =
+    assistantSelfClaimScore >= QUINN_CORRECTION_TUNING.assistantSelfClaimRisk.strongThreshold
+      ? 'strong'
+      : assistantSelfClaimScore >=
+            QUINN_CORRECTION_TUNING.assistantSelfClaimRisk.lightThreshold
+        ? 'light'
+        : 'none';
+  const premiseChallengeScore =
+    strongPremiseChallenge.score +
+    lightPremiseChallenge.score +
+    ((strongPremiseChallenge.score > 0 || lightPremiseChallenge.score > 0) &&
+    assistantSelfClaimRiskId !== 'none'
+      ? QUINN_CORRECTION_TUNING.premiseChallenge.priorSelfClaimBoost
+      : 0);
+  const premiseChallengeId: QuinnPremiseChallengeId =
+    premiseChallengeScore >= QUINN_CORRECTION_TUNING.premiseChallenge.strongThreshold
+      ? 'strong'
+      : premiseChallengeScore >= QUINN_CORRECTION_TUNING.premiseChallenge.lightThreshold
+        ? 'light'
+        : 'none';
+  const realityAnchorModeId: QuinnRealityAnchorModeId =
+    premiseChallengeId === 'strong'
+      ? 'repairFrame'
+      : premiseChallengeId === 'light'
+        ? assistantSelfClaimRiskId === 'strong'
+          ? 'repairFrame'
+          : 'softenPersona'
+        : 'normal';
+  const suppressConcreteSelfStatus =
+    premiseChallengeId !== 'none' && assistantSelfClaimRiskId !== 'none';
 
   const dominantConstraintScore =
     dominantConstraint.score +
@@ -474,14 +593,21 @@ export function inferQuinnCorrectionState({
       ? 0.9
       : clarificationOverrideId === 'partial'
         ? 0.35
+        : 0) +
+    (premiseChallengeId === 'strong'
+      ? 0.9
+      : premiseChallengeId === 'light'
+        ? 0.35
         : 0);
 
   const correctionLatchId: QuinnCorrectionLatchId =
     clarificationOverrideId === 'dominant' ||
+    premiseChallengeId === 'strong' ||
     exactRepeatScore >= QUINN_CORRECTION_TUNING.repeatGuard.exactThreshold ||
     correctionLatchScore >= QUINN_CORRECTION_TUNING.correctionLatch.hardThreshold
       ? 'hard'
       : clarificationOverrideId === 'partial' ||
+          premiseChallengeId === 'light' ||
           correctionLatchScore >= QUINN_CORRECTION_TUNING.correctionLatch.softThreshold ||
           dominantConstraintScore >= QUINN_CORRECTION_TUNING.constraintPriority.dominantThreshold
         ? 'soft'
@@ -504,6 +630,8 @@ export function inferQuinnCorrectionState({
   const correctionSignals = uniqueItems([
     ...hardCorrection.signals,
     ...softCorrection.signals,
+    ...strongPremiseChallenge.signals,
+    ...lightPremiseChallenge.signals,
     ...dominantClarification.signals,
     ...partialClarification.signals,
     ...(repeatGuardId !== 'none' ? ['the user is rejecting a just-used line or joke'] : []),
@@ -525,6 +653,7 @@ export function inferQuinnCorrectionState({
     constraintPriorityId !== 'none' ? 'prior suggestion or desire momentum' : '',
     correctionLatchId !== 'none' ? 'prior frame' : '',
     clarificationOverrideId !== 'none' ? 'older interpretation or meaning guess' : '',
+    premiseChallengeId !== 'none' ? 'literal assistant self-status premise' : '',
     repeatGuardId !== 'none'
       ? REPEAT_OBJECT_PATTERNS.some((pattern) => pattern.test(clean))
         ? 'prior joke or line'
@@ -532,16 +661,41 @@ export function inferQuinnCorrectionState({
       : '',
   ]);
 
-  const acknowledgmentStyleId: QuinnAcknowledgmentStyleId =
-    repeatGuardId !== 'none'
-      ? 'briefOwnIt'
-      : clarificationOverrideId !== 'none' ||
-          correctionLatchId === 'hard' ||
-          constraintPriorityId === 'dominant'
-        ? 'briefPivot'
-      : correctionLatchId === 'soft' || constraintPriorityId === 'elevated'
-          ? 'briefPivot'
-          : 'none';
+  let acknowledgmentStyleId: QuinnAcknowledgmentStyleId = 'none';
+
+  if (repeatGuardId !== 'none' || premiseChallengeId === 'strong') {
+    acknowledgmentStyleId = 'briefOwnIt';
+  } else if (
+    premiseChallengeId === 'light' ||
+    clarificationOverrideId !== 'none' ||
+    correctionLatchId === 'hard' ||
+    correctionLatchId === 'soft' ||
+    constraintPriorityId === 'dominant' ||
+    constraintPriorityId === 'elevated'
+  ) {
+    acknowledgmentStyleId = 'briefPivot';
+  }
+
+  const premiseChallengePromptGuidance =
+    premiseChallengeId === 'strong'
+      ? "The user is directly challenging Quinn's literal reality or self-claims. Repair the frame instead of continuing the fictional premise as fact."
+      : premiseChallengeId === 'light'
+        ? "The user is questioning whether Quinn's human-style framing is literal. Keep the personality, but stop leaning harder into offscreen life claims."
+        : 'No explicit premise challenge is active.';
+
+  const assistantSelfClaimPromptGuidance =
+    assistantSelfClaimRiskId === 'strong'
+      ? 'The previous Quinn move leaned on concrete offscreen logistics or workload detail. Treat that as risky to continue literally once challenged.'
+      : assistantSelfClaimRiskId === 'light'
+        ? 'The previous Quinn move carried some everyday-life self-status detail. Keep it light or nonliteral if the user questions it.'
+        : 'No elevated assistant self-claim risk is active from the immediately previous move.';
+
+  const realityAnchorPromptGuidance =
+    realityAnchorModeId === 'repairFrame'
+      ? 'Repair the frame. Keep Quinn’s texture, but say the earlier self-status was tone, metaphor, or bit logic rather than literal biography. Do not keep deadlines, vendors, schedules, or workload as factual offscreen life.'
+      : realityAnchorModeId === 'softenPersona'
+        ? 'Soften persona into vibe rather than literal self-biography. Keep the human feel, but stop implying a concrete offscreen Quinn life.'
+        : 'No special reality-anchor repair is active.';
 
   const clarificationPromptGuidance =
     clarificationOverrideId === 'dominant'
@@ -601,6 +755,29 @@ export function inferQuinnCorrectionState({
       blockedRecentText,
       promptGuidance: repeatPromptGuidance,
     },
+    premiseChallenge: {
+      id: premiseChallengeId,
+      score: premiseChallengeScore,
+      signals: uniqueItems([
+        ...strongPremiseChallenge.signals,
+        ...lightPremiseChallenge.signals,
+      ]),
+      promptGuidance: premiseChallengePromptGuidance,
+    },
+    assistantSelfClaimRisk: {
+      id: assistantSelfClaimRiskId,
+      score: assistantSelfClaimScore,
+      signals: uniqueItems([
+        ...strongAssistantSelfClaim.signals,
+        ...lightAssistantSelfClaim.signals,
+      ]),
+      promptGuidance: assistantSelfClaimPromptGuidance,
+    },
+    realityAnchorMode: {
+      id: realityAnchorModeId,
+      promptGuidance: realityAnchorPromptGuidance,
+    },
+    suppressConcreteSelfStatus,
     clarificationOverride: {
       id: clarificationOverrideId,
       score: clarificationScore,
@@ -619,11 +796,17 @@ export function inferQuinnCorrectionState({
     },
     invalidatedTargets,
     promptGuidance: [
+      `Premise challenge: ${premiseChallengeId}. ${premiseChallengePromptGuidance}`,
+      `Assistant self-claim risk: ${assistantSelfClaimRiskId}. ${assistantSelfClaimPromptGuidance}`,
+      `Reality anchor mode: ${realityAnchorModeId}. ${realityAnchorPromptGuidance}`,
       `Clarification override: ${clarificationOverrideId}. ${clarificationPromptGuidance}`,
       `Correction latch: ${correctionLatchId}. ${correctionPromptGuidance}`,
       `Constraint priority: ${constraintPriorityId}. ${constraintPromptGuidance}`,
       `Repeat guard: ${repeatGuardId}. ${repeatPromptGuidance}`,
       `Acknowledgment style: ${acknowledgmentStyleId}. ${acknowledgmentPromptGuidance}`,
+      suppressConcreteSelfStatus
+        ? 'Suppress concrete assistant self-status continuation for this run.'
+        : 'No explicit concrete assistant self-status suppression is active.',
       invalidatedTargets.length
         ? `Treat these as invalidated or secondary now: ${invalidatedTargets.join(', ')}.`
         : 'No specific prior target needs to be actively invalidated.',
@@ -634,16 +817,23 @@ export function inferQuinnCorrectionState({
 export function buildQuinnCorrectionPacketContext({
   packetText,
   sessionArc = null,
+  previousAssistantReply = '',
 }: {
   packetText: string;
   sessionArc?: SessionArc | null;
+  previousAssistantReply?: string;
 }) {
   const correction = inferQuinnCorrectionState({
     packetText,
     sessionArc,
+    previousAssistantReply,
   });
 
   const activeGuidance = [
+    correction.premiseChallenge.id !== 'none' ? correction.premiseChallenge.promptGuidance : '',
+    correction.realityAnchorMode.id !== 'normal'
+      ? correction.realityAnchorMode.promptGuidance
+      : '',
     correction.clarificationOverride.id !== 'none'
       ? correction.clarificationOverride.promptGuidance
       : '',

@@ -539,6 +539,13 @@ function resolveFinalAskStance({
   }
 
   if (
+    correction.realityAnchorMode.id === 'repairFrame' ||
+    correction.premiseChallenge.id === 'strong'
+  ) {
+    resolved = 'noAsk';
+  }
+
+  if (
     correction.clarificationOverride.id !== 'none' ||
     correction.correctionLatch.id !== 'none' ||
     correction.constraintPriority.id !== 'none' ||
@@ -584,6 +591,8 @@ function resolveFinalMemoryExpression({
   riff: QuinnRiffInference;
 }): QuinnMemoryExpressionId {
   if (
+    correction.realityAnchorMode.id !== 'normal' ||
+    correction.premiseChallenge.id !== 'none' ||
     correction.clarificationOverride.id !== 'none' ||
     correction.correctionLatch.id !== 'none' ||
     correction.constraintPriority.id !== 'none' ||
@@ -660,6 +669,9 @@ function inferElasticity({
   scores.micro += challenge.id === 'directChallenge' ? 0.7 : 0;
   scores.micro += correction.clarificationOverride.id === 'dominant' ? 1.05 : 0;
   scores.micro += correction.clarificationOverride.id === 'partial' ? 0.45 : 0;
+  scores.micro += correction.premiseChallenge.id === 'strong' ? 1.15 : 0;
+  scores.micro += correction.premiseChallenge.id === 'light' ? 0.45 : 0;
+  scores.micro += correction.realityAnchorMode.id === 'repairFrame' ? 0.7 : 0;
   scores.micro += correction.correctionLatch.id === 'hard' ? 1.15 : 0;
   scores.micro += correction.constraintPriority.id === 'dominant' ? 0.85 : 0;
   scores.micro += correction.repeatGuard.id !== 'none' ? 0.75 : 0;
@@ -680,6 +692,7 @@ function inferElasticity({
   scores.short += resolveAskCount > 0 ? 0.25 : 0;
   scores.short += wordCount > 0 && wordCount <= 42 ? 0.2 : 0;
   scores.short += correction.clarificationOverride.id === 'partial' ? 0.35 : 0;
+  scores.short += correction.premiseChallenge.id === 'light' ? 0.35 : 0;
   scores.short += correction.correctionLatch.id === 'soft' ? 0.35 : 0;
   scores.short += correction.constraintPriority.id === 'elevated' ? 0.25 : 0;
   scores.short +=
@@ -697,6 +710,8 @@ function inferElasticity({
   scores.medium +=
     threadContinuity.hasActiveThread && threadContinuity.frameContinuation ? 0.25 : 0;
   scores.medium -= turnRole.turnRoleAnchor.id === 'userReply' ? 0.4 : 0;
+  scores.medium -= correction.premiseChallenge.id === 'strong' ? 0.85 : 0;
+  scores.medium -= correction.premiseChallenge.id === 'light' ? 0.25 : 0;
   scores.medium -= correction.clarificationOverride.id === 'dominant' ? 0.85 : 0;
   scores.medium -= correction.clarificationOverride.id === 'partial' ? 0.25 : 0;
   scores.medium -= correction.correctionLatch.id === 'hard' ? 0.7 : 0;
@@ -711,6 +726,8 @@ function inferElasticity({
   scores.expanded += motifs.length > 1 ? 0.55 : 0;
   scores.expanded += energy.id === 'hypedIntense' && riff.id !== 'resolve' ? 0.25 : 0;
   scores.expanded += resolveAskCount >= 2 ? 0.35 : 0;
+  scores.expanded -= correction.premiseChallenge.id === 'strong' ? 1.15 : 0;
+  scores.expanded -= correction.premiseChallenge.id === 'light' ? 0.35 : 0;
   scores.expanded -= correction.clarificationOverride.id === 'dominant' ? 1.15 : 0;
   scores.expanded -= correction.clarificationOverride.id === 'partial' ? 0.4 : 0;
   scores.expanded -= correction.correctionLatch.id === 'hard' ? 1.1 : 0;
@@ -841,6 +858,22 @@ function buildArbitrationNotes({
     );
   }
 
+  if (correction.premiseChallenge.id === 'strong') {
+    notes.push("The user is questioning Quinn's literal premise or self-claims. Repair the frame instead of escalating the bit.");
+  } else if (correction.premiseChallenge.id === 'light') {
+    notes.push("The user's note is pushing on whether Quinn's human-like framing is literal. Keep the personality, but stop leaning harder into offscreen life claims.");
+  }
+
+  if (correction.realityAnchorMode.id === 'repairFrame') {
+    notes.push('Keep the human texture, but say the earlier self-status was tone or metaphor rather than literal offscreen biography.');
+  } else if (correction.realityAnchorMode.id === 'softenPersona') {
+    notes.push('Soften persona into vibe rather than literal self-biography for this turn.');
+  }
+
+  if (correction.suppressConcreteSelfStatus) {
+    notes.push("Concrete assistant self-status is risky here. Do not keep deadlines, vendors, schedules, or workload details alive as Quinn's factual life.");
+  }
+
   if (finalMemoryExpression === 'implicit') {
     notes.push('Keep continuity metabolized. Let memory sharpen the framing quietly instead of surfacing it.');
   }
@@ -909,6 +942,7 @@ export function inferQuinnConductor({
   const correction = inferQuinnCorrectionState({
     packetText,
     sessionArc,
+    previousAssistantReply,
   });
   const energy = inferQuinnEnergyState({
     packetText,

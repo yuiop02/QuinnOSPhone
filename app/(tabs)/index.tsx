@@ -141,8 +141,8 @@ type VisibleReplySource = {
   lensId: QuinnLensId;
 };
 
-const HEADER_HEIGHT = 236;
-const FADE_WALL_HEIGHT = 296;
+const HEADER_HEIGHT = 254;
+const FADE_WALL_HEIGHT = 324;
 const WINDOW_WIDTH = Dimensions.get('window').width;
 const QUINN_LENSES = getQuinnLenses();
 const SNAPSHOT_PERSIST_DEBOUNCE_MS = 250;
@@ -1049,117 +1049,128 @@ const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
 
   return (
     <View pointerEvents="none" style={styles.fixedHeaderShell}>
-      <Animated.View
-        style={[
-          styles.headerAuraLarge,
-          {
-            opacity: auraOpacity,
-            transform: [{ scale: auraScale }],
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.headerAuraSmall,
-          {
-            opacity: shimmerOpacity,
-            transform: [{ translateX: titleDriftX }],
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.headerNebulaRing,
-          {
-            opacity: shimmerOpacity,
-            transform: [{ translateX: titleDriftX }],
-          },
-        ]}
-      />
+      <View style={styles.headerPanel}>
+        <View style={styles.headerPanelGlow} />
+        <View style={styles.headerPanelWarmGlow} />
+        <View style={styles.headerPanelCoreBloom} />
+        <View style={styles.headerPanelRingPrimary} />
+        <View style={styles.headerPanelRingSecondary} />
+        <View style={styles.headerPanelTailArc} />
+        <View style={styles.headerPanelSheen} />
 
-      <Animated.View
-        style={[
-          styles.headerSparkle,
-          styles.headerSparkleOne,
-          {
-            opacity: shimmerOpacity,
-            transform: [{ translateY: sparkleFloat }],
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.headerSparkle,
-          styles.headerSparkleTwo,
-          {
-            opacity: shimmerOpacity,
-            transform: [{ translateY: titleLift }],
-          },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.headerSparkle,
-          styles.headerSparkleThree,
-          {
-            opacity: shimmerOpacity,
-            transform: [{ translateY: sparkleFloat }, { translateX: titleDriftX }],
-          },
-        ]}
-      />
+        <Animated.View
+          style={[
+            styles.headerAuraLarge,
+            {
+              opacity: auraOpacity,
+              transform: [{ scale: auraScale }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.headerAuraSmall,
+            {
+              opacity: shimmerOpacity,
+              transform: [{ translateX: titleDriftX }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.headerNebulaRing,
+            {
+              opacity: shimmerOpacity,
+              transform: [{ translateX: titleDriftX }],
+            },
+          ]}
+        />
 
-      <View style={styles.headerOverlineRow}>
-        <View style={styles.headerOverlineDot} />
-      </View>
+        <Animated.View
+          style={[
+            styles.headerSparkle,
+            styles.headerSparkleOne,
+            {
+              opacity: shimmerOpacity,
+              transform: [{ translateY: sparkleFloat }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.headerSparkle,
+            styles.headerSparkleTwo,
+            {
+              opacity: shimmerOpacity,
+              transform: [{ translateY: titleLift }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.headerSparkle,
+            styles.headerSparkleThree,
+            {
+              opacity: shimmerOpacity,
+              transform: [{ translateY: sparkleFloat }, { translateX: titleDriftX }],
+            },
+          ]}
+        />
 
-      <Animated.View
-        style={[
-          styles.heroTitleWrap,
-          {
-            transform: [
-              { translateY: titleLift },
-              { translateX: titleDriftX },
-              { scale: titleScale },
-            ],
-          },
-        ]}
-      >
-        <View style={styles.titleGlowBlobA} />
-        <View style={styles.titleGlowBlobB} />
-
-        <Text style={styles.headerQuinnGlow}>Quinn</Text>
-
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.headerQuinn}>
-            <Text style={styles.headerQuinnQ}>Q</Text>
-            <Text style={styles.headerQuinnRest}>uinn</Text>
-          </Text>
-
-          <Animated.View
-            style={[
-              styles.headerVersionCapsule,
-              {
-                transform: [{ rotate: badgeRotate }],
-              },
-            ]}
-          >
-            <View style={styles.headerVersionShine} />
-            <Text style={styles.headerVersionText}>2.0</Text>
-          </Animated.View>
+        <View style={styles.headerOverlineRow}>
+          <View style={styles.headerOverlineDot} />
+          <Text style={styles.headerOverline}>MAIN PORTAL</Text>
         </View>
-      </Animated.View>
 
-      <Animated.Text
-        style={[
-          styles.fixedIntroText,
-          {
-            transform: [{ translateY: introLift }],
-          },
-        ]}
-      >
-        When the real Quinn is too busy painting or crying over a man who didn&apos;t
-        deserve her, Quinn 2.0 can tell you what she&apos;d say in the meantime.
-      </Animated.Text>
+        <Animated.View
+          style={[
+            styles.heroTitleWrap,
+            {
+              transform: [
+                { translateY: titleLift },
+                { translateX: titleDriftX },
+                { scale: titleScale },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.titleGlowBlobA} />
+          <View style={styles.titleGlowBlobB} />
+
+          <Text style={styles.headerQuinnGlow}>Quinn</Text>
+
+          <View style={styles.headerTitleRow}>
+            <Text style={styles.headerQuinn}>
+              <Text style={styles.headerQuinnQ}>Q</Text>
+              <Text style={styles.headerQuinnRest}>uinn</Text>
+            </Text>
+
+            <Animated.View
+              style={[
+                styles.headerVersionCapsule,
+                {
+                  transform: [{ rotate: badgeRotate }],
+                },
+              ]}
+            >
+              <View style={styles.headerVersionShine} />
+              <Text style={styles.headerVersionText}>2.0</Text>
+            </Animated.View>
+          </View>
+        </Animated.View>
+
+        <Animated.Text
+          style={[
+            styles.fixedIntroText,
+            {
+              transform: [{ translateY: introLift }],
+            },
+          ]}
+        >
+          When the real Quinn is too busy painting or crying over a man who didn&apos;t
+          deserve her, Quinn 2.0 can tell you what she&apos;d say in the meantime.
+        </Animated.Text>
+      </View>
     </View>
   );
 });
@@ -2019,6 +2030,10 @@ function QuinnConversationSurface({
       syncVisibleInput: true,
     });
 
+    if (runResult) {
+      onChangePacketText('');
+    }
+
     const speakText = String(runResult?.written || '').trim();
 
     if (speakText) {
@@ -2039,23 +2054,33 @@ function QuinnConversationSurface({
   showsVerticalScrollIndicator={false}
   scrollEventThrottle={16}
 >
-      <Animated.View
-        style={[
-          styles.cardFloatWrap,
-          {
-            transform: [{ translateY: composerLift }],
-          },
-        ]}
-      >
-        <View style={styles.commandStage}>
-          <Animated.View
-            style={[
-              styles.composerShell,
-              {
-                transform: [{ scale: focusScale }],
-              },
-            ]}
-          >
+      <View style={styles.conversationStageShell}>
+        <View pointerEvents="none" style={styles.conversationStageVeil} />
+        <View pointerEvents="none" style={styles.conversationStageGlowPrimary} />
+        <View pointerEvents="none" style={styles.conversationStageGlowSecondary} />
+        <View pointerEvents="none" style={styles.conversationStageGlowWarm} />
+        <View pointerEvents="none" style={styles.conversationStageRingPrimary} />
+        <View pointerEvents="none" style={styles.conversationStageRingSecondary} />
+        <View pointerEvents="none" style={styles.conversationStageTailArc} />
+        <View pointerEvents="none" style={styles.conversationStageSheen} />
+
+        <Animated.View
+          style={[
+            styles.cardFloatWrap,
+            {
+              transform: [{ translateY: composerLift }],
+            },
+          ]}
+        >
+          <View style={styles.commandStage}>
+            <Animated.View
+              style={[
+                styles.composerShell,
+                {
+                  transform: [{ scale: focusScale }],
+                },
+              ]}
+            >
           <Animated.View
             pointerEvents="none"
             style={[
@@ -2343,19 +2368,19 @@ function QuinnConversationSurface({
         </View>
       </Animated.View>
 
-      <Animated.View
-        style={[
-          styles.cardFloatWrap,
-          {
-            opacity: responseCardOpacity,
-            transform: [
-              { translateY: responseCardTranslate },
-              { translateY: responseLift },
-            ],
-          },
-        ]}
-      >
-        <View style={styles.heroResponseCard}>
+        <Animated.View
+          style={[
+            styles.cardFloatWrap,
+            {
+              opacity: responseCardOpacity,
+              transform: [
+                { translateY: responseCardTranslate },
+                { translateY: responseLift },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.heroResponseCard}>
           <Animated.View
             pointerEvents="none"
             style={[
@@ -2529,8 +2554,9 @@ function QuinnConversationSurface({
               </View>
             </View>
           </View>
-        </View>
-      </Animated.View>
+          </View>
+        </Animated.View>
+      </View>
     </ScrollView>
   );
 }
@@ -3737,6 +3763,100 @@ appOrbitRingB: {
   paddingBottom: 12,
 },
 
+  headerPanel: {
+  overflow: 'hidden',
+  position: 'relative',
+  minHeight: 212,
+  borderRadius: 36,
+  borderWidth: 1,
+  borderColor: SURFACE_THEME.borderStrong,
+  backgroundColor: SURFACE_THEME.heroPanel,
+  paddingHorizontal: 20,
+  paddingTop: 16,
+  paddingBottom: 18,
+  shadowColor: SURFACE_THEME.shadow,
+  shadowOpacity: 0.54,
+  shadowRadius: 40,
+  shadowOffset: { width: 0, height: 24 },
+  elevation: 12,
+},
+
+  headerPanelGlow: {
+  position: 'absolute',
+  top: -62,
+  left: -34,
+  width: 360,
+  height: 236,
+  borderRadius: 999,
+  backgroundColor: SURFACE_THEME.plumGlow,
+},
+
+  headerPanelWarmGlow: {
+  position: 'absolute',
+  top: -12,
+  right: 38,
+  width: 210,
+  height: 160,
+  borderRadius: 999,
+  backgroundColor: SURFACE_THEME.portalWarm,
+},
+
+  headerPanelCoreBloom: {
+  position: 'absolute',
+  top: 18,
+  left: 168,
+  width: 198,
+  height: 124,
+  borderRadius: 999,
+  backgroundColor: SURFACE_THEME.portalHot,
+},
+
+  headerPanelRingPrimary: {
+  position: 'absolute',
+  top: 18,
+  right: 18,
+  width: 244,
+  height: 124,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: SURFACE_THEME.orbital,
+  transform: [{ rotate: '-14deg' }],
+},
+
+  headerPanelRingSecondary: {
+  position: 'absolute',
+  bottom: -16,
+  right: 72,
+  width: 218,
+  height: 96,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: SURFACE_THEME.portalTail,
+  transform: [{ rotate: '12deg' }],
+},
+
+  headerPanelTailArc: {
+  position: 'absolute',
+  top: 74,
+  right: 124,
+  width: 186,
+  height: 70,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 212, 233, 0.12)',
+  transform: [{ rotate: '20deg' }],
+},
+
+  headerPanelSheen: {
+  position: 'absolute',
+  top: 8,
+  left: 14,
+  right: 14,
+  height: 24,
+  borderRadius: 999,
+  backgroundColor: SURFACE_THEME.glassHighlight,
+},
+
   headerAuraLarge: {
   position: 'absolute',
   top: -52,
@@ -4037,8 +4157,112 @@ headerVersionShine: {
 
   quinnConversationScroll: {
     paddingHorizontal: 20,
-    paddingTop: HEADER_HEIGHT + 4,
+    paddingTop: HEADER_HEIGHT + 10,
     paddingBottom: 108,
+  },
+
+  conversationStageShell: {
+    position: 'relative',
+    width: '100%',
+    maxWidth: 1600,
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 18,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+
+  conversationStageVeil: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 42,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.portalEdge,
+    backgroundColor: SURFACE_THEME.heroPanelSoft,
+    shadowColor: SURFACE_THEME.shadow,
+    shadowOpacity: 0.32,
+    shadowRadius: 34,
+    shadowOffset: { width: 0, height: 20 },
+  },
+
+  conversationStageGlowPrimary: {
+    position: 'absolute',
+    top: -52,
+    left: -10,
+    width: 420,
+    height: 240,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.portalGlow,
+  },
+
+  conversationStageGlowSecondary: {
+    position: 'absolute',
+    top: 82,
+    right: -18,
+    width: 360,
+    height: 280,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.violetCore,
+  },
+
+  conversationStageGlowWarm: {
+    position: 'absolute',
+    right: 72,
+    top: 24,
+    width: 260,
+    height: 180,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.portalWarm,
+  },
+
+  conversationStageRingPrimary: {
+    position: 'absolute',
+    top: 22,
+    right: 28,
+    width: 236,
+    height: 124,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.orbital,
+    transform: [{ rotate: '-12deg' }],
+  },
+
+  conversationStageRingSecondary: {
+    position: 'absolute',
+    bottom: 8,
+    left: 22,
+    width: 212,
+    height: 112,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.portalTail,
+    transform: [{ rotate: '14deg' }],
+  },
+
+  conversationStageTailArc: {
+    position: 'absolute',
+    top: 86,
+    right: 118,
+    width: 220,
+    height: 80,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 216, 236, 0.12)',
+    transform: [{ rotate: '18deg' }],
+  },
+
+  conversationStageSheen: {
+    position: 'absolute',
+    top: 10,
+    left: 16,
+    right: 16,
+    height: 28,
+    borderRadius: 999,
+    backgroundColor: SURFACE_THEME.glassHighlight,
   },
 
   quinnScroll: {
@@ -4115,7 +4339,7 @@ headerVersionShine: {
 },
 
   commandStage: {
-  marginBottom: 20,
+  marginBottom: 18,
   position: 'relative',
   zIndex: 1,
   width: '100%',
