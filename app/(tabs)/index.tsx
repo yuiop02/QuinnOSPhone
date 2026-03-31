@@ -1169,6 +1169,8 @@ function QuinnConversationSurface({
   const [isSpeakingResponse, setIsSpeakingResponse] = useState(false);
   const [playbackSource, setPlaybackSource] = useState<string | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
+  const [showResponseDetails, setShowResponseDetails] = useState(false);
+  const [showThreadDetails, setShowThreadDetails] = useState(false);
 
   const speechChunksRef = useRef<string[]>([]);
   const speechActiveChunkIndexRef = useRef(-1);
@@ -1221,9 +1223,9 @@ function QuinnConversationSurface({
         : 'No extra pull needed',
     },
   ];
-  const responseFooterHint = writtenResult
-    ? 'Stage next move turns this reply into the next packet so Quinn can keep carrying the same thought.'
-    : 'Once Quinn answers, you can stage the next move to keep the thought going or start fresh for a clean topic.';
+  const responseMetaLine = `${responseLens.label} lens • ${sessionArc ? 'Carrying thread' : 'Fresh thread'}`;
+  const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
+  const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
   const {
     composerLift,
@@ -1256,6 +1258,10 @@ function QuinnConversationSurface({
   });
 
   useEffect(() => {
+    setShowResponseDetails(false);
+  }, [writtenResult]);
+
+  useEffect(() => {
     let isActive = true;
 
     async function checkVoice() {
@@ -1272,6 +1278,10 @@ function QuinnConversationSurface({
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    setShowThreadDetails(false);
+  }, [sessionArc?.id]);
 
   // Speech playback is index-driven so finish handling never depends on destructive
   // queue mutation during active playback.
@@ -2117,14 +2127,14 @@ function QuinnConversationSurface({
               </View>
 
               {sessionArc ? (
-                <View style={styles.sessionArcRail}>
-                  <View style={styles.sessionArcHeaderRow}>
-                    <View style={styles.sessionArcCopy}>
-                      <Text style={styles.sessionArcEyebrow}>Session arc</Text>
-                      <Text style={styles.sessionArcTitle} numberOfLines={1}>
+                <View style={styles.threadManagerRail}>
+                  <View style={styles.threadManagerRow}>
+                    <View style={styles.threadManagerCopy}>
+                      <Text style={styles.threadManagerEyebrow}>Thread</Text>
+                      <Text style={styles.threadManagerTitle} numberOfLines={1}>
                         {sessionArc.title}
                       </Text>
-                      <Text style={styles.sessionArcMeta}>
+                      <Text style={styles.threadManagerMeta}>
                         {sessionArcMeta.stepLabel}
                         {sessionArcMeta.continuityLabel
                           ? ` • ${sessionArcMeta.continuityLabel}`
@@ -2132,13 +2142,32 @@ function QuinnConversationSurface({
                       </Text>
                     </View>
 
-                    <Pressable style={styles.sessionArcResetChip} onPress={onStartFreshArc}>
-                      <Text style={styles.sessionArcResetChipText}>Start fresh</Text>
-                    </Pressable>
+                    <View style={styles.threadManagerActions}>
+                      {hasThreadDetails ? (
+                        <Pressable
+                          style={styles.threadManagerActionChip}
+                          onPress={() => setShowThreadDetails((prev) => !prev)}
+                        >
+                          <Text style={styles.threadManagerActionChipText}>
+                            {showThreadDetails ? 'Hide details' : 'Details'}
+                          </Text>
+                          <Feather
+                            name={showThreadDetails ? 'chevron-up' : 'chevron-down'}
+                            size={14}
+                            color="rgba(235, 240, 255, 0.72)"
+                          />
+                        </Pressable>
+                      ) : null}
+
+                      <Pressable style={styles.threadManagerResetChip} onPress={onStartFreshArc}>
+                        <Text style={styles.threadManagerResetChipText}>New thread</Text>
+                      </Pressable>
+                    </View>
                   </View>
 
-                  {sessionArcMeta.beats.length ? (
-                    <View style={styles.sessionArcBeatRow}>
+                  {showThreadDetails && hasThreadDetails ? (
+                    <View style={styles.threadManagerDetails}>
+                      <View style={styles.sessionArcBeatRow}>
                       {sessionArcMeta.beats.map((beat) => (
                         <View key={beat.id} style={styles.sessionArcBeat}>
                           <Text style={styles.sessionArcBeatLabel}>{beat.lensLabel}</Text>
@@ -2147,6 +2176,7 @@ function QuinnConversationSurface({
                           </Text>
                         </View>
                       ))}
+                      </View>
                     </View>
                   ) : null}
                 </View>
@@ -2294,18 +2324,42 @@ function QuinnConversationSurface({
             <View style={styles.responseHeaderRow}>
               <View style={styles.responseHeaderTextWrap}>
                 <Text style={styles.responseLabel}>Quinn 2.0 reply</Text>
-                <View style={styles.responseContextRow}>
-                  {responseContextItems.map((item) => (
-                    <View key={item.label} style={styles.responseContextChip}>
-                      <Text style={styles.responseContextChipLabel}>{item.label}</Text>
-                      <Text style={styles.responseContextChipValue} numberOfLines={2}>
-                        {item.value}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
+                <Text style={styles.responseMetaLine}>{responseMetaLine}</Text>
+              </View>
+              {hasResponseDetails ? (
+                <Pressable
+                  style={styles.responseDetailsToggle}
+                  onPress={() => setShowResponseDetails((prev) => !prev)}
+                >
+                  <Text style={styles.responseDetailsToggleText}>
+                    {showResponseDetails ? 'Hide details' : 'Details'}
+                  </Text>
+                  <Feather
+                    name={showResponseDetails ? 'chevron-up' : 'chevron-down'}
+                    size={14}
+                    color="rgba(227, 233, 248, 0.76)"
+                  />
+                </Pressable>
+              ) : null}
+            </View>
+
+            <Text style={styles.heroResponseBody}>
+              {writtenResult ||
+                'Ask something outrageous, practical, or heartbreak-adjacent and Quinn 2.0 will answer here.'}
+            </Text>
+
+            {showResponseDetails && hasResponseDetails ? (
+              <View style={styles.responseDetailsPanel}>
+                <Text style={styles.responseDetailsEyebrow}>Thread details</Text>
+                {responseContextItems.map((item) => (
+                  <View key={item.label} style={styles.responseDetailRow}>
+                    <Text style={styles.responseDetailLabel}>{item.label}</Text>
+                    <Text style={styles.responseDetailValue}>{item.value}</Text>
+                  </View>
+                ))}
+
                 {memoryResonance.length ? (
-                  <View style={styles.memoryResonanceWrap}>
+                  <View style={styles.responseDetailsSection}>
                     <Text style={styles.memoryResonanceEyebrow}>Why this felt personal</Text>
                     <View style={styles.memoryResonanceRow}>
                       {memoryResonance.slice(0, 4).map((item, index) => (
@@ -2323,12 +2377,7 @@ function QuinnConversationSurface({
                   </View>
                 ) : null}
               </View>
-            </View>
-
-            <Text style={styles.heroResponseBody}>
-              {writtenResult ||
-                'Ask something outrageous, practical, or heartbreak-adjacent and Quinn 2.0 will answer here.'}
-            </Text>
+            ) : null}
 
             <View style={styles.responseFooterRow}>
               <Pressable
@@ -2382,7 +2431,6 @@ function QuinnConversationSurface({
                 </Animated.View>
               </View>
             </View>
-            <Text style={styles.responseFooterHint}>{responseFooterHint}</Text>
           </View>
         </View>
       </Animated.View>
@@ -2663,6 +2711,12 @@ export default function App() {
     const stayOnScreen = override?.stayOnScreen ?? true;
     const syncVisibleInput = override?.syncVisibleInput ?? true;
     const sessionArcForRun = override?.sessionArc ?? currentSessionArc;
+    const runThreadId =
+      String(sessionArcForRun?.id || '').trim() || activeThreadIdRef.current;
+    const previousAssistantReply =
+      lastAssistantResponseRef.current?.threadId === runThreadId
+        ? lastAssistantResponseRef.current.text
+        : '';
     const activeLensLabel = getQuinnLens(effectiveLensId).label;
     const selectedOptionIndex = parseBareNumericSelection(rawNextText);
     const selectedOption =
@@ -2721,6 +2775,8 @@ export default function App() {
         packetText: nextText,
         lensId: effectiveLensId,
         sessionArc: sessionArcForRun,
+        previousAssistantReply,
+        threadId: runThreadId,
       });
 
       if (activeRunTokenRef.current !== runToken) {
@@ -4015,6 +4071,101 @@ headerVersionShine: {
     fontWeight: '500',
   },
 
+  threadManagerRail: {
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(204, 214, 255, 0.07)',
+    backgroundColor: 'rgba(7, 11, 20, 0.54)',
+  },
+
+  threadManagerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  threadManagerCopy: {
+    flex: 1,
+    paddingRight: 10,
+  },
+
+  threadManagerEyebrow: {
+    color: 'rgba(187, 196, 225, 0.48)',
+    fontSize: 9.5,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    marginBottom: 4,
+  },
+
+  threadManagerTitle: {
+    color: '#F4F7FF',
+    fontSize: 13.5,
+    lineHeight: 18,
+    fontWeight: '800',
+    letterSpacing: -0.15,
+    marginBottom: 2,
+  },
+
+  threadManagerMeta: {
+    color: 'rgba(206, 214, 236, 0.54)',
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '500',
+  },
+
+  threadManagerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+
+  threadManagerActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(214, 222, 255, 0.09)',
+    backgroundColor: 'rgba(10, 14, 24, 0.62)',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginRight: 7,
+  },
+
+  threadManagerActionChipText: {
+    color: 'rgba(235, 240, 255, 0.72)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginRight: 4,
+  },
+
+  threadManagerResetChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(214, 222, 255, 0.07)',
+    backgroundColor: 'rgba(8, 12, 21, 0.48)',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+
+  threadManagerResetChipText: {
+    color: 'rgba(245, 248, 255, 0.70)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+  },
+
+  threadManagerDetails: {
+    marginTop: 9,
+    paddingTop: 9,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(204, 214, 255, 0.06)',
+  },
+
   sessionArcRail: {
     marginBottom: 14,
     paddingHorizontal: 14,
@@ -4552,8 +4703,8 @@ cardOrbGlowWarm: {
   borderColor: 'rgba(255,255,255,0.08)',
   backgroundColor: 'rgba(7, 10, 18, 0.985)',
   paddingHorizontal: 30,
-  paddingTop: 24,
-  paddingBottom: 24,
+  paddingTop: 22,
+  paddingBottom: 22,
 },
 
   spokenInnerFrame: {
@@ -4587,8 +4738,8 @@ cardOrbGlowWarm: {
   responseHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 14,
+    alignItems: 'center',
+    marginBottom: 10,
   },
 
   responseHeaderTextWrap: {
@@ -4688,8 +4839,81 @@ cardOrbGlowWarm: {
   lineHeight: 18,
   fontWeight: '800',
   letterSpacing: 0.9,
-  marginBottom: 10,
+  marginBottom: 4,
 },
+
+  responseMetaLine: {
+  color: 'rgba(190, 198, 224, 0.56)',
+  fontSize: 11.5,
+  lineHeight: 16,
+  fontWeight: '600',
+  letterSpacing: 0.08,
+},
+
+  responseDetailsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 220, 255, 0.08)',
+    backgroundColor: 'rgba(10, 13, 22, 0.72)',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginLeft: 12,
+  },
+
+  responseDetailsToggleText: {
+    color: 'rgba(227, 233, 248, 0.76)',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '700',
+    marginRight: 6,
+  },
+
+  responseDetailsPanel: {
+    marginTop: 16,
+    marginBottom: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(206, 214, 255, 0.08)',
+    backgroundColor: 'rgba(9, 12, 21, 0.70)',
+  },
+
+  responseDetailsEyebrow: {
+    color: 'rgba(188, 198, 226, 0.54)',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1.3,
+    marginBottom: 10,
+  },
+
+  responseDetailRow: {
+    marginBottom: 10,
+  },
+
+  responseDetailLabel: {
+    color: 'rgba(184, 193, 219, 0.56)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 1.05,
+    marginBottom: 3,
+  },
+
+  responseDetailValue: {
+    color: 'rgba(242, 246, 255, 0.84)',
+    fontSize: 12.2,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+
+  responseDetailsSection: {
+    marginTop: 8,
+  },
 
   responseSubLabel: {
     color: 'rgba(226, 231, 246, 0.68)',
@@ -4724,16 +4948,7 @@ cardOrbGlowWarm: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 22,
-  },
-
-  responseFooterHint: {
-    color: 'rgba(200, 207, 231, 0.54)',
-    fontSize: 11.5,
-    lineHeight: 17,
-    fontWeight: '500',
-    marginTop: 12,
-    maxWidth: 720,
+    marginTop: 18,
   },
 
   responseFooterActions: {
