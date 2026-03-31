@@ -558,9 +558,9 @@ function resolveFinalAskStance({
   if (
     turnRole.turnRoleAnchor.id === 'userReply' &&
     turnRole.previousAssistantAskedQuestion &&
-    resolved === 'ask'
+    turnRole.shouldSuppressAssistantStatusPattern
   ) {
-    resolved = 'optionalAsk';
+    resolved = 'noAsk';
   }
 
   if ((energy.id === 'tenderSoft' || riff.id === 'deepRiff') && resolved === 'ask') {
@@ -798,7 +798,7 @@ function buildArbitrationNotes({
     turnRole.turnRoleAnchor.id === 'userReply' &&
     turnRole.previousAssistantAskedQuestion
   ) {
-    notes.push("The newest user turn is answering Quinn here. Respond to their update directly instead of replaying Quinn's earlier stance.");
+    notes.push("The newest user turn is answering Quinn here. Respond to their update directly instead of replaying Quinn's earlier stance or tossing the same question back again.");
   } else if (turnRole.turnRoleAnchor.id === 'userAsk') {
     notes.push('The newest user turn is a fresh ask for Quinn. Answer that directly instead of extending the old answer pattern.');
   } else if (turnRole.turnRoleAnchor.id === 'userClarification') {

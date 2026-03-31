@@ -74,13 +74,13 @@ const USER_REPLY_PATTERNS: readonly QuinnTurnRoleSignalPattern[] = [
     score: 1.0,
   },
   {
-    pattern: /\b(?:i(?:'m| am)\s+(?:good|fine|okay|ok|alright|pretty good|not bad|tired|sleepy|busy|scattered)|i(?:'m| am)\s+just)\b/i,
+    pattern: /\b(?:i(?:'m| am|m)\s+(?:good|fine|okay|ok|alright|pretty good|not bad|tired|sleepy|busy|scattered)|i(?:'m| am|m)\s+just)\b/i,
     label: 'the newest turn gives a first-person status update',
     score: 0.9,
   },
   {
-    pattern: /\b(?:just eating|eating breakfast|heading to bed|working on|tweaking|making|fixing|building)\b/i,
-    label: 'the newest turn adds concrete current-life detail',
+    pattern: /\b(?:like i just said|as i just said|i just said|just eating|eating breakfast|having breakfast|after breakfast|heading to bed|working on|tweaking|making|fixing|building|sitting in|sitting at|hanging in|hanging at)\b/i,
+    label: 'the newest turn adds concrete current-life detail or explicitly continues the user side of the exchange',
     score: 0.7,
   },
 ];
@@ -136,6 +136,38 @@ function countWords(text: string) {
   return cleanText(text).split(/\s+/).filter(Boolean).length;
 }
 
+function countRegex(text: string, pattern: RegExp) {
+  const matches = text.match(pattern);
+  return matches ? matches.length : 0;
+}
+
+function inferDirectAnswerBoost(text: string) {
+  let score = 0;
+
+  score += countRegex(
+    text,
+    /\b(?:i(?:'m| am|m)\b|i've\b|i was\b|i just\b|i kinda\b|i kind of\b|my\b|me\b)\b/gi
+  ) * 0.18;
+  score += countRegex(
+    text,
+    /\b(?:sitting|eating|having|heading|working|tweaking|making|fixing|building|hanging|laying|lying|trying|finishing|winding down|chilling)\b/gi
+  ) * 0.14;
+  score += countRegex(
+    text,
+    /\b(?:right now|currently|after|after having|at the moment|tonight|today|in the kitchen|at home|in bed)\b/gi
+  ) * 0.12;
+
+  if (/^(?:like i just said|as i just said)\b/i.test(text)) {
+    score += 0.55;
+  }
+
+  if (!/\?\s*$/.test(text) && /\b(?:i(?:'m| am|m)|i just|my|me)\b/i.test(text)) {
+    score += 0.2;
+  }
+
+  return score;
+}
+
 function collectPatternHits(
   text: string,
   patterns: readonly QuinnTurnRoleSignalPattern[]
@@ -188,6 +220,7 @@ export function inferQuinnTurnRoleState({
     userAskHits.score < 0.85
       ? 0.25
       : 0;
+  userReplyScore += previousAssistantAskedQuestion ? inferDirectAnswerBoost(cleanPacket) : 0;
   userReplyScore -= userClarificationHits.score > 0 ? 0.35 : 0;
 
   let userAskScore = userAskHits.score;
