@@ -8,6 +8,7 @@ import { buildQuinnEndingPacketContext } from './quinnEndingState';
 import { buildQuinnMemoryExpressionPacketContext } from './quinnMemoryExpressionState';
 import { buildQuinnPolishPacketContext } from './quinnPolishState';
 import { buildQuinnRiffPacketContext } from './quinnRiffState';
+import { buildQuinnTurnRolePacketContext } from './quinnTurnRoleState';
 import { buildQuinnThreadContinuityPacketContext } from './quinnThreadContinuityState';
 import { buildQuinnTexturePacketContext } from './quinnTextureState';
 import { buildSessionArcPacketContext } from './quinnSessionArc';
@@ -104,18 +105,25 @@ export function buildQuinnPacket({
   packetText,
   lensId = DEFAULT_QUINN_LENS_ID,
   sessionArc = null,
+  previousAssistantReply = '',
 }: {
   packetTitle: string;
   packetText: string;
   lensId?: QuinnLensId;
   sessionArc?: SessionArc | null;
+  previousAssistantReply?: string;
 }) {
   const lens = getQuinnLens(lensId);
   const safeTitle = cleanPacketValue(packetTitle) || 'Untitled packet';
   const safeText = String(packetText || '').trim();
+  const safePreviousAssistantReply = String(previousAssistantReply || '').trim();
   const threadContinuityContext = buildQuinnThreadContinuityPacketContext({
     packetText: safeText,
     sessionArc,
+  });
+  const turnRoleContext = buildQuinnTurnRolePacketContext({
+    packetText: safeText,
+    previousAssistantReply: safePreviousAssistantReply,
   });
   const sessionArcContext = buildSessionArcPacketContext(
     sessionArc,
@@ -153,6 +161,7 @@ export function buildQuinnPacket({
     packetText: safeText,
     sessionArc,
     lensMode: lens.mode,
+    previousAssistantReply: safePreviousAssistantReply,
   });
   const askContext = buildQuinnAskPacketContext({
     packetText: safeText,
@@ -228,8 +237,19 @@ export function buildQuinnPacket({
       'FRAME CONTINUATION',
       threadContinuityContext.threadContinuity.frameContinuation ? 'true' : 'false'
     ),
+    listPacketSection('TURN ROLE ANCHOR', turnRoleContext.turnRole.turnRoleAnchor.id),
+    listPacketSection(
+      'PREVIOUS ASSISTANT ASKED QUESTION',
+      turnRoleContext.turnRole.previousAssistantAskedQuestion ? 'true' : 'false'
+    ),
+    listPacketSection('ADJACENCY MODE', turnRoleContext.turnRole.adjacencyMode.id),
+    listPacketSection(
+      'SUPPRESS ASSISTANT STATUS PATTERN',
+      turnRoleContext.turnRole.shouldSuppressAssistantStatusPattern ? 'true' : 'false'
+    ),
     listPacketSection('LOCAL COURSE CORRECTION', correctionContext.context),
     listPacketSection('THREAD CONTINUITY POLICY', threadContinuityContext.context),
+    listPacketSection('TURN ROLE POLICY', turnRoleContext.context),
     listPacketSection('MEMORY EXPRESSION', memoryExpressionContext.context),
     listPacketSection('PERSONALITY TEXTURE', textureContext.context),
     listPacketSection('RIFF STANCE', riffContext.context),

@@ -38,6 +38,10 @@ import {
   type QuinnThreadContinuityInference,
 } from './quinnThreadContinuityState';
 import {
+  inferQuinnTurnRoleState,
+  type QuinnTurnRoleInference,
+} from './quinnTurnRoleState';
+import {
   inferQuinnTexture,
   type QuinnTextureId,
 } from './quinnTextureState';
@@ -509,6 +513,7 @@ function resolveFinalAskStance({
   ask,
   correction,
   threadContinuity,
+  turnRole,
   ending,
   challenge,
   energy,
@@ -517,6 +522,7 @@ function resolveFinalAskStance({
   ask: QuinnAskInference;
   correction: QuinnCorrectionInference;
   threadContinuity: QuinnThreadContinuityInference;
+  turnRole: QuinnTurnRoleInference;
   ending: QuinnEndingStyleInference;
   challenge: QuinnChallengeInference;
   energy: QuinnEnergyInference;
@@ -547,6 +553,14 @@ function resolveFinalAskStance({
     threadContinuity.liveSubjectDominance.id === 'high'
   ) {
     resolved = 'noAsk';
+  }
+
+  if (
+    turnRole.turnRoleAnchor.id === 'userReply' &&
+    turnRole.previousAssistantAskedQuestion &&
+    resolved === 'ask'
+  ) {
+    resolved = 'optionalAsk';
   }
 
   if ((energy.id === 'tenderSoft' || riff.id === 'deepRiff') && resolved === 'ask') {
@@ -606,6 +620,7 @@ function inferElasticity({
   packetText,
   correction,
   threadContinuity,
+  turnRole,
   energy,
   challenge,
   riff,
@@ -617,6 +632,7 @@ function inferElasticity({
   packetText: string;
   correction: QuinnCorrectionInference;
   threadContinuity: QuinnThreadContinuityInference;
+  turnRole: QuinnTurnRoleInference;
   energy: QuinnEnergyInference;
   challenge: QuinnChallengeInference;
   riff: QuinnRiffInference;
@@ -651,6 +667,11 @@ function inferElasticity({
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
       ? 0.8
       : 0;
+  scores.micro +=
+    turnRole.turnRoleAnchor.id === 'userReply' &&
+    turnRole.previousAssistantAskedQuestion
+      ? 0.55
+      : 0;
   scores.micro -= riff.id === 'coBuild' ? 0.55 : 0;
   scores.micro -= riff.id === 'deepRiff' ? 0.95 : 0;
   scores.micro -= energy.id === 'tenderSoft' ? 0.25 : 0;
@@ -665,6 +686,7 @@ function inferElasticity({
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'soften'
       ? 0.25
       : 0;
+  scores.short += turnRole.turnRoleAnchor.id === 'userReply' ? 0.2 : 0;
 
   scores.medium += riff.id === 'coBuild' ? 0.8 : 0;
   scores.medium += energy.id === 'tenderSoft' ? 0.55 : 0;
@@ -674,6 +696,7 @@ function inferElasticity({
   scores.medium += wordCount > 42 ? 0.2 : 0;
   scores.medium +=
     threadContinuity.hasActiveThread && threadContinuity.frameContinuation ? 0.25 : 0;
+  scores.medium -= turnRole.turnRoleAnchor.id === 'userReply' ? 0.4 : 0;
   scores.medium -= correction.clarificationOverride.id === 'dominant' ? 0.85 : 0;
   scores.medium -= correction.clarificationOverride.id === 'partial' ? 0.25 : 0;
   scores.medium -= correction.correctionLatch.id === 'hard' ? 0.7 : 0;
@@ -697,6 +720,7 @@ function inferElasticity({
     threadContinuity.hasActiveThread && threadContinuity.staleFrameRisk.id === 'strong'
       ? 0.45
       : 0;
+  scores.expanded -= turnRole.turnRoleAnchor.id === 'userReply' ? 0.55 : 0;
 
   const winner =
     scores.expanded >= QUINN_CONDUCTOR_TUNING.elasticity.threshold.expanded
@@ -719,6 +743,7 @@ function inferElasticity({
 function buildArbitrationNotes({
   correction,
   threadContinuity,
+  turnRole,
   energyBlend,
   textureBlend,
   challengeBlend,
@@ -731,6 +756,7 @@ function buildArbitrationNotes({
 }: {
   correction: QuinnCorrectionInference;
   threadContinuity: QuinnThreadContinuityInference;
+  turnRole: QuinnTurnRoleInference;
   energyBlend: {
     primary: WeightedState<QuinnEnergyStateId>;
     secondary: WeightedState<QuinnEnergyStateId> | null;
@@ -766,6 +792,17 @@ function buildArbitrationNotes({
     } else if (threadContinuity.frameContinuation) {
       notes.push('Continuity can stay active because the newest note still appears to continue the same subject.');
     }
+  }
+
+  if (
+    turnRole.turnRoleAnchor.id === 'userReply' &&
+    turnRole.previousAssistantAskedQuestion
+  ) {
+    notes.push("The newest user turn is answering Quinn here. Respond to their update directly instead of replaying Quinn's earlier stance.");
+  } else if (turnRole.turnRoleAnchor.id === 'userAsk') {
+    notes.push('The newest user turn is a fresh ask for Quinn. Answer that directly instead of extending the old answer pattern.');
+  } else if (turnRole.turnRoleAnchor.id === 'userClarification') {
+    notes.push('The newest turn is clarifying the exchange. Replace the older read before you answer.');
   }
 
   if (
@@ -854,14 +891,20 @@ export function inferQuinnConductor({
   packetText,
   sessionArc = null,
   lensMode = 'adaptive',
+  previousAssistantReply = '',
 }: {
   packetText: string;
   sessionArc?: SessionArc | null;
   lensMode?: string;
+  previousAssistantReply?: string;
 }): QuinnConductorInference {
   const threadContinuity = inferQuinnThreadContinuity({
     packetText,
     sessionArc,
+  });
+  const turnRole = inferQuinnTurnRoleState({
+    packetText,
+    previousAssistantReply,
   });
   const correction = inferQuinnCorrectionState({
     packetText,
@@ -931,6 +974,7 @@ export function inferQuinnConductor({
     ask,
     correction,
     threadContinuity,
+    turnRole,
     ending,
     challenge,
     energy,
@@ -947,6 +991,7 @@ export function inferQuinnConductor({
     packetText,
     correction,
     threadContinuity,
+    turnRole,
     energy,
     challenge,
     riff,
@@ -958,6 +1003,7 @@ export function inferQuinnConductor({
   const arbitrationNotes = buildArbitrationNotes({
     correction,
     threadContinuity,
+    turnRole,
     energyBlend,
     textureBlend,
     challengeBlend,
@@ -984,6 +1030,7 @@ export function inferQuinnConductor({
     arbitrationNotes,
     promptGuidance: [
       ...correction.promptGuidance,
+      ...turnRole.promptGuidance,
       ...threadContinuity.promptGuidance,
       describeBlend('Energy blend', energyBlend),
       describeBlend('Texture blend', textureBlend),
@@ -1008,15 +1055,18 @@ export function buildQuinnConductorPacketContext({
   packetText,
   sessionArc = null,
   lensMode = 'adaptive',
+  previousAssistantReply = '',
 }: {
   packetText: string;
   sessionArc?: SessionArc | null;
   lensMode?: string;
+  previousAssistantReply?: string;
 }) {
   const conductor = inferQuinnConductor({
     packetText,
     sessionArc,
     lensMode,
+    previousAssistantReply,
   });
 
   return {

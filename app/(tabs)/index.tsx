@@ -2182,65 +2182,69 @@ function QuinnConversationSurface({
                 </View>
               ) : null}
 
-              <TextInput
-                multiline
-                value={packetText}
-                onChangeText={onChangePacketText}
-                onFocus={() => setInputFocused(true)}
-                onBlur={() => setInputFocused(false)}
-                placeholder="Type something impossible, petty, practical, emotional, or specific..."
-                placeholderTextColor="rgba(214, 221, 236, 0.56)"
-                style={styles.composerInput}
-                textAlignVertical="center"
-              />
+              <View style={styles.composerFieldShell}>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.composerActionDockGlow,
+                    {
+                      opacity: dockGlowOpacity,
+                    },
+                  ]}
+                />
 
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.composerActionDockGlow,
-                  {
-                    opacity: dockGlowOpacity,
-                  },
-                ]}
-              />
+                <View style={styles.composerFieldRow}>
+                  <TextInput
+                    multiline
+                    value={packetText}
+                    onChangeText={onChangePacketText}
+                    onFocus={() => setInputFocused(true)}
+                    onBlur={() => setInputFocused(false)}
+                    placeholder="Type what's actually going on..."
+                    placeholderTextColor="rgba(214, 221, 236, 0.44)"
+                    style={styles.composerInput}
+                    textAlignVertical="top"
+                  />
 
-              <View style={styles.composerActionDock}>
-                <View style={styles.composerActions}>
-                  <Pressable
-                    style={[
-                      styles.inlineIconButton,
-                      styles.inlineHeartButton,
-                      !canSend && styles.inlineHeartButtonDisabled,
-                    ]}
-                    onPress={handleRunTypedQuinn}
-                    disabled={!canSend}
-                  >
-                    {isRunning ? (
-                      <Text style={styles.inlineLoadingIcon}>…</Text>
-                    ) : (
-                      <Feather
-                        name="send"
-                        size={16}
-                        color={canSend ? '#FBFCFF' : 'rgba(251,252,255,0.40)'}
-                      />
-                    )}
-                  </Pressable>
+                  <View style={styles.composerActionDock}>
+                    <View style={styles.composerActions}>
+                      <Pressable
+                        style={[
+                          styles.inlineIconButton,
+                          styles.inlineHeartButton,
+                          !canSend && styles.inlineHeartButtonDisabled,
+                        ]}
+                        onPress={handleRunTypedQuinn}
+                        disabled={!canSend}
+                      >
+                        {isRunning ? (
+                          <Text style={styles.inlineLoadingIcon}>…</Text>
+                        ) : (
+                          <Feather
+                            name="send"
+                            size={16}
+                            color={canSend ? '#FBFCFF' : 'rgba(251,252,255,0.40)'}
+                          />
+                        )}
+                      </Pressable>
 
-                  {!recorderState.isRecording ? (
-                    <Pressable
-                      style={[styles.inlineIconButton, styles.inlineMicButton]}
-                      onPress={handleStartRecording}
-                    >
-                      <Feather name="mic" size={16} color="#FBFCFF" />
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      style={[styles.inlineIconButton, styles.inlineMicButtonActive]}
-                      onPress={handleStopRecording}
-                    >
-                      <Feather name="square" size={15} color="#FBFCFF" />
-                    </Pressable>
-                  )}
+                      {!recorderState.isRecording ? (
+                        <Pressable
+                          style={[styles.inlineIconButton, styles.inlineMicButton]}
+                          onPress={handleStartRecording}
+                        >
+                          <Feather name="mic" size={16} color="#FBFCFF" />
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          style={[styles.inlineIconButton, styles.inlineMicButtonActive]}
+                          onPress={handleStopRecording}
+                        >
+                          <Feather name="square" size={15} color="#FBFCFF" />
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
                 </View>
               </View>
             </View>
@@ -3986,18 +3990,18 @@ headerVersionShine: {
   borderColor: 'rgba(255,255,255,0.10)',
   backgroundColor: 'rgba(8, 12, 24, 0.985)',
   paddingLeft: 24,
-  paddingRight: 114,
-  paddingTop: 24,
-  paddingBottom: 22,
+  paddingRight: 24,
+  paddingTop: 22,
+  paddingBottom: 18,
 },
 
   lensRailWrap: {
-    marginBottom: 14,
-    paddingRight: 22,
+    marginBottom: 10,
+    paddingRight: 8,
   },
 
   threadTitleWrap: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   threadTitleEyebrow: {
@@ -4066,19 +4070,19 @@ headerVersionShine: {
 
   lensBlurb: {
     color: 'rgba(204, 212, 236, 0.54)',
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 11.5,
+    lineHeight: 17,
     fontWeight: '500',
   },
 
   threadManagerRail: {
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderRadius: 18,
+    marginBottom: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(204, 214, 255, 0.07)',
-    backgroundColor: 'rgba(7, 11, 20, 0.54)',
+    backgroundColor: 'rgba(7, 11, 20, 0.44)',
   },
 
   threadManagerRow: {
@@ -4121,6 +4125,7 @@ headerVersionShine: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 10,
+    alignSelf: 'flex-start',
   },
 
   threadManagerActionChip: {
@@ -4160,10 +4165,27 @@ headerVersionShine: {
   },
 
   threadManagerDetails: {
-    marginTop: 9,
-    paddingTop: 9,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(204, 214, 255, 0.06)',
+  },
+
+  composerFieldShell: {
+    position: 'relative',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(215, 224, 255, 0.10)',
+    backgroundColor: 'rgba(9, 13, 24, 0.82)',
+    paddingLeft: 16,
+    paddingRight: 12,
+    paddingTop: 14,
+    paddingBottom: 12,
+  },
+
+  composerFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
 
   sessionArcRail: {
@@ -4505,31 +4527,31 @@ cardOrbGlowWarm: {
   },
 
   composerInput: {
-  minHeight: 76,
+  flex: 1,
+  minHeight: 72,
   color: 'rgba(247, 249, 255, 0.96)',
-  fontSize: 17.6,
-  lineHeight: 28,
-  fontWeight: '600',
-  letterSpacing: -0.12,
+  fontSize: 15.5,
+  lineHeight: 24,
+  fontWeight: '500',
+  letterSpacing: -0.08,
   padding: 0,
-  paddingBottom: 6,
-  maxWidth: 1080,
+  paddingTop: 2,
+  paddingBottom: 4,
+  paddingRight: 12,
 },
 
   composerActionDockGlow: {
   position: 'absolute',
-  right: 10,
-  bottom: 10,
-  width: 106,
-  height: 58,
-  borderRadius: 29,
-  backgroundColor: 'rgba(214, 152, 216, 0.08)',
+  right: 12,
+  bottom: 12,
+  width: 100,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: 'rgba(214, 152, 216, 0.10)',
 },
 
   composerActionDock: {
-    position: 'absolute',
-    right: 10,
-    bottom: 10,
+    marginLeft: 10,
     paddingHorizontal: 6,
     paddingVertical: 6,
     borderRadius: 999,
