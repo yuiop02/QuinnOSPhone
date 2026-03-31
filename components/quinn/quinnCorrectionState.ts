@@ -101,6 +101,21 @@ const SOFT_CORRECTION_PATTERNS: readonly QuinnSignalPattern[] = [
     label: 'user is trying to hinge or correct the thought',
     score: 0.55,
   },
+  {
+    pattern: /\bthat(?:'s| was)\s+(?:kind of |a little |pretty |a bit )?(?:rude|harsh|mean|aggressive|out of pocket)\b/i,
+    label: 'user says the last reply landed too harshly',
+    score: 1.05,
+  },
+  {
+    pattern: /\b(?:came|coming) for (?:my throat|me)\b/i,
+    label: 'user says the last reply felt like an attack',
+    score: 1.15,
+  },
+  {
+    pattern: /\b(?:why are you coming for me|easy there|dial it back)\b/i,
+    label: 'user objects to the tone of the last reply',
+    score: 1,
+  },
 ];
 
 const DOMINANT_CONSTRAINT_PATTERNS: readonly QuinnSignalPattern[] = [

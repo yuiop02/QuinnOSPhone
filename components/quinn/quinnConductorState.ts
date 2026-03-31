@@ -527,8 +527,8 @@ function resolveFinalAskStance({
   }
 
   if (
-    correction.correctionLatch.id === 'hard' ||
-    correction.constraintPriority.id === 'dominant' ||
+    correction.correctionLatch.id !== 'none' ||
+    correction.constraintPriority.id !== 'none' ||
     correction.repeatGuard.id !== 'none'
   ) {
     resolved = 'noAsk';
@@ -553,7 +553,8 @@ function resolveFinalMemoryExpression({
   riff: QuinnRiffInference;
 }): QuinnMemoryExpressionId {
   if (
-    correction.correctionLatch.id === 'hard' ||
+    correction.correctionLatch.id !== 'none' ||
+    correction.constraintPriority.id !== 'none' ||
     correction.repeatGuard.id !== 'none'
   ) {
     return 'implicit';
