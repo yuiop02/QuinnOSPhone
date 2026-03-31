@@ -1,4 +1,5 @@
 import type { RunHistoryItem, SessionArc, SessionArcBeat } from './quinnTypes';
+import type { QuinnThreadContinuityInference } from './quinnThreadContinuityState';
 
 const MAX_SESSION_ARC_BEATS = 3;
 const GENERIC_TITLES = new Set(['quinn thread', 'quinnos sprint 2', 'untitled packet', 'next move']);
@@ -158,7 +159,10 @@ export function resumeSessionArcFromRun(run: RunHistoryItem): SessionArc | null 
   };
 }
 
-export function buildSessionArcPacketContext(sessionArc: SessionArc | null | undefined) {
+export function buildSessionArcPacketContext(
+  sessionArc: SessionArc | null | undefined,
+  threadContinuity: QuinnThreadContinuityInference | null = null
+) {
   if (!sessionArc) {
     return '';
   }
@@ -168,11 +172,24 @@ export function buildSessionArcPacketContext(sessionArc: SessionArc | null | und
     .map((beat) => cleanArcText(beat.summary, 110))
     .filter(Boolean)
     .join('\n');
+  const carryoverMode = threadContinuity?.threadCarryoverMode.id || 'soften';
+  const recentFlowLabel =
+    carryoverMode === 'keep'
+      ? 'Carryover that still seems live'
+      : carryoverMode === 'soften'
+        ? 'Background thread carryover'
+        : 'Background-only thread carryover';
+  const continuityPolicy =
+    carryoverMode === 'keep'
+      ? 'This still looks like the same live subject. Carry the thread forward only as far as the newest note keeps it alive.'
+      : carryoverMode === 'soften'
+        ? 'This is the same thread, but continuity is background support rather than the main subject. Let the newest note decide what the reply is actually about.'
+        : 'This is still the same thread, but the live subject has shifted. Do not keep extending the old scene, tone posture, or semantic frame.';
 
   return [
-    `This is still the same thread:\n${sessionArc.title}`,
-    recentFlow ? `What we were just circling:\n${recentFlow}` : '',
-    `Only carry it forward if it still fits:\nThis is turn ${sessionArc.stepCount}. If the new note has clearly shifted, answer the new thing instead of forcing the old thread. If the thread is still exploratory, stay with the exploration instead of pushing it into a conclusion too early, ending on advice just to make it feel useful, or shrinking a live thought into a cleaner answer before it is ready. Let continuity show up as quicker understanding and better calibration more often than as named callbacks to the thread itself.`,
+    `Same thread:\n${sessionArc.title}`,
+    recentFlow ? `${recentFlowLabel}:\n${recentFlow}` : '',
+    `Only carry it forward if it still fits:\nThis is turn ${sessionArc.stepCount}. ${continuityPolicy} If the thread is still exploratory, stay with the exploration instead of pushing it into a conclusion too early, ending on advice just to make it feel useful, or shrinking a live thought into a cleaner answer before it is ready. Let continuity show up as quicker understanding and better calibration more often than as named callbacks to the thread itself.`,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -191,8 +208,8 @@ export function buildSessionArcMeta(sessionArc: SessionArc | null | undefined) {
     stepLabel: `Step ${sessionArc.stepCount}`,
     continuityLabel:
       sessionArc.stepCount > 1
-        ? 'This thought is still carrying forward.'
-        : 'This thread just started.',
+        ? 'Carryover available if it still fits.'
+        : 'Thread just started.',
     beats: Array.isArray(sessionArc.beats) ? sessionArc.beats.slice(-3) : [],
   };
 }

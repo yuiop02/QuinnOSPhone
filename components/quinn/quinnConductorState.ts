@@ -34,6 +34,10 @@ import {
   type QuinnRiffStanceId,
 } from './quinnRiffState';
 import {
+  inferQuinnThreadContinuity,
+  type QuinnThreadContinuityInference,
+} from './quinnThreadContinuityState';
+import {
   inferQuinnTexture,
   type QuinnTextureId,
 } from './quinnTextureState';
@@ -504,6 +508,7 @@ function inferStructuralNoticing(packetText: string, sessionArc: SessionArc | nu
 function resolveFinalAskStance({
   ask,
   correction,
+  threadContinuity,
   ending,
   challenge,
   energy,
@@ -511,6 +516,7 @@ function resolveFinalAskStance({
 }: {
   ask: QuinnAskInference;
   correction: QuinnCorrectionInference;
+  threadContinuity: QuinnThreadContinuityInference;
   ending: QuinnEndingStyleInference;
   challenge: QuinnChallengeInference;
   energy: QuinnEnergyInference;
@@ -535,6 +541,14 @@ function resolveFinalAskStance({
     resolved = 'noAsk';
   }
 
+  if (
+    threadContinuity.hasActiveThread &&
+    threadContinuity.threadCarryoverMode.id === 'drop' &&
+    threadContinuity.liveSubjectDominance.id === 'high'
+  ) {
+    resolved = 'noAsk';
+  }
+
   if ((energy.id === 'tenderSoft' || riff.id === 'deepRiff') && resolved === 'ask') {
     resolved = 'optionalAsk';
   }
@@ -545,11 +559,13 @@ function resolveFinalAskStance({
 function resolveFinalMemoryExpression({
   memoryExpression,
   correction,
+  threadContinuity,
   energy,
   riff,
 }: {
   memoryExpression: QuinnMemoryExpressionInference;
   correction: QuinnCorrectionInference;
+  threadContinuity: QuinnThreadContinuityInference;
   energy: QuinnEnergyInference;
   riff: QuinnRiffInference;
 }): QuinnMemoryExpressionId {
@@ -558,6 +574,13 @@ function resolveFinalMemoryExpression({
     correction.correctionLatch.id !== 'none' ||
     correction.constraintPriority.id !== 'none' ||
     correction.repeatGuard.id !== 'none'
+  ) {
+    return 'implicit';
+  }
+
+  if (
+    threadContinuity.hasActiveThread &&
+    threadContinuity.threadCarryoverMode.id !== 'keep'
   ) {
     return 'implicit';
   }
@@ -582,6 +605,7 @@ function resolveFinalMemoryExpression({
 function inferElasticity({
   packetText,
   correction,
+  threadContinuity,
   energy,
   challenge,
   riff,
@@ -592,6 +616,7 @@ function inferElasticity({
 }: {
   packetText: string;
   correction: QuinnCorrectionInference;
+  threadContinuity: QuinnThreadContinuityInference;
   energy: QuinnEnergyInference;
   challenge: QuinnChallengeInference;
   riff: QuinnRiffInference;
@@ -622,6 +647,10 @@ function inferElasticity({
   scores.micro += correction.correctionLatch.id === 'hard' ? 1.15 : 0;
   scores.micro += correction.constraintPriority.id === 'dominant' ? 0.85 : 0;
   scores.micro += correction.repeatGuard.id !== 'none' ? 0.75 : 0;
+  scores.micro +=
+    threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
+      ? 0.8
+      : 0;
   scores.micro -= riff.id === 'coBuild' ? 0.55 : 0;
   scores.micro -= riff.id === 'deepRiff' ? 0.95 : 0;
   scores.micro -= energy.id === 'tenderSoft' ? 0.25 : 0;
@@ -632,6 +661,10 @@ function inferElasticity({
   scores.short += correction.clarificationOverride.id === 'partial' ? 0.35 : 0;
   scores.short += correction.correctionLatch.id === 'soft' ? 0.35 : 0;
   scores.short += correction.constraintPriority.id === 'elevated' ? 0.25 : 0;
+  scores.short +=
+    threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'soften'
+      ? 0.25
+      : 0;
 
   scores.medium += riff.id === 'coBuild' ? 0.8 : 0;
   scores.medium += energy.id === 'tenderSoft' ? 0.55 : 0;
@@ -639,10 +672,16 @@ function inferElasticity({
   scores.medium += motifs.length > 0 ? 0.35 : 0;
   scores.medium += resolveAskCount > 0 ? 0.3 : 0;
   scores.medium += wordCount > 42 ? 0.2 : 0;
+  scores.medium +=
+    threadContinuity.hasActiveThread && threadContinuity.frameContinuation ? 0.25 : 0;
   scores.medium -= correction.clarificationOverride.id === 'dominant' ? 0.85 : 0;
   scores.medium -= correction.clarificationOverride.id === 'partial' ? 0.25 : 0;
   scores.medium -= correction.correctionLatch.id === 'hard' ? 0.7 : 0;
   scores.medium -= correction.repeatGuard.id !== 'none' ? 0.4 : 0;
+  scores.medium -=
+    threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
+      ? 0.55
+      : 0;
 
   scores.expanded += riff.id === 'deepRiff' ? 1.35 : 0;
   scores.expanded += structural.id === 'strongNotice' ? 0.7 : 0;
@@ -654,6 +693,10 @@ function inferElasticity({
   scores.expanded -= correction.correctionLatch.id === 'hard' ? 1.1 : 0;
   scores.expanded -= correction.constraintPriority.id === 'dominant' ? 0.8 : 0;
   scores.expanded -= correction.repeatGuard.id !== 'none' ? 0.75 : 0;
+  scores.expanded -=
+    threadContinuity.hasActiveThread && threadContinuity.staleFrameRisk.id === 'strong'
+      ? 0.45
+      : 0;
 
   const winner =
     scores.expanded >= QUINN_CONDUCTOR_TUNING.elasticity.threshold.expanded
@@ -675,6 +718,7 @@ function inferElasticity({
 
 function buildArbitrationNotes({
   correction,
+  threadContinuity,
   energyBlend,
   textureBlend,
   challengeBlend,
@@ -686,6 +730,7 @@ function buildArbitrationNotes({
   motifs,
 }: {
   correction: QuinnCorrectionInference;
+  threadContinuity: QuinnThreadContinuityInference;
   energyBlend: {
     primary: WeightedState<QuinnEnergyStateId>;
     secondary: WeightedState<QuinnEnergyStateId> | null;
@@ -712,6 +757,16 @@ function buildArbitrationNotes({
   motifs: QuinnMotifResonance[];
 }) {
   const notes: string[] = [];
+
+  if (threadContinuity.hasActiveThread) {
+    if (threadContinuity.threadCarryoverMode.id === 'drop') {
+      notes.push('Same thread does not mean same subject here. Drop the stale frame and answer the newest note directly.');
+    } else if (threadContinuity.threadCarryoverMode.id === 'soften') {
+      notes.push('Keep continuity light. Let it speed up recognition without becoming the topic.');
+    } else if (threadContinuity.frameContinuation) {
+      notes.push('Continuity can stay active because the newest note still appears to continue the same subject.');
+    }
+  }
 
   if (
     (energyBlend.primary.id === 'tenderSoft' ||
@@ -804,6 +859,10 @@ export function inferQuinnConductor({
   sessionArc?: SessionArc | null;
   lensMode?: string;
 }): QuinnConductorInference {
+  const threadContinuity = inferQuinnThreadContinuity({
+    packetText,
+    sessionArc,
+  });
   const correction = inferQuinnCorrectionState({
     packetText,
     sessionArc,
@@ -871,6 +930,7 @@ export function inferQuinnConductor({
   const finalAsk = resolveFinalAskStance({
     ask,
     correction,
+    threadContinuity,
     ending,
     challenge,
     energy,
@@ -879,12 +939,14 @@ export function inferQuinnConductor({
   const finalMemoryExpression = resolveFinalMemoryExpression({
     memoryExpression,
     correction,
+    threadContinuity,
     energy,
     riff,
   });
   const elasticity = inferElasticity({
     packetText,
     correction,
+    threadContinuity,
     energy,
     challenge,
     riff,
@@ -895,6 +957,7 @@ export function inferQuinnConductor({
   });
   const arbitrationNotes = buildArbitrationNotes({
     correction,
+    threadContinuity,
     energyBlend,
     textureBlend,
     challengeBlend,
@@ -921,6 +984,7 @@ export function inferQuinnConductor({
     arbitrationNotes,
     promptGuidance: [
       ...correction.promptGuidance,
+      ...threadContinuity.promptGuidance,
       describeBlend('Energy blend', energyBlend),
       describeBlend('Texture blend', textureBlend),
       describeBlend('Challenge blend', challengeBlend),

@@ -8,6 +8,7 @@ import { buildQuinnEndingPacketContext } from './quinnEndingState';
 import { buildQuinnMemoryExpressionPacketContext } from './quinnMemoryExpressionState';
 import { buildQuinnPolishPacketContext } from './quinnPolishState';
 import { buildQuinnRiffPacketContext } from './quinnRiffState';
+import { buildQuinnThreadContinuityPacketContext } from './quinnThreadContinuityState';
 import { buildQuinnTexturePacketContext } from './quinnTextureState';
 import { buildSessionArcPacketContext } from './quinnSessionArc';
 
@@ -112,7 +113,14 @@ export function buildQuinnPacket({
   const lens = getQuinnLens(lensId);
   const safeTitle = cleanPacketValue(packetTitle) || 'Untitled packet';
   const safeText = String(packetText || '').trim();
-  const sessionArcContext = buildSessionArcPacketContext(sessionArc);
+  const threadContinuityContext = buildQuinnThreadContinuityPacketContext({
+    packetText: safeText,
+    sessionArc,
+  });
+  const sessionArcContext = buildSessionArcPacketContext(
+    sessionArc,
+    threadContinuityContext.threadContinuity
+  );
   const correctionContext = buildQuinnCorrectionPacketContext({
     packetText: safeText,
     sessionArc,
@@ -200,7 +208,28 @@ export function buildQuinnPacket({
       'ACKNOWLEDGMENT STYLE',
       correctionContext.correction.acknowledgmentStyle.id
     ),
+    listPacketSection(
+      'ACTIVE THREAD CONTINUITY',
+      threadContinuityContext.threadContinuity.hasActiveThread ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'LIVE SUBJECT DOMINANCE',
+      threadContinuityContext.threadContinuity.liveSubjectDominance.id
+    ),
+    listPacketSection(
+      'THREAD CARRYOVER MODE',
+      threadContinuityContext.threadContinuity.threadCarryoverMode.id
+    ),
+    listPacketSection(
+      'STALE FRAME RISK',
+      threadContinuityContext.threadContinuity.staleFrameRisk.id
+    ),
+    listPacketSection(
+      'FRAME CONTINUATION',
+      threadContinuityContext.threadContinuity.frameContinuation ? 'true' : 'false'
+    ),
     listPacketSection('LOCAL COURSE CORRECTION', correctionContext.context),
+    listPacketSection('THREAD CONTINUITY POLICY', threadContinuityContext.context),
     listPacketSection('MEMORY EXPRESSION', memoryExpressionContext.context),
     listPacketSection('PERSONALITY TEXTURE', textureContext.context),
     listPacketSection('RIFF STANCE', riffContext.context),
