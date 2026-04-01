@@ -607,6 +607,8 @@ function resolveFinalMemoryExpression({
 }): QuinnMemoryExpressionId {
   if (
     replyDiscipline.concreteSelfClaimSuppression.id === 'strong' ||
+    replyDiscipline.thirdPartyDraftMode ||
+    replyDiscipline.professionalToneGuard ||
     correction.socialFrameMode.id !== 'continue' ||
     correction.suppressEscalatedBounceback ||
     correction.realityAnchorMode.id !== 'normal' ||
@@ -951,6 +953,20 @@ function buildArbitrationNotes({
 
   if (replyDiscipline.draftCommentaryAllowance.id === 'low') {
     notes.push('On this drafting turn, return the usable line cleanly. Skip grammar asides, side jokes, and extra commentary around it.');
+  }
+
+  if (replyDiscipline.thirdPartyDraftMode) {
+    notes.push("This draft is for someone else. Keep Quinn's home-thread banter on the user's side and make the recipient-facing wording read as socially normal.");
+  }
+
+  if (replyDiscipline.flirtTransferSuppression.id === 'high') {
+    notes.push('Do not transfer flirt, romantic tension, spicy teasing, or attitude theater onto the recipient unless the user explicitly asked for that.');
+  } else if (replyDiscipline.flirtTransferSuppression.id === 'medium') {
+    notes.push('Keep recipient-facing tone appropriate and non-suggestive. Warmth is fine; flirt leakage is not.');
+  }
+
+  if (replyDiscipline.professionalToneGuard) {
+    notes.push('The recipient reads as a professional contact. Keep the line especially clean, appropriate, and non-flirty.');
   }
 
   if (finalMemoryExpression === 'implicit') {

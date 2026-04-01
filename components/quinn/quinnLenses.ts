@@ -235,6 +235,18 @@ export function buildQuinnPacket({
       conductorContext.conductor.replyDiscipline.draftCommentaryAllowance.id
     ),
     listPacketSection(
+      'RECIPIENT ROLE',
+      conductorContext.conductor.replyDiscipline.recipientRole.id
+    ),
+    listPacketSection(
+      'FLIRT TRANSFER SUPPRESSION',
+      conductorContext.conductor.replyDiscipline.flirtTransferSuppression.id
+    ),
+    listPacketSection(
+      'RECIPIENT BOUNDARY RISK',
+      conductorContext.conductor.replyDiscipline.recipientBoundaryRisk.id
+    ),
+    listPacketSection(
       'REPLY PRESENTATION MODE',
       conductorContext.conductor.replyDiscipline.replyPresentationMode.id
     ),
@@ -247,8 +259,20 @@ export function buildQuinnPacket({
       conductorContext.conductor.replyDiscipline.explicitPlayfulInvite ? 'true' : 'false'
     ),
     listPacketSection(
+      'EXPLICIT RECIPIENT FLIRT INVITE',
+      conductorContext.conductor.replyDiscipline.explicitRecipientFlirtInvite ? 'true' : 'false'
+    ),
+    listPacketSection(
       'SINGLE-LINE DRAFT REQUEST',
       conductorContext.conductor.replyDiscipline.singleLineDraftRequest ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'THIRD-PARTY DRAFT MODE',
+      conductorContext.conductor.replyDiscipline.thirdPartyDraftMode ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'PROFESSIONAL TONE GUARD',
+      conductorContext.conductor.replyDiscipline.professionalToneGuard ? 'true' : 'false'
     ),
     listPacketSection(
       'OPTION MENU SUPPRESSION',
