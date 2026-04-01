@@ -1,5 +1,6 @@
 import type { QuinnCorrectionInference } from './quinnCorrectionState';
 import type { QuinnReplyDisciplineInference } from './quinnReplyDisciplineState';
+import type { QuinnSpeakerContractInference } from './quinnSpeakerContractState';
 import type { QuinnThreadContinuityInference } from './quinnThreadContinuityState';
 import type { QuinnTurnRoleInference } from './quinnTurnRoleState';
 
@@ -63,12 +64,14 @@ export function inferQuinnConversationalCoherence({
   packetText,
   correction,
   replyDiscipline,
+  speakerContract,
   threadContinuity,
   turnRole,
 }: {
   packetText: string;
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  speakerContract: QuinnSpeakerContractInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
 }): QuinnConversationalCoherenceInference {
@@ -83,6 +86,8 @@ export function inferQuinnConversationalCoherence({
     (replyDiscipline.singleLineDraftRequest ? 0.7 : 0) +
     (replyDiscipline.thirdPartyDraftMode ? 0.8 : 0) +
     (replyDiscipline.thirdPartyGreetingMode ? 0.95 : 0) +
+    (speakerContract.speakerContract.id === 'metaAppDebug' ? 1.15 : 0) +
+    (speakerContract.speakerContract.id === 'draftForUser' ? 0.9 : 0) +
     (correction.correctionLatch.id !== 'none' ? 0.65 : 0) +
     (correction.clarificationOverride.id !== 'none' ? 0.75 : 0) +
     (correction.constraintPriority.id !== 'none' ? 0.55 : 0) +
@@ -93,6 +98,9 @@ export function inferQuinnConversationalCoherence({
     (replyDiscipline.thirdPartyGreetingMode ? 1.35 : 0) +
     (replyDiscipline.thirdPartyDraftMode ? 1.05 : 0) +
     (replyDiscipline.singleLineDraftRequest ? 0.85 : 0) +
+    (speakerContract.speakerPosition.id === 'onBehalfOfUser' ? 1.0 : 0) +
+    (speakerContract.speakerContract.id === 'metaAppDebug' ? 1.15 : 0) +
+    (speakerContract.speakerContract.id === 'mirrorToUser' ? 0.35 : 0) +
     (turnRole.turnRoleAnchor.id === 'userReply' ? 1.0 : 0) +
     (turnRole.turnRoleAnchor.id === 'userAsk' ? 0.9 : 0) +
     (turnRole.turnRoleAnchor.id === 'userClarification' ? 1.0 : 0) +
@@ -117,6 +125,9 @@ export function inferQuinnConversationalCoherence({
     (correction.premiseChallenge.id !== 'none' ? 0.8 : 0) +
     (correction.clarificationOverride.id !== 'none' ? 0.7 : 0) +
     (correction.clarificationOverride.interpretationReplacement ? 0.4 : 0) +
+    (speakerContract.roleValidationRisk.id === 'strong' ? 1.0 : 0) +
+    (speakerContract.roleValidationRisk.id === 'light' ? 0.45 : 0) +
+    (speakerContract.speakerContract.id === 'metaAppDebug' ? 0.8 : 0) +
     (replyDiscipline.thirdPartyGreetingMode ? 1.0 : 0) +
     (replyDiscipline.thirdPartyDraftMode ? 0.7 : 0) +
     (replyDiscipline.recipientBoundaryRisk.id !== 'none' ? 0.7 : 0) +
@@ -133,15 +144,19 @@ export function inferQuinnConversationalCoherence({
     (threadContinuity.staleFrameRisk.id === 'strong' ? 0.85 : 0) +
     (threadContinuity.staleFrameRisk.id === 'light' ? 0.35 : 0) +
     (turnRole.shouldSuppressAssistantStatusPattern ? 0.8 : 0) +
+    (speakerContract.metaRoleClarification ? 0.6 : 0) +
     (correction.repeatGuard.id !== 'none' ? 0.65 : 0) +
     (threadContinuity.frameContinuation && threadContinuity.liveSubjectDominance.id === 'low'
       ? 0.35
       : 0);
 
   const groundedReplyModeId: QuinnGroundedReplyModeId =
-    replyDiscipline.thirdPartyDraftMode || replyDiscipline.singleLineDraftRequest
+    speakerContract.speakerContract.id === 'draftForUser' ||
+    replyDiscipline.thirdPartyDraftMode ||
+    replyDiscipline.singleLineDraftRequest
       ? 'draft'
-      : threadContinuity.directComplaintAboutConversation ||
+      : speakerContract.speakerContract.id === 'metaAppDebug' ||
+          threadContinuity.directComplaintAboutConversation ||
           correction.correctionLatch.id !== 'none' ||
           correction.clarificationOverride.id !== 'none' ||
           correction.frameRejection.id !== 'none' ||
@@ -248,6 +263,9 @@ export function inferQuinnConversationalCoherence({
     ...(replyDiscipline.thirdPartyDraftMode
       ? ['the user wants wording for someone else']
       : []),
+    ...(speakerContract.speakerContract.id === 'metaAppDebug'
+      ? ['the turn is really about Quinn’s role or app behavior']
+      : []),
     ...(threadContinuity.directComplaintAboutConversation
       ? ['the user is explicitly challenging Quinn’s conversational fit']
       : []),
@@ -265,6 +283,9 @@ export function inferQuinnConversationalCoherence({
       : []),
     ...(replyDiscipline.thirdPartyGreetingMode
       ? ['recipient-facing drafting should stay simpler than home-thread banter']
+      : []),
+    ...(speakerContract.roleValidationRisk.id !== 'none'
+      ? ['speaker-position mistakes would distort the reply if left unchecked']
       : []),
   ]);
 

@@ -68,6 +68,13 @@ const INTERNAL_REPLY_SECTION_LABELS = new Set([
   'task',
   'output',
   'context',
+  'speaker contract',
+  'speaker position',
+  'speaker persona literalness',
+  'offscreen self allowance',
+  'role validation risk',
+  'meta role clarification',
+  'offscreen self disallowed',
   'premise challenge',
   'reality anchor mode',
   'assistant self-claim risk',
@@ -121,8 +128,10 @@ const INTERNAL_REPLY_SECTION_LABELS = new Set([
   'local course correction',
   'thread continuity policy',
   'thread continuity control',
+  'speaker contract control',
   'conversational coherence',
   'turn role policy',
+  'speaker contract policy',
 ]);
 
 function joinCleanParts(parts: string[], separator = '\n\n') {

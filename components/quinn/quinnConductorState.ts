@@ -50,6 +50,10 @@ import {
   type QuinnConversationalCoherenceInference,
 } from './quinnConversationalCoherenceState';
 import {
+  inferQuinnSpeakerContract,
+  type QuinnSpeakerContractInference,
+} from './quinnSpeakerContractState';
+import {
   inferQuinnTexture,
   type QuinnTextureId,
 } from './quinnTextureState';
@@ -99,6 +103,7 @@ export type QuinnStructuralInference = {
 export type QuinnConductorInference = {
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  speakerContract: QuinnSpeakerContractInference;
   conversationalCoherence: QuinnConversationalCoherenceInference;
   energyBlend: {
     primary: WeightedState<QuinnEnergyStateId>;
@@ -523,6 +528,7 @@ function resolveFinalAskStance({
   ask,
   correction,
   replyDiscipline,
+  speakerContract,
   conversationalCoherence,
   threadContinuity,
   turnRole,
@@ -534,6 +540,7 @@ function resolveFinalAskStance({
   ask: QuinnAskInference;
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  speakerContract: QuinnSpeakerContractInference;
   conversationalCoherence: QuinnConversationalCoherenceInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
@@ -562,6 +569,13 @@ function resolveFinalAskStance({
   }
 
   if (replyDiscipline.singleLineDraftRequest) {
+    resolved = 'noAsk';
+  }
+
+  if (
+    speakerContract.speakerContract.id === 'draftForUser' ||
+    speakerContract.speakerContract.id === 'metaAppDebug'
+  ) {
     resolved = 'noAsk';
   }
 
@@ -610,6 +624,7 @@ function resolveFinalMemoryExpression({
   memoryExpression,
   correction,
   replyDiscipline,
+  speakerContract,
   conversationalCoherence,
   threadContinuity,
   energy,
@@ -618,12 +633,16 @@ function resolveFinalMemoryExpression({
   memoryExpression: QuinnMemoryExpressionInference;
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  speakerContract: QuinnSpeakerContractInference;
   conversationalCoherence: QuinnConversationalCoherenceInference;
   threadContinuity: QuinnThreadContinuityInference;
   energy: QuinnEnergyInference;
   riff: QuinnRiffInference;
 }): QuinnMemoryExpressionId {
   if (
+    speakerContract.speakerContract.id === 'draftForUser' ||
+    speakerContract.speakerContract.id === 'metaAppDebug' ||
+    speakerContract.offscreenSelfDisallowed ||
     replyDiscipline.concreteSelfClaimSuppression.id === 'strong' ||
     replyDiscipline.thirdPartyDraftMode ||
     replyDiscipline.professionalToneGuard ||
@@ -677,6 +696,7 @@ function inferElasticity({
   packetText,
   correction,
   replyDiscipline,
+  speakerContract,
   conversationalCoherence,
   threadContinuity,
   turnRole,
@@ -691,6 +711,7 @@ function inferElasticity({
   packetText: string;
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  speakerContract: QuinnSpeakerContractInference;
   conversationalCoherence: QuinnConversationalCoherenceInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
@@ -732,6 +753,9 @@ function inferElasticity({
   scores.micro += correction.repeatGuard.id !== 'none' ? 0.75 : 0;
   scores.micro += replyDiscipline.singleLineDraftRequest ? 1.05 : 0;
   scores.micro += replyDiscipline.draftCommentaryAllowance.id === 'low' ? 0.45 : 0;
+  scores.micro += speakerContract.speakerContract.id === 'draftForUser' ? 0.7 : 0;
+  scores.micro += speakerContract.speakerContract.id === 'metaAppDebug' ? 0.65 : 0;
+  scores.micro += speakerContract.roleValidationRisk.id === 'strong' ? 0.35 : 0;
   scores.micro +=
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
       ? 0.8
@@ -770,6 +794,8 @@ function inferElasticity({
   scores.short += turnRole.turnRoleAnchor.id === 'userReply' ? 0.2 : 0;
   scores.short += replyDiscipline.casualStatusRestraint.id === 'high' ? 0.25 : 0;
   scores.short += replyDiscipline.draftCommentaryAllowance.id === 'low' ? 0.2 : 0;
+  scores.short += speakerContract.roleValidationRisk.id === 'light' ? 0.2 : 0;
+  scores.short += speakerContract.speakerContract.id === 'mirrorToUser' ? 0.1 : 0;
   scores.short +=
     conversationalCoherence.conversationalCoherencePriority.id === 'medium' ? 0.25 : 0;
   scores.short +=
@@ -794,6 +820,8 @@ function inferElasticity({
   scores.medium -= correction.correctionLatch.id === 'hard' ? 0.7 : 0;
   scores.medium -= correction.repeatGuard.id !== 'none' ? 0.4 : 0;
   scores.medium -= replyDiscipline.singleLineDraftRequest ? 0.95 : 0;
+  scores.medium -= speakerContract.speakerContract.id === 'draftForUser' ? 0.85 : 0;
+  scores.medium -= speakerContract.speakerContract.id === 'metaAppDebug' ? 0.95 : 0;
   scores.medium -= replyDiscipline.casualStatusRestraint.id === 'high' ? 0.35 : 0;
   scores.medium -=
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
@@ -821,6 +849,8 @@ function inferElasticity({
   scores.expanded -= correction.constraintPriority.id === 'dominant' ? 0.8 : 0;
   scores.expanded -= correction.repeatGuard.id !== 'none' ? 0.75 : 0;
   scores.expanded -= replyDiscipline.singleLineDraftRequest ? 1.2 : 0;
+  scores.expanded -= speakerContract.speakerContract.id === 'draftForUser' ? 1.1 : 0;
+  scores.expanded -= speakerContract.speakerContract.id === 'metaAppDebug' ? 1.2 : 0;
   scores.expanded -= replyDiscipline.casualStatusRestraint.id === 'high' ? 0.5 : 0;
   scores.expanded -=
     threadContinuity.hasActiveThread && threadContinuity.staleFrameRisk.id === 'strong'
@@ -856,6 +886,7 @@ function inferElasticity({
 function buildArbitrationNotes({
   correction,
   replyDiscipline,
+  speakerContract,
   conversationalCoherence,
   threadContinuity,
   turnRole,
@@ -871,6 +902,7 @@ function buildArbitrationNotes({
 }: {
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  speakerContract: QuinnSpeakerContractInference;
   conversationalCoherence: QuinnConversationalCoherenceInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
@@ -900,6 +932,32 @@ function buildArbitrationNotes({
   motifs: QuinnMotifResonance[];
 }) {
   const notes: string[] = [];
+
+  if (speakerContract.speakerContract.id === 'metaAppDebug') {
+    notes.push('This turn is about Quinn’s role, behavior, or app fit. Treat that as routing, not as just another conversational topic.');
+  } else if (speakerContract.speakerContract.id === 'draftForUser') {
+    notes.push('This turn is drafting on behalf of the user. Any first-person line belongs to the draft itself, not to Quinn claiming that position outside the draft.');
+  } else if (speakerContract.speakerContract.id === 'playfulBanter') {
+    notes.push('Playfulness is allowed, but Quinn still stays separate from the user and from any literal offscreen life.');
+  } else if (speakerContract.speakerContract.id === 'interpretiveMirror') {
+    notes.push('Interpret from close to the user’s perspective, but still answer as Quinn speaking back to them.');
+  } else {
+    notes.push('Quinn speaks to the user, not as the user. Let style ride on top of that contract.');
+  }
+
+  if (speakerContract.speakerPosition.id === 'separateFromUser') {
+    notes.push('Do not occupy the user’s literal first-person position or body on this turn.');
+  }
+
+  if (speakerContract.offscreenSelfDisallowed) {
+    notes.push('Do not improvise Quinn as a literal offscreen person with her own concrete schedule, logistics, or life obligations here.');
+  }
+
+  if (speakerContract.roleValidationRisk.id === 'strong') {
+    notes.push('Speaker correctness is load-bearing on this turn. If a stylish move violates the role contract, it is the wrong move.');
+  } else if (speakerContract.roleValidationRisk.id === 'light') {
+    notes.push('Keep an eye on speaker position. Do not let continuity or texture slide Quinn onto the wrong side of the glass.');
+  }
 
   if (conversationalCoherence.conversationalCoherencePriority.id === 'high') {
     notes.push('Start from the most ordinary socially coherent reading of the latest turn. Let Quinn texture layer on after that, not instead of it.');
@@ -1152,10 +1210,19 @@ export function inferQuinnConductor({
     sessionArc,
     previousAssistantReply,
   });
+  const speakerContract = inferQuinnSpeakerContract({
+    packetText,
+    lensMode,
+    correction,
+    replyDiscipline,
+    threadContinuity,
+    turnRole,
+  });
   const conversationalCoherence = inferQuinnConversationalCoherence({
     packetText,
     correction,
     replyDiscipline,
+    speakerContract,
     threadContinuity,
     turnRole,
   });
@@ -1223,6 +1290,7 @@ export function inferQuinnConductor({
     ask,
     correction,
     replyDiscipline,
+    speakerContract,
     conversationalCoherence,
     threadContinuity,
     turnRole,
@@ -1235,6 +1303,7 @@ export function inferQuinnConductor({
     memoryExpression,
     correction,
     replyDiscipline,
+    speakerContract,
     conversationalCoherence,
     threadContinuity,
     energy,
@@ -1244,6 +1313,7 @@ export function inferQuinnConductor({
     packetText,
     correction,
     replyDiscipline,
+    speakerContract,
     conversationalCoherence,
     threadContinuity,
     turnRole,
@@ -1258,6 +1328,7 @@ export function inferQuinnConductor({
   const arbitrationNotes = buildArbitrationNotes({
     correction,
     replyDiscipline,
+    speakerContract,
     conversationalCoherence,
     threadContinuity,
     turnRole,
@@ -1275,6 +1346,7 @@ export function inferQuinnConductor({
   return {
     correction,
     replyDiscipline,
+    speakerContract,
     conversationalCoherence,
     energyBlend,
     textureBlend,
@@ -1290,6 +1362,7 @@ export function inferQuinnConductor({
     promptGuidance: [
       ...correction.promptGuidance,
       ...replyDiscipline.promptGuidance,
+      ...speakerContract.promptGuidance,
       ...turnRole.promptGuidance,
       ...threadContinuity.promptGuidance,
       ...conversationalCoherence.promptGuidance,

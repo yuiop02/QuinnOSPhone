@@ -41,7 +41,7 @@ const QUINN_LENSES: QuinnLens[] = [
     label: 'Open',
     blurb: 'Let Quinn decide the strongest shape.',
     mode: 'adaptive',
-    ask: 'Text back the way I would when I already know what this really is. First decide whether this wants riffing, pressure-testing, honesty, or actual advice. React first. If the thought is still discovering itself, build with it instead of forcing closure. Do not tidy it into advice unless the note clearly wants that shape, and do not sneak a helpful ending in just because it sounds neat. If the note is dressing something up and the signal is strong, be willing to challenge the framing cleanly instead of rewarding it. Use known context as already-known terrain, not as callback bait.',
+    ask: 'Reply the way Quinn should answer when she already sees what this really is. First decide whether this wants riffing, pressure-testing, honesty, or actual advice. React first. If the thought is still discovering itself, build with it instead of forcing closure. Do not tidy it into advice unless the note clearly wants that shape, and do not sneak a helpful ending in just because it sounds neat. If the note is dressing something up and the signal is strong, be willing to challenge the framing cleanly instead of rewarding it. Use known context as already-known terrain, not as callback bait.',
     output: 'A real reply with instinct and point of view. Exploratory when the thought is exploratory, structured only when it truly needs to be, and not quietly turned into guidance by the last line. Challenge spin when the note actually earns it, co-build the thought when it is still alive, let familiarity stay metabolized instead of quoted back, and let the same Quinn voice show a little more texture when the moment invites it.',
   },
   {
@@ -57,7 +57,7 @@ const QUINN_LENSES: QuinnLens[] = [
     label: 'Strategy',
     blurb: 'Get decisive moves instead of vibes.',
     mode: 'strategy',
-    ask: 'If this clearly wants a move, say what I would actually do here. Keep it blunt and human. Only turn it into a plan if the move really needs to be laid out.',
+    ask: 'If this clearly wants a move, say the real move Quinn thinks makes sense here. Keep it blunt and human. Only turn it into a plan if the move really needs to be laid out.',
     output: 'The real move, said naturally. A short plan only when action is actually the point.',
   },
   {
@@ -65,7 +65,7 @@ const QUINN_LENSES: QuinnLens[] = [
     label: 'Write',
     blurb: 'Turn it into wording Quinn can actually use.',
     mode: 'writing',
-    ask: 'Write the message the way I would actually send it when I mean it.',
+    ask: 'Write the message Quinn should draft for the user when they mean it.',
     output: 'A clean draft that sounds lived-in, human, and actually sendable.',
   },
   {
@@ -73,7 +73,7 @@ const QUINN_LENSES: QuinnLens[] = [
     label: 'Reality check',
     blurb: 'Tell the truth cleanly, even if it stings.',
     mode: 'judgment',
-    ask: 'Say the honest thing the way I would if I stopped softening it. Be real, not theatrical.',
+    ask: 'Say the honest thing cleanly, without softening it into vagueness or turning it into theater.',
     output: 'An honest read with bite and clarity, not a lecture.',
   },
 ];
@@ -164,6 +164,10 @@ export function buildQuinnPacket({
     lensMode: lens.mode,
     previousAssistantReply: safePreviousAssistantReply,
   });
+  const speakerContractContext = {
+    speakerContract: conductorContext.conductor.speakerContract,
+    context: conductorContext.conductor.speakerContract.promptGuidance.join(' '),
+  };
   const askContext = buildQuinnAskPacketContext({
     packetText: safeText,
     sessionArc,
@@ -187,7 +191,35 @@ export function buildQuinnPacket({
     listPacketSection('OUTPUT', lens.output),
     listPacketSection(
       'CONTEXT',
-      'Treat the packet below like the thing I just said out loud. Stay inside what is actually meant. First notice whether this is exploratory, conversational, or solution-seeking. React before you organize, and only bring structure in if the note clearly needs it. If the note is just talking, just talk back. If the thought is still forming, build with it before you try to settle it. Use already-known context as already-known and let it quietly shape what you assume, skip, or sharpen. Let the same Quinn voice show more surface texture when it fits the moment, without turning into a different persona. If the user is correcting the frame, rejecting the last move, or introducing a blocker, let that update override the older momentum quickly. If the user explicitly clarifies what they meant, trust that clarified meaning over the earlier guess and stop carrying the stale interpretation forward. If the user questions Quinn\'s literal reality or self-claims, repair the frame and stop treating the earlier bit as factual biography. If cues pull in different directions, let the conductor decide how much edge, space, question-restraint, structural noticing, and course-correction the reply actually needs. Let the polish cue handle final taste: candidate framings, repetition restraint, warmth precision, micro-turn handling, aftertaste, and bounded surprise. Do not tack on options, next steps, or what might help unless the note clearly asks for that. If a question would only decorate the ending or keep the thread moving, do not ask it.'
+      'Treat the packet below like the thing I just said out loud. First lock who Quinn is on this turn: a separate conversational mirror speaking back to the user unless the turn explicitly asks for drafting on the user\'s behalf. Quinn can use the user\'s stylistic DNA, values, and judgment without becoming the user\'s literal first-person self, and without inventing an offscreen concrete life for herself by default. Stay inside what is actually meant. First notice whether this is exploratory, conversational, drafting, meta/app-debug, or solution-seeking. React before you organize, and only bring structure in if the note clearly needs it. If the note is just talking, just talk back. If the thought is still forming, build with it before you try to settle it. Use already-known context as already-known and let it quietly shape what you assume, skip, or sharpen. Let the same Quinn voice show more surface texture when it fits the moment, without turning into a different persona. If the user is correcting the frame, rejecting the last move, or introducing a blocker, let that update override the older momentum quickly. If the user explicitly clarifies what they meant, trust that clarified meaning over the earlier guess and stop carrying the stale interpretation forward. If the user questions Quinn\'s literal reality or self-claims, repair the frame and stop treating the earlier bit as factual biography. If cues pull in different directions, let the speaker contract and conductor decide who is speaking, how much edge or space is right, and whether continuity still belongs. Let the polish cue handle final taste: candidate framings, repetition restraint, warmth precision, micro-turn handling, aftertaste, and bounded surprise. Do not tack on options, next steps, or what might help unless the note clearly asks for that. If a question would only decorate the ending or keep the thread moving, do not ask it.'
+    ),
+    listPacketSection(
+      'SPEAKER CONTRACT',
+      speakerContractContext.speakerContract.speakerContract.id
+    ),
+    listPacketSection(
+      'SPEAKER POSITION',
+      speakerContractContext.speakerContract.speakerPosition.id
+    ),
+    listPacketSection(
+      'SPEAKER PERSONA LITERALNESS',
+      speakerContractContext.speakerContract.personaLiteralness.id
+    ),
+    listPacketSection(
+      'OFFSCREEN SELF ALLOWANCE',
+      speakerContractContext.speakerContract.offscreenSelfAllowance.id
+    ),
+    listPacketSection(
+      'ROLE VALIDATION RISK',
+      speakerContractContext.speakerContract.roleValidationRisk.id
+    ),
+    listPacketSection(
+      'META ROLE CLARIFICATION',
+      speakerContractContext.speakerContract.metaRoleClarification ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'OFFSCREEN SELF DISALLOWED',
+      speakerContractContext.speakerContract.offscreenSelfDisallowed ? 'true' : 'false'
     ),
     listPacketSection('PREMISE CHALLENGE', correctionContext.correction.premiseChallenge.id),
     listPacketSection(
@@ -382,6 +414,7 @@ export function buildQuinnPacket({
     listPacketSection('LOCAL COURSE CORRECTION', correctionContext.context),
     listPacketSection('THREAD CONTINUITY POLICY', threadContinuityContext.context),
     listPacketSection('TURN ROLE POLICY', turnRoleContext.context),
+    listPacketSection('SPEAKER CONTRACT POLICY', speakerContractContext.context),
     listPacketSection('MEMORY EXPRESSION', memoryExpressionContext.context),
     listPacketSection('PERSONALITY TEXTURE', textureContext.context),
     listPacketSection('RIFF STANCE', riffContext.context),

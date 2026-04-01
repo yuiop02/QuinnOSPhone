@@ -323,8 +323,13 @@ function inferCandidateFraming({
 }) {
   const clean = cleanText(packetText);
   const replyDiscipline = conductor.replyDiscipline;
+  const speakerContract = conductor.speakerContract;
 
-  if (replyDiscipline.singleLineDraftRequest) {
+  if (
+    replyDiscipline.singleLineDraftRequest ||
+    speakerContract.speakerContract.id === 'draftForUser' ||
+    speakerContract.speakerContract.id === 'metaAppDebug'
+  ) {
     return {
       ...CANDIDATE_FRAMING_PROFILES.single,
       score: 0,
@@ -630,6 +635,7 @@ function inferAftertaste({
   scores.assistantResidue += signatureGuard.id === 'high' ? 0.25 : 0;
   scores.assistantResidue += conductor.replyDiscipline.optionMenuSuppression ? 0.3 : 0;
   scores.assistantResidue += conductor.replyDiscipline.draftCommentaryAllowance.id === 'low' ? 0.45 : 0;
+  scores.assistantResidue += conductor.speakerContract.roleValidationRisk.id === 'strong' ? 0.4 : 0;
   scores.assistantResidue +=
     conductor.conversationalCoherence.conversationalCoherencePriority.id === 'high'
       ? 0.35
@@ -641,6 +647,7 @@ function inferAftertaste({
   scores.explanationResidue += conductor.structural.id === 'none' ? 0.25 : 0;
   scores.explanationResidue += conductor.replyDiscipline.singleLineDraftRequest ? 0.45 : 0;
   scores.explanationResidue += conductor.replyDiscipline.casualStatusRestraint.id === 'high' ? 0.2 : 0;
+  scores.explanationResidue += conductor.speakerContract.speakerContract.id === 'metaAppDebug' ? 0.35 : 0;
   scores.explanationResidue +=
     conductor.conversationalCoherence.groundedReplyMode.id === 'draft' ? 0.35 : 0;
   scores.explanationResidue +=
