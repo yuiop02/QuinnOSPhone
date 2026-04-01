@@ -173,6 +173,7 @@ export function buildQuinnPacket({
     packetText: safeText,
     sessionArc,
     lensMode: lens.mode,
+    previousAssistantReply: safePreviousAssistantReply,
   });
   const energyContext = buildQuinnEnergyPacketContext({
     packetText: safeText,
@@ -247,6 +248,10 @@ export function buildQuinnPacket({
       conductorContext.conductor.replyDiscipline.recipientBoundaryRisk.id
     ),
     listPacketSection(
+      'RECIPIENT INVITE LEAK RISK',
+      conductorContext.conductor.replyDiscipline.recipientInviteLeakRisk.id
+    ),
+    listPacketSection(
       'REPLY PRESENTATION MODE',
       conductorContext.conductor.replyDiscipline.replyPresentationMode.id
     ),
@@ -263,12 +268,20 @@ export function buildQuinnPacket({
       conductorContext.conductor.replyDiscipline.explicitRecipientFlirtInvite ? 'true' : 'false'
     ),
     listPacketSection(
+      'EXPLICIT INVITATION ASK',
+      conductorContext.conductor.replyDiscipline.explicitInvitationAsk ? 'true' : 'false'
+    ),
+    listPacketSection(
       'SINGLE-LINE DRAFT REQUEST',
       conductorContext.conductor.replyDiscipline.singleLineDraftRequest ? 'true' : 'false'
     ),
     listPacketSection(
       'THIRD-PARTY DRAFT MODE',
       conductorContext.conductor.replyDiscipline.thirdPartyDraftMode ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'THIRD-PARTY GREETING MODE',
+      conductorContext.conductor.replyDiscipline.thirdPartyGreetingMode ? 'true' : 'false'
     ),
     listPacketSection(
       'PROFESSIONAL TONE GUARD',
@@ -325,8 +338,36 @@ export function buildQuinnPacket({
       threadContinuityContext.threadContinuity.staleFrameRisk.id
     ),
     listPacketSection(
+      'STALE TEMPLATE INTERRUPT',
+      threadContinuityContext.threadContinuity.staleTemplateInterrupt.id
+    ),
+    listPacketSection(
+      'DIRECT COMPLAINT ABOUT CONVERSATION',
+      threadContinuityContext.threadContinuity.directComplaintAboutConversation ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'SUPPRESS TEMPLATE REUSE',
+      threadContinuityContext.threadContinuity.suppressTemplateReuse ? 'true' : 'false'
+    ),
+    listPacketSection(
       'FRAME CONTINUATION',
       threadContinuityContext.threadContinuity.frameContinuation ? 'true' : 'false'
+    ),
+    listPacketSection(
+      'CONVERSATIONAL COHERENCE PRIORITY',
+      conductorContext.conductor.conversationalCoherence.conversationalCoherencePriority.id
+    ),
+    listPacketSection(
+      'GROUNDED REPLY MODE',
+      conductorContext.conductor.conversationalCoherence.groundedReplyMode.id
+    ),
+    listPacketSection(
+      'STYLE OVERRIDE RISK',
+      conductorContext.conductor.conversationalCoherence.styleOverrideRisk.id
+    ),
+    listPacketSection(
+      'STALE PATTERN PRESSURE',
+      conductorContext.conductor.conversationalCoherence.stalePatternPressure.id
     ),
     listPacketSection('TURN ROLE ANCHOR', turnRoleContext.turnRole.turnRoleAnchor.id),
     listPacketSection(

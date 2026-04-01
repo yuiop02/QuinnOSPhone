@@ -14,6 +14,7 @@ export type QuinnRecipientRoleId =
   | 'thirdPartyGeneral';
 export type QuinnFlirtTransferSuppressionId = 'low' | 'medium' | 'high';
 export type QuinnRecipientBoundaryRiskId = 'none' | 'light' | 'strong';
+export type QuinnRecipientInviteLeakRiskId = 'none' | 'light' | 'strong';
 
 type QuinnSignalPattern = {
   pattern: RegExp;
@@ -37,11 +38,14 @@ export type QuinnReplyDisciplineInference = {
   recipientRole: QuinnSignalBucket<QuinnRecipientRoleId>;
   flirtTransferSuppression: QuinnSignalBucket<QuinnFlirtTransferSuppressionId>;
   recipientBoundaryRisk: QuinnSignalBucket<QuinnRecipientBoundaryRiskId>;
+  recipientInviteLeakRisk: QuinnSignalBucket<QuinnRecipientInviteLeakRiskId>;
   explicitMultiOptionAsk: boolean;
   explicitPlayfulInvite: boolean;
   explicitRecipientFlirtInvite: boolean;
+  explicitInvitationAsk: boolean;
   singleLineDraftRequest: boolean;
   thirdPartyDraftMode: boolean;
+  thirdPartyGreetingMode: boolean;
   professionalToneGuard: boolean;
   optionMenuSuppression: boolean;
   replyPresentationMode: {
@@ -71,6 +75,10 @@ export const QUINN_REPLY_DISCIPLINE_TUNING = {
   recipientBoundaryRisk: {
     lightThreshold: 0.9,
     strongThreshold: 1.65,
+  },
+  recipientInviteLeakRisk: {
+    lightThreshold: 0.95,
+    strongThreshold: 1.7,
   },
   replyPresentationMode: {
     pairedThreshold: 1.15,
@@ -123,6 +131,21 @@ const THIRD_PARTY_DRAFT_PATTERNS: readonly QuinnSignalPattern[] = [
   },
 ];
 
+const THIRD_PARTY_GREETING_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:say hi to|say hello to|tell\s+\w+\s+i said hi|tell\s+\w+\s+i said hello|tell\s+\w+\s+hi|tell\s+\w+\s+hello)\b/i,
+    label: 'the note is asking for a simple third-party greeting or relay',
+    score: 1.25,
+  },
+  {
+    pattern:
+      /\b(?:just say hi|just say hello|send a quick hi|quick hello|say hey to)\b/i,
+    label: 'the note frames the draft as a simple greeting',
+    score: 1.1,
+  },
+];
+
 const MULTI_OPTION_PATTERNS: readonly QuinnSignalPattern[] = [
   {
     pattern:
@@ -161,6 +184,15 @@ const RECIPIENT_FLIRT_INVITE_PATTERNS: readonly QuinnSignalPattern[] = [
     pattern:
       /\b(?:flirty|romantic|seductive|suggestive|sexual|sexy|spicy|hit on|shoot my shot|pickup line|pick-up line|thirsty)\b/i,
     label: 'the user explicitly invited romantic or suggestive wording for the recipient',
+    score: 1.2,
+  },
+];
+
+const EXPLICIT_INVITATION_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:ask (?:them|her|him) out|invite (?:them|her|him)|grab a drink|get a drink|go for drinks|meet for a drink|hang out|go out|see if we click|meet up|take (?:them|her|him) out)\b/i,
+    label: 'the user explicitly asked for an invitation or date-like move',
     score: 1.2,
   },
 ];
@@ -254,10 +286,12 @@ export function inferQuinnReplyDiscipline({
   const statusHits = collectPatternHits(lower, STATUS_PROMPT_PATTERNS);
   const writeHits = collectPatternHits(lower, WRITE_LINE_PATTERNS);
   const thirdPartyHits = collectPatternHits(lower, THIRD_PARTY_DRAFT_PATTERNS);
+  const thirdPartyGreetingHits = collectPatternHits(lower, THIRD_PARTY_GREETING_PATTERNS);
   const multiOptionHits = collectPatternHits(lower, MULTI_OPTION_PATTERNS);
   const roleplayHits = collectPatternHits(lower, ROLEPLAY_ALLOWANCE_PATTERNS);
   const playfulInviteHits = collectPatternHits(lower, PLAYFUL_INVITE_PATTERNS);
   const recipientFlirtInviteHits = collectPatternHits(lower, RECIPIENT_FLIRT_INVITE_PATTERNS);
+  const invitationAskHits = collectPatternHits(lower, EXPLICIT_INVITATION_PATTERNS);
   const professionalRecipientHits = collectPatternHits(lower, PROFESSIONAL_RECIPIENT_PATTERNS);
   const familyRecipientHits = collectPatternHits(lower, FAMILY_RECIPIENT_PATTERNS);
   const friendRecipientHits = collectPatternHits(lower, FRIEND_RECIPIENT_PATTERNS);
@@ -265,8 +299,14 @@ export function inferQuinnReplyDiscipline({
   const explicitMultiOptionAsk = multiOptionHits.score >= 1;
   const explicitPlayfulInvite = playfulInviteHits.score >= 1;
   const explicitRecipientFlirtInvite = recipientFlirtInviteHits.score >= 1;
+  const explicitInvitationAsk = invitationAskHits.score >= 1;
   const singleLineDraftRequest = writeHits.score >= 1 && !explicitMultiOptionAsk;
   const thirdPartyDraftMode = writeHits.score >= 1 && thirdPartyHits.score >= 1;
+  const thirdPartyGreetingMode =
+    thirdPartyDraftMode &&
+    thirdPartyGreetingHits.score >= 1 &&
+    !explicitInvitationAsk &&
+    !explicitRecipientFlirtInvite;
   const recipientRoleId: QuinnRecipientRoleId =
     professionalRecipientHits.score >= 1
       ? 'professional'
@@ -338,8 +378,10 @@ export function inferQuinnReplyDiscipline({
         : 'medium';
   const flirtTransferSuppressionScore =
     (thirdPartyDraftMode ? 1.1 : 0) +
+    (thirdPartyGreetingMode ? 0.85 : 0) +
     (professionalToneGuard ? 1.0 : recipientRoleId === 'thirdPartyGeneral' ? 0.35 : 0) +
     (singleLineDraftRequest ? 0.3 : 0) -
+    (explicitInvitationAsk ? 1.05 : 0) -
     (explicitRecipientFlirtInvite ? 1.3 : 0) -
     (explicitPlayfulInvite && !explicitRecipientFlirtInvite ? 0.15 : 0);
   const flirtTransferSuppressionId: QuinnFlirtTransferSuppressionId =
@@ -354,8 +396,10 @@ export function inferQuinnReplyDiscipline({
           : 'low';
   const recipientBoundaryRiskScore =
     (thirdPartyDraftMode ? 1.0 : 0) +
+    (thirdPartyGreetingMode ? 0.45 : 0) +
     (professionalToneGuard ? 1.1 : 0) +
     (singleLineDraftRequest ? 0.2 : 0) -
+    (explicitInvitationAsk ? 1.0 : 0) -
     (explicitRecipientFlirtInvite ? 1.05 : 0);
   const recipientBoundaryRiskId: QuinnRecipientBoundaryRiskId =
     recipientBoundaryRiskScore >=
@@ -363,6 +407,20 @@ export function inferQuinnReplyDiscipline({
       ? 'strong'
       : recipientBoundaryRiskScore >=
             QUINN_REPLY_DISCIPLINE_TUNING.recipientBoundaryRisk.lightThreshold
+        ? 'light'
+        : 'none';
+  const recipientInviteLeakRiskScore =
+    (thirdPartyGreetingMode ? 1.2 : 0) +
+    (thirdPartyDraftMode ? 0.35 : 0) +
+    (professionalToneGuard ? 0.7 : 0) -
+    (explicitInvitationAsk ? 1.25 : 0) -
+    (explicitRecipientFlirtInvite ? 0.9 : 0);
+  const recipientInviteLeakRiskId: QuinnRecipientInviteLeakRiskId =
+    recipientInviteLeakRiskScore >=
+    QUINN_REPLY_DISCIPLINE_TUNING.recipientInviteLeakRisk.strongThreshold
+      ? 'strong'
+      : recipientInviteLeakRiskScore >=
+            QUINN_REPLY_DISCIPLINE_TUNING.recipientInviteLeakRisk.lightThreshold
         ? 'light'
         : 'none';
 
@@ -429,7 +487,13 @@ export function inferQuinnReplyDiscipline({
       ? 'Boundary risk is high on this recipient-facing turn. Default to neutral, warm, casual, or professional wording that is safe for the relationship.'
       : recipientBoundaryRiskId === 'light'
         ? 'There is some recipient-boundary risk here. Favor clean socially normal wording over attitude theater or romantic implication.'
-        : 'No special recipient-boundary risk is active.';
+      : 'No special recipient-boundary risk is active.';
+  const recipientInviteLeakRiskPromptGuidance =
+    recipientInviteLeakRiskId === 'strong'
+      ? 'This looks like a simple third-party greeting. Do not escalate it into a drink invite, hangout ask, romantic move, or “see if we click” line unless the user explicitly asked for that.'
+      : recipientInviteLeakRiskId === 'light'
+        ? 'Keep the recipient-facing line greeting-sized. Do not quietly add an invitation or change the social stakes.'
+        : 'No special invitation-leak risk is active.';
   const replyPresentationModePromptGuidance =
     replyPresentationModeId === 'menu'
       ? 'The user explicitly wants multiple versions. You may give a small set of options, but keep them concise and clean.'
@@ -502,11 +566,23 @@ export function inferQuinnReplyDiscipline({
       ]),
       promptGuidance: recipientBoundaryRiskPromptGuidance,
     },
+    recipientInviteLeakRisk: {
+      id: recipientInviteLeakRiskId,
+      score: recipientInviteLeakRiskScore,
+      signals: uniqueItems([
+        ...thirdPartyGreetingHits.signals,
+        ...invitationAskHits.signals,
+        ...professionalRecipientHits.signals,
+      ]),
+      promptGuidance: recipientInviteLeakRiskPromptGuidance,
+    },
     explicitMultiOptionAsk,
     explicitPlayfulInvite,
     explicitRecipientFlirtInvite,
+    explicitInvitationAsk,
     singleLineDraftRequest,
     thirdPartyDraftMode,
+    thirdPartyGreetingMode,
     professionalToneGuard,
     optionMenuSuppression,
     replyPresentationMode: {
@@ -522,6 +598,7 @@ export function inferQuinnReplyDiscipline({
       `Recipient role: ${recipientRoleId}. ${recipientRolePromptGuidance}`,
       `Flirt-transfer suppression: ${flirtTransferSuppressionId}. ${flirtTransferSuppressionPromptGuidance}`,
       `Recipient boundary risk: ${recipientBoundaryRiskId}. ${recipientBoundaryRiskPromptGuidance}`,
+      `Recipient invite leak risk: ${recipientInviteLeakRiskId}. ${recipientInviteLeakRiskPromptGuidance}`,
       `Reply presentation mode: ${replyPresentationModeId}. ${replyPresentationModePromptGuidance}`,
       explicitMultiOptionAsk
         ? 'An explicit multi-option ask is active.'
@@ -532,12 +609,18 @@ export function inferQuinnReplyDiscipline({
       explicitRecipientFlirtInvite
         ? 'An explicit recipient flirt invite is active.'
         : 'No explicit recipient flirt invite is active.',
+      explicitInvitationAsk
+        ? 'An explicit recipient invitation ask is active.'
+        : 'No explicit recipient invitation ask is active.',
       singleLineDraftRequest
         ? 'This is a direct write-the-line prompt. Give one strong line, not a menu.'
         : 'This is not a direct single-line drafting prompt.',
       thirdPartyDraftMode
         ? 'This is a third-party draft turn. Keep the recipient-facing wording socially appropriate.'
         : 'This is not a third-party draft turn.',
+      thirdPartyGreetingMode
+        ? 'This is a simple third-party greeting turn. Keep it to a clean hello or relay, not a social escalation.'
+        : 'This is not a simple third-party greeting turn.',
       professionalToneGuard
         ? 'Professional-tone guard is active for the recipient.'
         : 'Professional-tone guard is not active.',

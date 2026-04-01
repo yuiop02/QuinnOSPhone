@@ -332,6 +332,16 @@ function inferCandidateFraming({
   }
 
   if (
+    conductor.conversationalCoherence.conversationalCoherencePriority.id === 'high' &&
+    conductor.conversationalCoherence.styleOverrideRisk.id !== 'none'
+  ) {
+    return {
+      ...CANDIDATE_FRAMING_PROFILES.single,
+      score: 0,
+    };
+  }
+
+  if (
     replyDiscipline.optionMenuSuppression &&
     replyDiscipline.replyPresentationMode.id === 'singleBest'
   ) {
@@ -620,6 +630,10 @@ function inferAftertaste({
   scores.assistantResidue += signatureGuard.id === 'high' ? 0.25 : 0;
   scores.assistantResidue += conductor.replyDiscipline.optionMenuSuppression ? 0.3 : 0;
   scores.assistantResidue += conductor.replyDiscipline.draftCommentaryAllowance.id === 'low' ? 0.45 : 0;
+  scores.assistantResidue +=
+    conductor.conversationalCoherence.conversationalCoherencePriority.id === 'high'
+      ? 0.35
+      : 0;
 
   scores.explanationResidue += conductor.elasticity.id === 'expanded' ? 0.7 : 0;
   scores.explanationResidue += conductor.elasticity.id === 'medium' ? 0.35 : 0;
@@ -627,6 +641,10 @@ function inferAftertaste({
   scores.explanationResidue += conductor.structural.id === 'none' ? 0.25 : 0;
   scores.explanationResidue += conductor.replyDiscipline.singleLineDraftRequest ? 0.45 : 0;
   scores.explanationResidue += conductor.replyDiscipline.casualStatusRestraint.id === 'high' ? 0.2 : 0;
+  scores.explanationResidue +=
+    conductor.conversationalCoherence.groundedReplyMode.id === 'draft' ? 0.35 : 0;
+  scores.explanationResidue +=
+    conductor.conversationalCoherence.styleOverrideRisk.id === 'strong' ? 0.2 : 0;
 
   scores.neatnessResidue += conductor.endingBlend.primary.id === 'softLanding' ? 0.65 : 0;
   scores.neatnessResidue += conductor.endingBlend.primary.id === 'nudge' ? 0.55 : 0;
@@ -737,15 +755,18 @@ export function inferQuinnPolishState({
   packetText,
   sessionArc = null,
   lensMode = 'adaptive',
+  previousAssistantReply = '',
 }: {
   packetText: string;
   sessionArc?: SessionArc | null;
   lensMode?: string;
+  previousAssistantReply?: string;
 }): QuinnPolishInference {
   const conductor = inferQuinnConductor({
     packetText,
     sessionArc,
     lensMode,
+    previousAssistantReply,
   });
   const microTurn = inferMicroTurn(packetText);
   const candidateFraming = inferCandidateFraming({
@@ -800,15 +821,18 @@ export function buildQuinnPolishPacketContext({
   packetText,
   sessionArc = null,
   lensMode = 'adaptive',
+  previousAssistantReply = '',
 }: {
   packetText: string;
   sessionArc?: SessionArc | null;
   lensMode?: string;
+  previousAssistantReply?: string;
 }) {
   const polish = inferQuinnPolishState({
     packetText,
     sessionArc,
     lensMode,
+    previousAssistantReply,
   });
 
   return {

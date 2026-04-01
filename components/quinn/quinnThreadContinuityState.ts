@@ -3,6 +3,7 @@ import type { SessionArc } from './quinnTypes';
 export type QuinnLiveSubjectDominanceId = 'low' | 'medium' | 'high';
 export type QuinnThreadCarryoverModeId = 'keep' | 'soften' | 'drop';
 export type QuinnStaleFrameRiskId = 'none' | 'light' | 'strong';
+export type QuinnStaleTemplateInterruptId = 'none' | 'light' | 'hard';
 
 type QuinnSignalPattern = {
   pattern: RegExp;
@@ -24,6 +25,9 @@ export type QuinnThreadContinuityInference = {
   liveSubjectDominance: QuinnSignalBucket<QuinnLiveSubjectDominanceId>;
   threadCarryoverMode: QuinnSignalBucket<QuinnThreadCarryoverModeId>;
   staleFrameRisk: QuinnSignalBucket<QuinnStaleFrameRiskId>;
+  staleTemplateInterrupt: QuinnSignalBucket<QuinnStaleTemplateInterruptId>;
+  directComplaintAboutConversation: boolean;
+  suppressTemplateReuse: boolean;
   promptGuidance: string[];
 };
 
@@ -36,6 +40,10 @@ export const QUINN_THREAD_CONTINUITY_TUNING = {
     lightThreshold: 0.95,
     strongThreshold: 1.8,
   },
+  staleTemplateInterrupt: {
+    lightThreshold: 0.95,
+    hardThreshold: 1.85,
+  },
   continuation: {
     keepThreshold: 1.4,
     overlapKeepThreshold: 0.38,
@@ -43,6 +51,36 @@ export const QUINN_THREAD_CONTINUITY_TUNING = {
     shortTurnMaxWords: 9,
   },
 } as const;
+
+const HARD_META_COMPLAINT_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:that makes no sense|makes zero sense|out of context|not what (?:we(?:'re| are)|i(?:'m| am)) talking about|not having a normal human conversation|normal human conversation|what(?:'s| is) going on)\b/i,
+    label: 'the user says Quinn is off-topic or making no sense',
+    score: 1.35,
+  },
+  {
+    pattern:
+      /\b(?:you keep (?:just )?saying weird things|you(?:'re| are) being weird|i don['’]?t understand why you don['’]?t understand)\b/i,
+    label: 'the user directly complains about Quinn’s conversational behavior',
+    score: 1.3,
+  },
+];
+
+const LIGHT_META_COMPLAINT_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:that(?:'s| is) weird|that(?:'s| is) out of pocket|why are you being rude|be (?:so )?for real|i was testing (?:the )?app)\b/i,
+    label: 'the user is pushing back on Quinn’s conversational framing',
+    score: 0.95,
+  },
+  {
+    pattern:
+      /\b(?:that(?:'s| is) not what this is|all i said was|why are you saying that)\b/i,
+    label: 'the user says Quinn is overreading or inventing the wrong scene',
+    score: 0.85,
+  },
+];
 
 const THREAD_CONTINUATION_PATTERNS: readonly QuinnSignalPattern[] = [
   {
@@ -241,9 +279,13 @@ export function inferQuinnThreadContinuity({
   const continuationHits = collectPatternHits(clean, THREAD_CONTINUATION_PATTERNS);
   const freshSubjectHits = collectPatternHits(clean, FRESH_SUBJECT_PATTERNS);
   const pivotHits = collectPatternHits(clean, SUBJECT_PIVOT_PATTERNS);
+  const hardMetaComplaintHits = collectPatternHits(clean, HARD_META_COMPLAINT_PATTERNS);
+  const lightMetaComplaintHits = collectPatternHits(clean, LIGHT_META_COMPLAINT_PATTERNS);
   const currentTokens = tokenizeSignificantTerms(clean);
   const priorTokens = tokenizeSignificantTerms(recentBeatText);
   const overlapRatio = countTokenOverlapRatio(currentTokens, priorTokens);
+  const metaComplaintScore = hardMetaComplaintHits.score + lightMetaComplaintHits.score;
+  const directComplaintAboutConversation = metaComplaintScore >= 0.95;
 
   let continuationScore = continuationHits.score;
   continuationScore +=
@@ -258,6 +300,7 @@ export function inferQuinnThreadContinuity({
     currentTokens.length > 0
       ? 0.45
       : 0;
+  continuationScore -= directComplaintAboutConversation ? 0.9 : 0;
 
   let liveSubjectScore = freshSubjectHits.score + pivotHits.score;
   liveSubjectScore += wordCount >= 10 ? 0.3 : 0;
@@ -271,6 +314,7 @@ export function inferQuinnThreadContinuity({
     hasActiveThread && currentTokens.length >= 4 && priorTokens.length >= 4 && overlapRatio === 0
       ? 0.45
       : 0;
+  liveSubjectScore += metaComplaintScore;
   liveSubjectScore -= continuationHits.score > 0 ? 0.35 : 0;
 
   let staleFrameRiskScore = hasActiveThread ? 0.15 : 0;
@@ -283,7 +327,26 @@ export function inferQuinnThreadContinuity({
       ? 0.7
       : 0;
   staleFrameRiskScore += pivotHits.score > 0 ? 0.3 : 0;
+  staleFrameRiskScore += directComplaintAboutConversation ? 0.95 : 0;
   staleFrameRiskScore -= continuationScore >= QUINN_THREAD_CONTINUITY_TUNING.continuation.keepThreshold ? 0.6 : 0;
+
+  const staleTemplateInterruptScore =
+    metaComplaintScore +
+    (hasActiveThread ? 0.35 : 0) +
+    (overlapRatio <= QUINN_THREAD_CONTINUITY_TUNING.continuation.overlapDropThreshold
+      ? 0.25
+      : 0) +
+    (directComplaintAboutConversation && recentBeatText ? 0.25 : 0);
+  const staleTemplateInterruptId: QuinnStaleTemplateInterruptId =
+    !hasActiveThread
+      ? 'none'
+      : staleTemplateInterruptScore >=
+            QUINN_THREAD_CONTINUITY_TUNING.staleTemplateInterrupt.hardThreshold
+        ? 'hard'
+        : staleTemplateInterruptScore >=
+              QUINN_THREAD_CONTINUITY_TUNING.staleTemplateInterrupt.lightThreshold
+          ? 'light'
+          : 'none';
 
   const liveSubjectDominanceId: QuinnLiveSubjectDominanceId =
     !hasActiveThread
@@ -307,6 +370,7 @@ export function inferQuinnThreadContinuity({
 
   const frameContinuation =
     hasActiveThread &&
+    staleTemplateInterruptId !== 'hard' &&
     (continuationScore >= QUINN_THREAD_CONTINUITY_TUNING.continuation.keepThreshold ||
       (overlapRatio >= QUINN_THREAD_CONTINUITY_TUNING.continuation.overlapKeepThreshold &&
         liveSubjectDominanceId !== 'high'));
@@ -316,9 +380,16 @@ export function inferQuinnThreadContinuity({
       ? 'keep'
       : frameContinuation && staleFrameRiskId === 'none'
         ? 'keep'
-        : staleFrameRiskId === 'strong' || liveSubjectDominanceId === 'high'
+        : staleTemplateInterruptId === 'hard' ||
+            staleFrameRiskId === 'strong' ||
+            liveSubjectDominanceId === 'high'
           ? 'drop'
           : 'soften';
+  const suppressTemplateReuse =
+    hasActiveThread &&
+    (staleTemplateInterruptId === 'hard' ||
+      (directComplaintAboutConversation &&
+        (staleFrameRiskId !== 'none' || threadCarryoverModeId === 'drop')));
 
   const liveSubjectSignals = uniqueItems([
     ...freshSubjectHits.signals,
@@ -345,7 +416,16 @@ export function inferQuinnThreadContinuity({
     ...(staleFrameRiskId !== 'none'
       ? ['older thread framing could overshadow the newest user turn if left unchecked']
       : []),
+    ...hardMetaComplaintHits.signals,
+    ...lightMetaComplaintHits.signals,
     ...(pivotHits.signals.length ? pivotHits.signals : []),
+  ]);
+  const staleTemplateInterruptSignals = uniqueItems([
+    ...hardMetaComplaintHits.signals,
+    ...lightMetaComplaintHits.signals,
+    ...(staleTemplateInterruptId !== 'none'
+      ? ['the newest turn is explicitly complaining about Quinn being off-topic or not making sense']
+      : []),
   ]);
 
   const liveSubjectPromptGuidance =
@@ -368,6 +448,12 @@ export function inferQuinnThreadContinuity({
       : staleFrameRiskId === 'light'
         ? 'There is some stale-frame risk. Keep the old thread light unless the new note clearly calls back to it.'
         : 'No special stale-frame suppression is needed beyond normal continuity judgment.';
+  const staleTemplateInterruptPromptGuidance =
+    staleTemplateInterruptId === 'hard'
+      ? 'The user is directly complaining that Quinn is off-topic, weird, or not making sense. Treat that as a hard interrupt on stale template reuse and answer the complaint itself.'
+      : staleTemplateInterruptId === 'light'
+        ? 'There is a conversational complaint signal here. Do not reflexively reuse the earlier template or stale room/greeting pattern.'
+        : 'No stale-template interrupt is active beyond normal thread continuity judgment.';
 
   return {
     hasActiveThread,
@@ -391,10 +477,25 @@ export function inferQuinnThreadContinuity({
       signals: staleFrameSignals,
       promptGuidance: staleFramePromptGuidance,
     },
+    staleTemplateInterrupt: {
+      id: staleTemplateInterruptId,
+      score: staleTemplateInterruptScore,
+      signals: staleTemplateInterruptSignals,
+      promptGuidance: staleTemplateInterruptPromptGuidance,
+    },
+    directComplaintAboutConversation,
+    suppressTemplateReuse,
     promptGuidance: [
       `Live subject dominance: ${liveSubjectDominanceId}. ${liveSubjectPromptGuidance}`,
       `Thread carryover mode: ${threadCarryoverModeId}. ${carryoverPromptGuidance}`,
       `Stale frame risk: ${staleFrameRiskId}. ${staleFramePromptGuidance}`,
+      `Stale template interrupt: ${staleTemplateInterruptId}. ${staleTemplateInterruptPromptGuidance}`,
+      directComplaintAboutConversation
+        ? 'Direct complaint about conversation: true. The newest turn is objecting to Quinn being weird, off-topic, or not making sense.'
+        : 'Direct complaint about conversation: false.',
+      suppressTemplateReuse
+        ? 'Suppress template reuse: true. Do not give another version of the earlier thread template.'
+        : 'Suppress template reuse: false.',
       frameContinuation
         ? 'Frame continuation: true. The current turn still appears to continue the same subject.'
         : 'Frame continuation: false. Do not assume the same thread means the same live subject.',
@@ -417,13 +518,7 @@ export function buildQuinnThreadContinuityPacketContext({
   return {
     threadContinuity,
     context: threadContinuity.hasActiveThread
-      ? [
-          threadContinuity.liveSubjectDominance.promptGuidance,
-          threadContinuity.threadCarryoverMode.promptGuidance,
-          threadContinuity.staleFrameRisk.promptGuidance,
-        ]
-          .filter(Boolean)
-          .join(' ')
+      ? threadContinuity.promptGuidance.filter(Boolean).join(' ')
       : 'No active thread carryover is competing with the live note.',
   };
 }

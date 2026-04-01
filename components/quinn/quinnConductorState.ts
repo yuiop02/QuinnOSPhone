@@ -46,6 +46,10 @@ import {
   type QuinnTurnRoleInference,
 } from './quinnTurnRoleState';
 import {
+  inferQuinnConversationalCoherence,
+  type QuinnConversationalCoherenceInference,
+} from './quinnConversationalCoherenceState';
+import {
   inferQuinnTexture,
   type QuinnTextureId,
 } from './quinnTextureState';
@@ -95,6 +99,7 @@ export type QuinnStructuralInference = {
 export type QuinnConductorInference = {
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  conversationalCoherence: QuinnConversationalCoherenceInference;
   energyBlend: {
     primary: WeightedState<QuinnEnergyStateId>;
     secondary: WeightedState<QuinnEnergyStateId> | null;
@@ -518,6 +523,7 @@ function resolveFinalAskStance({
   ask,
   correction,
   replyDiscipline,
+  conversationalCoherence,
   threadContinuity,
   turnRole,
   ending,
@@ -528,6 +534,7 @@ function resolveFinalAskStance({
   ask: QuinnAskInference;
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  conversationalCoherence: QuinnConversationalCoherenceInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
   ending: QuinnEndingStyleInference;
@@ -559,6 +566,14 @@ function resolveFinalAskStance({
   }
 
   if (
+    conversationalCoherence.conversationalCoherencePriority.id === 'high' &&
+    (conversationalCoherence.groundedReplyMode.id === 'draft' ||
+      conversationalCoherence.groundedReplyMode.id === 'corrective')
+  ) {
+    resolved = 'noAsk';
+  }
+
+  if (
     correction.clarificationOverride.id !== 'none' ||
     correction.correctionLatch.id !== 'none' ||
     correction.constraintPriority.id !== 'none' ||
@@ -569,8 +584,9 @@ function resolveFinalAskStance({
 
   if (
     threadContinuity.hasActiveThread &&
-    threadContinuity.threadCarryoverMode.id === 'drop' &&
-    threadContinuity.liveSubjectDominance.id === 'high'
+    (threadContinuity.suppressTemplateReuse ||
+      (threadContinuity.threadCarryoverMode.id === 'drop' &&
+        threadContinuity.liveSubjectDominance.id === 'high'))
   ) {
     resolved = 'noAsk';
   }
@@ -594,6 +610,7 @@ function resolveFinalMemoryExpression({
   memoryExpression,
   correction,
   replyDiscipline,
+  conversationalCoherence,
   threadContinuity,
   energy,
   riff,
@@ -601,6 +618,7 @@ function resolveFinalMemoryExpression({
   memoryExpression: QuinnMemoryExpressionInference;
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  conversationalCoherence: QuinnConversationalCoherenceInference;
   threadContinuity: QuinnThreadContinuityInference;
   energy: QuinnEnergyInference;
   riff: QuinnRiffInference;
@@ -622,8 +640,18 @@ function resolveFinalMemoryExpression({
   }
 
   if (
+    conversationalCoherence.conversationalCoherencePriority.id === 'high' &&
+    (conversationalCoherence.styleOverrideRisk.id === 'strong' ||
+      conversationalCoherence.groundedReplyMode.id === 'draft' ||
+      conversationalCoherence.groundedReplyMode.id === 'corrective')
+  ) {
+    return 'implicit';
+  }
+
+  if (
     threadContinuity.hasActiveThread &&
-    threadContinuity.threadCarryoverMode.id !== 'keep'
+    (threadContinuity.threadCarryoverMode.id !== 'keep' ||
+      threadContinuity.suppressTemplateReuse)
   ) {
     return 'implicit';
   }
@@ -649,6 +677,7 @@ function inferElasticity({
   packetText,
   correction,
   replyDiscipline,
+  conversationalCoherence,
   threadContinuity,
   turnRole,
   energy,
@@ -662,6 +691,7 @@ function inferElasticity({
   packetText: string;
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  conversationalCoherence: QuinnConversationalCoherenceInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
   energy: QuinnEnergyInference;
@@ -706,11 +736,20 @@ function inferElasticity({
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
       ? 0.8
       : 0;
+  scores.micro += threadContinuity.suppressTemplateReuse ? 1.1 : 0;
+  scores.micro += threadContinuity.staleTemplateInterrupt.id === 'hard' ? 0.85 : 0;
+  scores.micro += threadContinuity.staleTemplateInterrupt.id === 'light' ? 0.3 : 0;
   scores.micro +=
     turnRole.turnRoleAnchor.id === 'userReply' &&
     turnRole.previousAssistantAskedQuestion
       ? 0.55
       : 0;
+  scores.micro +=
+    conversationalCoherence.conversationalCoherencePriority.id === 'high' ? 0.8 : 0;
+  scores.micro += conversationalCoherence.styleOverrideRisk.id === 'strong' ? 0.65 : 0;
+  scores.micro += conversationalCoherence.stalePatternPressure.id === 'strong' ? 0.65 : 0;
+  scores.micro += conversationalCoherence.groundedReplyMode.id === 'draft' ? 0.95 : 0;
+  scores.micro += conversationalCoherence.groundedReplyMode.id === 'corrective' ? 0.7 : 0;
   scores.micro -= riff.id === 'coBuild' ? 0.55 : 0;
   scores.micro -= riff.id === 'deepRiff' ? 0.95 : 0;
   scores.micro -= energy.id === 'tenderSoft' ? 0.25 : 0;
@@ -727,9 +766,15 @@ function inferElasticity({
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'soften'
       ? 0.25
       : 0;
+  scores.short += threadContinuity.staleTemplateInterrupt.id === 'light' ? 0.35 : 0;
   scores.short += turnRole.turnRoleAnchor.id === 'userReply' ? 0.2 : 0;
   scores.short += replyDiscipline.casualStatusRestraint.id === 'high' ? 0.25 : 0;
   scores.short += replyDiscipline.draftCommentaryAllowance.id === 'low' ? 0.2 : 0;
+  scores.short +=
+    conversationalCoherence.conversationalCoherencePriority.id === 'medium' ? 0.25 : 0;
+  scores.short +=
+    conversationalCoherence.conversationalCoherencePriority.id === 'high' ? 0.4 : 0;
+  scores.short += conversationalCoherence.styleOverrideRisk.id === 'light' ? 0.15 : 0;
 
   scores.medium += riff.id === 'coBuild' ? 0.8 : 0;
   scores.medium += energy.id === 'tenderSoft' ? 0.55 : 0;
@@ -754,6 +799,12 @@ function inferElasticity({
     threadContinuity.hasActiveThread && threadContinuity.threadCarryoverMode.id === 'drop'
       ? 0.55
       : 0;
+  scores.medium -=
+    conversationalCoherence.conversationalCoherencePriority.id === 'high' ? 0.75 : 0;
+  scores.medium -= conversationalCoherence.styleOverrideRisk.id === 'strong' ? 0.55 : 0;
+  scores.medium -= conversationalCoherence.groundedReplyMode.id === 'draft' ? 0.6 : 0;
+  scores.medium -= threadContinuity.suppressTemplateReuse ? 0.95 : 0;
+  scores.medium -= threadContinuity.staleTemplateInterrupt.id === 'hard' ? 0.65 : 0;
 
   scores.expanded += riff.id === 'deepRiff' ? 1.35 : 0;
   scores.expanded += structural.id === 'strongNotice' ? 0.7 : 0;
@@ -775,7 +826,14 @@ function inferElasticity({
     threadContinuity.hasActiveThread && threadContinuity.staleFrameRisk.id === 'strong'
       ? 0.45
       : 0;
+  scores.expanded -= threadContinuity.suppressTemplateReuse ? 1.05 : 0;
+  scores.expanded -= threadContinuity.staleTemplateInterrupt.id === 'hard' ? 0.75 : 0;
   scores.expanded -= turnRole.turnRoleAnchor.id === 'userReply' ? 0.55 : 0;
+  scores.expanded -=
+    conversationalCoherence.conversationalCoherencePriority.id === 'high' ? 0.95 : 0;
+  scores.expanded -= conversationalCoherence.styleOverrideRisk.id === 'strong' ? 0.7 : 0;
+  scores.expanded -= conversationalCoherence.stalePatternPressure.id === 'strong' ? 0.45 : 0;
+  scores.expanded -= conversationalCoherence.groundedReplyMode.id === 'draft' ? 0.8 : 0;
 
   const winner =
     scores.expanded >= QUINN_CONDUCTOR_TUNING.elasticity.threshold.expanded
@@ -798,6 +856,7 @@ function inferElasticity({
 function buildArbitrationNotes({
   correction,
   replyDiscipline,
+  conversationalCoherence,
   threadContinuity,
   turnRole,
   energyBlend,
@@ -812,6 +871,7 @@ function buildArbitrationNotes({
 }: {
   correction: QuinnCorrectionInference;
   replyDiscipline: QuinnReplyDisciplineInference;
+  conversationalCoherence: QuinnConversationalCoherenceInference;
   threadContinuity: QuinnThreadContinuityInference;
   turnRole: QuinnTurnRoleInference;
   energyBlend: {
@@ -841,7 +901,37 @@ function buildArbitrationNotes({
 }) {
   const notes: string[] = [];
 
+  if (conversationalCoherence.conversationalCoherencePriority.id === 'high') {
+    notes.push('Start from the most ordinary socially coherent reading of the latest turn. Let Quinn texture layer on after that, not instead of it.');
+  } else if (conversationalCoherence.conversationalCoherencePriority.id === 'medium') {
+    notes.push('Give coherence a little priority here. If style and relevance pull apart, let relevance win first.');
+  }
+
+  if (conversationalCoherence.groundedReplyMode.id === 'draft') {
+    notes.push('This turn wants usable wording first. Write the socially coherent line before doing anything cute or interpretive.');
+  } else if (conversationalCoherence.groundedReplyMode.id === 'corrective') {
+    notes.push('This turn wants grounded repair first. Answer the actual correction, contradiction, or complaint before adding personality texture.');
+  } else if (conversationalCoherence.groundedReplyMode.id === 'conversational') {
+    notes.push('This is normal conversation first. Answer what the user just said in the most humanly sensible way before getting stylized.');
+  }
+
+  if (conversationalCoherence.styleOverrideRisk.id === 'strong') {
+    notes.push('Do not let carryover, cleverness, or persona texture outrun common-sense social meaning on this turn.');
+  } else if (conversationalCoherence.styleOverrideRisk.id === 'light') {
+    notes.push('Keep style secondary to the grounded reading.');
+  }
+
+  if (conversationalCoherence.stalePatternPressure.id === 'strong') {
+    notes.push('Stale pattern pressure is strong. Do not let the familiar Quinn move win just because it was recently active.');
+  }
+
   if (threadContinuity.hasActiveThread) {
+    if (threadContinuity.staleTemplateInterrupt.id === 'hard') {
+      notes.push('The newest turn is directly complaining about Quinn being off-topic, weird, or not making sense. Treat that as a hard interrupt on stale template reuse.');
+    } else if (threadContinuity.staleTemplateInterrupt.id === 'light') {
+      notes.push('There is a live complaint about Quinn’s conversational fit. Do not coast on the old thread template.');
+    }
+
     if (threadContinuity.threadCarryoverMode.id === 'drop') {
       notes.push('Same thread does not mean same subject here. Drop the stale frame and answer the newest note directly.');
     } else if (threadContinuity.threadCarryoverMode.id === 'soften') {
@@ -860,6 +950,14 @@ function buildArbitrationNotes({
     notes.push('The newest user turn is a fresh ask for Quinn. Answer that directly instead of extending the old answer pattern.');
   } else if (turnRole.turnRoleAnchor.id === 'userClarification') {
     notes.push('The newest turn is clarifying the exchange. Replace the older read before you answer.');
+  }
+
+  if (threadContinuity.directComplaintAboutConversation) {
+    notes.push("The user is objecting to Quinn's conversational behavior itself. Answer that complaint directly instead of outputting another version of the earlier template.");
+  }
+
+  if (threadContinuity.suppressTemplateReuse) {
+    notes.push('Do not reuse the prior room-greeting, greeting-template, or stale answer pattern on this turn.');
   }
 
   if (
@@ -955,6 +1053,16 @@ function buildArbitrationNotes({
     notes.push('On this drafting turn, return the usable line cleanly. Skip grammar asides, side jokes, and extra commentary around it.');
   }
 
+  if (replyDiscipline.thirdPartyGreetingMode) {
+    notes.push('This is a simple third-party greeting. Keep it to a clean socially normal hello or relay, not an invitation, date move, or social-stakes escalation.');
+  }
+
+  if (replyDiscipline.recipientInviteLeakRisk.id === 'strong') {
+    notes.push('Invitation or romantic-escalation leakage is high-risk here. Do not turn the greeting into grabbing drinks, meeting up, seeing if they click, or other escalated social moves.');
+  } else if (replyDiscipline.recipientInviteLeakRisk.id === 'light') {
+    notes.push('Keep the third-party line greeting-sized. Do not quietly add a hangout or invitation beat unless the user asked for one.');
+  }
+
   if (replyDiscipline.thirdPartyDraftMode) {
     notes.push("This draft is for someone else. Keep Quinn's home-thread banter on the user's side and make the recipient-facing wording read as socially normal.");
   }
@@ -1044,6 +1152,13 @@ export function inferQuinnConductor({
     sessionArc,
     previousAssistantReply,
   });
+  const conversationalCoherence = inferQuinnConversationalCoherence({
+    packetText,
+    correction,
+    replyDiscipline,
+    threadContinuity,
+    turnRole,
+  });
   const energy = inferQuinnEnergyState({
     packetText,
     sessionArc,
@@ -1108,6 +1223,7 @@ export function inferQuinnConductor({
     ask,
     correction,
     replyDiscipline,
+    conversationalCoherence,
     threadContinuity,
     turnRole,
     ending,
@@ -1119,6 +1235,7 @@ export function inferQuinnConductor({
     memoryExpression,
     correction,
     replyDiscipline,
+    conversationalCoherence,
     threadContinuity,
     energy,
     riff,
@@ -1127,6 +1244,7 @@ export function inferQuinnConductor({
     packetText,
     correction,
     replyDiscipline,
+    conversationalCoherence,
     threadContinuity,
     turnRole,
     energy,
@@ -1140,6 +1258,7 @@ export function inferQuinnConductor({
   const arbitrationNotes = buildArbitrationNotes({
     correction,
     replyDiscipline,
+    conversationalCoherence,
     threadContinuity,
     turnRole,
     energyBlend,
@@ -1156,6 +1275,7 @@ export function inferQuinnConductor({
   return {
     correction,
     replyDiscipline,
+    conversationalCoherence,
     energyBlend,
     textureBlend,
     challengeBlend,
@@ -1172,6 +1292,7 @@ export function inferQuinnConductor({
       ...replyDiscipline.promptGuidance,
       ...turnRole.promptGuidance,
       ...threadContinuity.promptGuidance,
+      ...conversationalCoherence.promptGuidance,
       describeBlend('Energy blend', energyBlend),
       describeBlend('Texture blend', textureBlend),
       describeBlend('Challenge blend', challengeBlend),
