@@ -123,6 +123,24 @@ const FRESH_SUBJECT_PATTERNS: readonly QuinnSignalPattern[] = [
   },
 ];
 
+const EXPLICIT_TOPIC_PIVOT_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:moving on|move on|different question|new question|new topic|on another note|another thing|separate thing|separate question|switching gears|changing subjects|unrelated question|unrelated topic)\b/i,
+    label: 'the note explicitly says it is moving to a different subject',
+    score: 1.2,
+  },
+];
+
+const SAME_TOPIC_CONTINUATION_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:about the same|same work-life balance|same issue|same topic|same problem|same point|same thing|still on that)\b/i,
+    label: 'the note explicitly says the subject is still the same',
+    score: 1.45,
+  },
+];
+
 const SUBJECT_PIVOT_PATTERNS: readonly QuinnSignalPattern[] = [
   {
     pattern: /\b(?:actually|anyway|either way|right now|for real)\b/i,
@@ -278,6 +296,8 @@ export function inferQuinnThreadContinuity({
     wordCount <= QUINN_THREAD_CONTINUITY_TUNING.continuation.shortTurnMaxWords;
   const continuationHits = collectPatternHits(clean, THREAD_CONTINUATION_PATTERNS);
   const freshSubjectHits = collectPatternHits(clean, FRESH_SUBJECT_PATTERNS);
+  const explicitTopicPivotHits = collectPatternHits(clean, EXPLICIT_TOPIC_PIVOT_PATTERNS);
+  const sameTopicContinuationHits = collectPatternHits(clean, SAME_TOPIC_CONTINUATION_PATTERNS);
   const pivotHits = collectPatternHits(clean, SUBJECT_PIVOT_PATTERNS);
   const hardMetaComplaintHits = collectPatternHits(clean, HARD_META_COMPLAINT_PATTERNS);
   const lightMetaComplaintHits = collectPatternHits(clean, LIGHT_META_COMPLAINT_PATTERNS);
@@ -286,8 +306,11 @@ export function inferQuinnThreadContinuity({
   const overlapRatio = countTokenOverlapRatio(currentTokens, priorTokens);
   const metaComplaintScore = hardMetaComplaintHits.score + lightMetaComplaintHits.score;
   const directComplaintAboutConversation = metaComplaintScore >= 0.95;
+  const explicitTopicPivotActive =
+    explicitTopicPivotHits.score > 0 && sameTopicContinuationHits.score === 0;
 
   let continuationScore = continuationHits.score;
+  continuationScore += sameTopicContinuationHits.score;
   continuationScore +=
     hasActiveThread &&
     overlapRatio >= QUINN_THREAD_CONTINUITY_TUNING.continuation.overlapKeepThreshold
@@ -301,8 +324,10 @@ export function inferQuinnThreadContinuity({
       ? 0.45
       : 0;
   continuationScore -= directComplaintAboutConversation ? 0.9 : 0;
+  continuationScore -= explicitTopicPivotActive ? 0.45 : 0;
 
-  let liveSubjectScore = freshSubjectHits.score + pivotHits.score;
+  let liveSubjectScore =
+    freshSubjectHits.score + pivotHits.score + (explicitTopicPivotActive ? explicitTopicPivotHits.score : 0);
   liveSubjectScore += wordCount >= 10 ? 0.3 : 0;
   liveSubjectScore +=
     hasActiveThread &&
@@ -327,6 +352,7 @@ export function inferQuinnThreadContinuity({
       ? 0.7
       : 0;
   staleFrameRiskScore += pivotHits.score > 0 ? 0.3 : 0;
+  staleFrameRiskScore += explicitTopicPivotActive ? 0.55 : 0;
   staleFrameRiskScore += directComplaintAboutConversation ? 0.95 : 0;
   staleFrameRiskScore -= continuationScore >= QUINN_THREAD_CONTINUITY_TUNING.continuation.keepThreshold ? 0.6 : 0;
 
@@ -371,6 +397,7 @@ export function inferQuinnThreadContinuity({
   const frameContinuation =
     hasActiveThread &&
     staleTemplateInterruptId !== 'hard' &&
+    !explicitTopicPivotActive &&
     (continuationScore >= QUINN_THREAD_CONTINUITY_TUNING.continuation.keepThreshold ||
       (overlapRatio >= QUINN_THREAD_CONTINUITY_TUNING.continuation.overlapKeepThreshold &&
         liveSubjectDominanceId !== 'high'));
@@ -388,6 +415,7 @@ export function inferQuinnThreadContinuity({
   const suppressTemplateReuse =
     hasActiveThread &&
     (staleTemplateInterruptId === 'hard' ||
+      explicitTopicPivotActive ||
       (directComplaintAboutConversation &&
         (staleFrameRiskId !== 'none' || threadCarryoverModeId === 'drop')));
 
@@ -399,6 +427,8 @@ export function inferQuinnThreadContinuity({
       ? ['the current note has low lexical overlap with the recent thread beat']
       : []),
     ...(wordCount >= 10 ? ['the current note contains enough fresh material to stand on its own'] : []),
+    ...(explicitTopicPivotActive ? explicitTopicPivotHits.signals : []),
+    ...sameTopicContinuationHits.signals,
   ]);
 
   const carryoverSignals = uniqueItems([
@@ -418,6 +448,8 @@ export function inferQuinnThreadContinuity({
       : []),
     ...hardMetaComplaintHits.signals,
     ...lightMetaComplaintHits.signals,
+    ...(explicitTopicPivotActive ? explicitTopicPivotHits.signals : []),
+    ...sameTopicContinuationHits.signals,
     ...(pivotHits.signals.length ? pivotHits.signals : []),
   ]);
   const staleTemplateInterruptSignals = uniqueItems([
