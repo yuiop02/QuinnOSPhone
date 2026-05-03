@@ -115,7 +115,7 @@ export default function NotificationsPanel({
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>No alerts yet</Text>
           <Text style={styles.emptyBody}>
-            Run Quinn, pin memory, or change controls and new alerts will show up here.
+            Run Ren, pin memory, or change controls and new alerts will show up here.
           </Text>
         </View>
       )}

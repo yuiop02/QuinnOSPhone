@@ -93,7 +93,7 @@ export default function GravityMicro({
 
       <View style={styles.gravityHintBand}>
         <Text style={styles.gravityHintText}>
-          Gravity is live against your backend. Press Run Quinn to send the current packet through the run endpoint.
+          Gravity is live against your backend. Press Run Ren to send the current packet through the run endpoint.
         </Text>
       </View>
 
@@ -137,7 +137,7 @@ export default function GravityMicro({
             disabled={!cleanPacket || isRunning}
           >
             <Text style={styles.primaryButtonText}>
-              {isRunning ? 'Running Quinn...' : 'Run Quinn'}
+              {isRunning ? 'Running Ren...' : 'Run Ren'}
             </Text>
           </Pressable>
 
