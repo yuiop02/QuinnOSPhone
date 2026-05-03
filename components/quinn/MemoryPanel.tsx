@@ -143,7 +143,7 @@ export default function MemoryPanel({
       ) : (
         <SectionCard eyebrow="EMPTY" title="Nothing worth keeping yet">
           <Text style={styles.bodyLine}>
-            Run Quinn from the homepage. When a reply creates a strong reusable shape, it lands here and can be loaded back into the composer.
+            Run Ren from the homepage. When a reply creates a strong reusable shape, it lands here and can be loaded back into the composer.
           </Text>
         </SectionCard>
       )}

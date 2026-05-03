@@ -138,7 +138,7 @@ export default function HomeTileGrid({
   const signalPreview =
     cleanPacket || 'The surface is waiting. Start with the strongest signal.';
   const compressionPreview =
-    runError || lastSummary || 'No Quinn reply yet. Run Quinn from the homepage.';
+    runError || lastSummary || 'No Quinn reply yet. Run Ren from the homepage.';
   const storageMeta = isHydrated
     ? formatStamp(lastSavedAt, 'Saved on device')
     : 'Loading saved state...';
@@ -154,7 +154,7 @@ export default function HomeTileGrid({
           currentMemoryResonance.length === 1 ? '' : 's'
         } helped shape the latest reply. Use Stage next move on the homepage if this thought should keep carrying forward.`
       : 'The latest reply is live. Follow up on the homepage or start fresh to open a new topic.'
-    : 'Run Quinn once and this rail will show the current lens, whether the thought is carrying forward, and how memory shaped the answer.';
+    : 'Run Ren once and this rail will show the current lens, whether the thought is carrying forward, and how memory shaped the answer.';
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -220,7 +220,7 @@ export default function HomeTileGrid({
                 !canRunCurrentPacket && styles.primaryButtonTextDisabled,
               ]}
             >
-              {isRunning ? 'Running Quinn...' : 'Run Quinn'}
+              {isRunning ? 'Running Ren...' : 'Run Ren'}
             </Text>
           </Pressable>
 
@@ -402,7 +402,7 @@ export default function HomeTileGrid({
             </Text>
           </View>
         ) : (
-          <Text style={styles.emptyText}>Run Quinn once and the strongest kept memory will land here.</Text>
+          <Text style={styles.emptyText}>Run Ren once and the strongest kept memory will land here.</Text>
         )}
       </View>
 

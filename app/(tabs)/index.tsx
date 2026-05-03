@@ -1167,8 +1167,8 @@ const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
             },
           ]}
         >
-          When the real Quinn is too busy painting or crying over a man who didn&apos;t
-          deserve her, Quinn 2.0 can tell you what she&apos;d say in the meantime.
+          Ren lives inside QuinnOS: memory-aware, emotionally accurate, funny on purpose,
+          and built to keep the thread from turning into soup.
         </Animated.Text>
       </View>
     </View>
@@ -1303,7 +1303,7 @@ function QuinnConversationSurface({
         : 'No extra pull needed',
     },
   ];
-  const responseMetaLine = `${responseLens.label} lens • ${sessionArc ? 'Carrying thread' : 'Fresh thread'}`;
+  const responseMetaLine = sessionArc ? 'Thread carried' : 'Fresh thread';
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -1870,7 +1870,7 @@ function QuinnConversationSurface({
   const clean = voicePlan.clean;
 
   if (!clean) {
-    setVoiceStatus('Run Quinn first so there is something to speak.');
+    setVoiceStatus('Run Ren first so there is something to speak.');
     return;
   }
 
@@ -1906,7 +1906,7 @@ function QuinnConversationSurface({
     const chunks = voicePlan.chunks;
 
     if (!chunks.length) {
-      setVoiceStatus('Run Quinn first so there is something to speak.');
+      setVoiceStatus('Run Ren first so there is something to speak.');
       setIsPreparingQuinnVoice(false);
       return;
     }
@@ -2211,7 +2211,7 @@ function QuinnConversationSurface({
               ) : null}
 
               <View style={styles.lensRailWrap}>
-                <Text style={styles.lensEyebrow}>Response lens</Text>
+                <Text style={styles.lensEyebrow}>Response mode</Text>
                 <View style={styles.lensRail}>
                   {QUINN_LENSES.map((lens) => {
                     const selected = lens.id === activeLensId;
@@ -2445,7 +2445,7 @@ function QuinnConversationSurface({
           <View style={styles.responseInnerFrame}>
             <View style={styles.responseHeaderRow}>
               <View style={styles.responseHeaderTextWrap}>
-                <Text style={styles.responseLabel}>Quinn 2.0 reply</Text>
+                <Text style={styles.responseLabel}>Ren reply</Text>
                 <Text style={styles.responseMetaLine}>{responseMetaLine}</Text>
               </View>
               {hasResponseDetails ? (
@@ -2467,7 +2467,7 @@ function QuinnConversationSurface({
 
             <Text style={styles.heroResponseBody}>
               {writtenResult ||
-                'Ask something outrageous, practical, or heartbreak-adjacent and Quinn 2.0 will answer here.'}
+                'Ask something outrageous, practical, or heartbreak-adjacent and Ren will answer here.'}
             </Text>
 
             {showResponseDetails && hasResponseDetails ? (
@@ -2989,7 +2989,7 @@ export default function App() {
     if (isRunning) {
       pushNotification({
         title: 'Run in progress',
-        body: 'Wait for Quinn to finish, then stage the next move from the latest reply.',
+        body: 'Wait for Ren to finish, then stage the next move from the latest reply.',
         target: 'QuinnConversation',
         tone: 'alert',
       });
@@ -3008,7 +3008,7 @@ export default function App() {
     if (!responseText) {
       pushNotification({
         title: 'Nothing to stage yet',
-        body: 'Run Quinn first, then stage the next move from the response card.',
+        body: 'Run Ren first, then stage the next move from the response card.',
         target: 'QuinnConversation',
         tone: 'alert',
       });
@@ -3046,7 +3046,7 @@ export default function App() {
       });
 
       if (!nextText) {
-        throw new Error('Quinn did not return a usable next move.');
+        throw new Error('Ren did not return a usable next move.');
       }
 
       setPacketTitle(nextTitle);
@@ -3058,7 +3058,7 @@ export default function App() {
 
       pushNotification({
         title: 'Next move staged',
-        body: followUp.summary || `${nextTitle} is loaded into Quinn.`,
+        body: followUp.summary || `${nextTitle} is loaded into Ren.`,
         target: 'QuinnConversation',
         tone: 'gold',
       });
@@ -3310,9 +3310,9 @@ export default function App() {
         <QuinnSurfaceShell
           eyebrow="SYSTEM LAYER"
           title="Everything around the conversation, kept precise."
-          description="Quinn 2.0 stays at the center. This layer is where memory, voice, exports, signals, and control stay organized without turning the app into a cluttered dashboard."
+          description="Ren stays at the center. This layer is where memory, voice, exports, signals, and control stay organized without turning the app into a cluttered dashboard."
           onBack={() => setScreen('QuinnConversation')}
-          backLabel="Back to Quinn"
+          backLabel="Back to Ren"
           actions={[
             { label: `${recentRuns.length} runs`, tone: 'secondary' },
             { label: `${memories.length} memory items`, tone: 'ghost' },
