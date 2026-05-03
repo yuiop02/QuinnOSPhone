@@ -1895,9 +1895,11 @@ function QuinnConversationSurface({
 
     await preparePlaybackMode();
 
-    if (await tryPlaySingleReplySpeech(clean, voicePlan.ttsHint)) {
-      return;
-    }
+    // Speed Pass v1:
+    // Skip full-reply TTS first attempt.
+    // Full-reply audio makes the user wait for the entire spoken response before anything plays.
+    // Go straight to buffered chunk playback so voice can start sooner.
+    setVoiceStatus('Ren voice starting in fast chunks...');
 
     setVoiceError(null);
     setIsPreparingQuinnVoice(true);
@@ -1920,12 +1922,12 @@ function QuinnConversationSurface({
 
     setVoiceStatus(
       chunks.length > 1
-        ? `Quinn voice warming up 1/${chunks.length}...`
-        : 'Quinn voice requested. Using buffered playback.'
+        ? `Ren voice starting 1/${chunks.length}...`
+        : 'Ren voice requested. Using fast buffered playback.'
     );
 
     if (chunks.length > 1) {
-      void warmUpcomingSpeechChunks(sessionId, 2, 1);
+      void warmUpcomingSpeechChunks(sessionId, 4, 1);
     }
 
     await playSpeechChunkAtIndex(sessionId, 0);
