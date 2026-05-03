@@ -51,6 +51,15 @@ export const QUINN_SPEAKER_CONTRACT_TUNING = {
   },
 } as const;
 
+const EXPLICIT_WRONG_SPEAKER_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:you(?:['’]re| are)\s+(?:talking|answering|acting|responding)\s+like\s+you(?:['’]re| are)\s+(?:literally\s+)?me|don['’]t\s+(?:answer|respond)\s+as\s+if\s+you(?:['’]re| are)\s+(?:the\s+real\s+)?me|you(?:['’]re| are)\s+answering\s+as\s+if\s+you(?:['’]re| are)\s+(?:the\s+real\s+)?me)\b/i,
+    label: 'the user is plainly saying Quinn is occupying the wrong speaker position',
+    score: 1.35,
+  },
+];
+
 const META_ROLE_CLARIFICATION_PATTERNS: readonly QuinnSignalPattern[] = [
   {
     pattern:
@@ -58,6 +67,7 @@ const META_ROLE_CLARIFICATION_PATTERNS: readonly QuinnSignalPattern[] = [
     label: 'the user is explicitly clarifying Quinn’s speaker position',
     score: 1.3,
   },
+  ...EXPLICIT_WRONG_SPEAKER_PATTERNS,
   {
     pattern:
       /\b(?:speaker contract|speaker model|speaker position|role contract|who are you here|what are you supposed to be)\b/i,
@@ -128,6 +138,10 @@ export function inferQuinnSpeakerContract({
 }): QuinnSpeakerContractInference {
   const cleanPacket = cleanText(packetText);
   const metaRoleHits = collectPatternHits(cleanPacket, META_ROLE_CLARIFICATION_PATTERNS);
+  const explicitWrongSpeakerHits = collectPatternHits(
+    cleanPacket,
+    EXPLICIT_WRONG_SPEAKER_PATTERNS
+  );
   const roleplayHits = collectPatternHits(cleanPacket, ROLEPLAY_ALLOWANCE_PATTERNS);
 
   const metaRoleClarification =
@@ -188,6 +202,7 @@ export function inferQuinnSpeakerContract({
 
   const roleValidationRiskScore =
     (metaRoleClarification ? 1.2 : 0) +
+    (explicitWrongSpeakerHits.score > 0 ? 0.75 : 0) +
     (speakerContractId === 'draftForUser' ? 0.95 : 0) +
     (replyDiscipline.thirdPartyGreetingMode ? 0.75 : 0) +
     (replyDiscipline.professionalToneGuard ? 0.55 : 0) +

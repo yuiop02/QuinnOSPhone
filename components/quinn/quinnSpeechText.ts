@@ -106,13 +106,13 @@ function normalizeSpeechStructureForTts(input: string) {
 
 function normalizeSpeechCadenceForTts(input: string) {
   return String(input || '')
-    .replace(/\bvs\.\b/gi, 'versus')
+    .replace(/\bvs\.(?=\s|$)/gi, 'versus')
     .replace(/\s+[—–]\s+/g, ', ')
     .replace(
-      /([A-Za-z0-9)])\s*:\s*(?=(?:next,\s+)?option\b|point:|next point:)/g,
+      /([A-Za-z0-9)])\s*:\s*(?=(?:next,\s+)?option\b|point:|next point:)/gi,
       '$1. '
     )
-    .replace(/\s{2,}/g, ' ')
+    .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
 
@@ -122,7 +122,6 @@ export function normalizeSpeechChunkSource(input: string): string {
       String(input || '')
         .replace(/\r\n?/g, '\n')
         .replace(/[ \t]+\n/g, '\n')
-        .replace(/\n[ \t]+/g, '\n')
         .replace(/[ \t]+/g, ' ')
         .replace(/\n{3,}/g, '\n\n')
         .replace(/…/g, '...')

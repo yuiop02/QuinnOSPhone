@@ -102,7 +102,7 @@ const THREAD_CONTINUATION_PATTERNS: readonly QuinnSignalPattern[] = [
 
 const FRESH_SUBJECT_PATTERNS: readonly QuinnSignalPattern[] = [
   {
-    pattern: /\b(?:i(?:'m| am)\s+(?:okay|good|fine|tired|sleepy|heading|working|building|making|tweaking|trying|about to)|i(?:'m| am)\s+just)\b/i,
+    pattern: /\b(?:i(?:'m| am)\s+(?:okay|good|pretty good|fine|not bad|alright|tired|sleepy|heading|working|building|making|tweaking|trying|about to)|i(?:'m| am)\s+just)\b/i,
     label: 'the user is giving a fresh first-person status update',
     score: 0.95,
   },
@@ -120,6 +120,47 @@ const FRESH_SUBJECT_PATTERNS: readonly QuinnSignalPattern[] = [
     pattern: /\b(?:at work|at starbucks|in the app|in the code|in the build)\b/i,
     label: 'the note names a concrete current setting',
     score: 0.75,
+  },
+];
+
+const EXPLICIT_TOPIC_PIVOT_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:moving on|move on|different question|new question|new topic|on another note|another thing|separate thing|separate question|switching gears|changing subjects|unrelated question|unrelated topic)\b/i,
+    label: 'the note explicitly says it is moving to a different subject',
+    score: 1.2,
+  },
+];
+
+const SAME_TOPIC_CONTINUATION_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:about the same|same work-life balance|same issue|same topic|same problem|same point|same thing|still on that)\b/i,
+    label: 'the note explicitly says the subject is still the same',
+    score: 1.45,
+  },
+];
+
+const LIGHTWEIGHT_SOCIAL_THREAD_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:hows it going|how(?:'s| is) it going|what(?:'s| is) up|how are you|check-?in|quick check-?in|generic check-?in|casual check-?in|light(?:weight)? check-?in|status reply|status-reply posture|status question|greeting posture|same tempo)\b/i,
+    label: 'the active thread is still centered on a lightweight social check-in',
+    score: 1.2,
+  },
+];
+
+const SUBSTANTIVE_ASK_PATTERNS: readonly QuinnSignalPattern[] = [
+  {
+    pattern:
+      /\b(?:how do you think|what do you think|be straight with me(?: about)?|be honest with me(?: about)?|tell me straight(?: about)?|how am i doing|how am i managing|am i managing|how am i handling|am i handling|what should i do first|what do you think i should do first|what should i do|what do i do first)\b/i,
+    label: 'the newest turn is a substantive evaluative or advice-seeking ask',
+    score: 1.15,
+  },
+  {
+    pattern: /\b(?:work-?life balance|boundary|boundaries|burnout)\b/i,
+    label: 'the newest turn introduces a concrete substantive topic',
+    score: 0.65,
   },
 ];
 
@@ -211,6 +252,12 @@ function buildRecentBeatText(sessionArc: SessionArc | null | undefined) {
     : '';
 }
 
+function buildThreadContextText(sessionArc: SessionArc | null | undefined) {
+  return [cleanText(sessionArc?.title || ''), buildRecentBeatText(sessionArc)]
+    .filter(Boolean)
+    .join(' ');
+}
+
 function getLatestBeatSummary(sessionArc: SessionArc | null | undefined) {
   const latestBeat = Array.isArray(sessionArc?.beats)
     ? sessionArc.beats[sessionArc.beats.length - 1]
@@ -271,6 +318,7 @@ export function inferQuinnThreadContinuity({
   const clean = cleanText(packetText);
   const hasActiveThread = Boolean(sessionArc?.id);
   const recentBeatText = buildRecentBeatText(sessionArc);
+  const threadContextText = buildThreadContextText(sessionArc);
   const recentBeatSummary = getLatestBeatSummary(sessionArc);
   const wordCount = clean ? clean.split(/\s+/).filter(Boolean).length : 0;
   const shortTurn =
@@ -278,6 +326,13 @@ export function inferQuinnThreadContinuity({
     wordCount <= QUINN_THREAD_CONTINUITY_TUNING.continuation.shortTurnMaxWords;
   const continuationHits = collectPatternHits(clean, THREAD_CONTINUATION_PATTERNS);
   const freshSubjectHits = collectPatternHits(clean, FRESH_SUBJECT_PATTERNS);
+  const explicitTopicPivotHits = collectPatternHits(clean, EXPLICIT_TOPIC_PIVOT_PATTERNS);
+  const sameTopicContinuationHits = collectPatternHits(clean, SAME_TOPIC_CONTINUATION_PATTERNS);
+  const lightweightSocialThreadHits = collectPatternHits(
+    threadContextText,
+    LIGHTWEIGHT_SOCIAL_THREAD_PATTERNS
+  );
+  const substantiveAskHits = collectPatternHits(clean, SUBSTANTIVE_ASK_PATTERNS);
   const pivotHits = collectPatternHits(clean, SUBJECT_PIVOT_PATTERNS);
   const hardMetaComplaintHits = collectPatternHits(clean, HARD_META_COMPLAINT_PATTERNS);
   const lightMetaComplaintHits = collectPatternHits(clean, LIGHT_META_COMPLAINT_PATTERNS);
@@ -286,8 +341,28 @@ export function inferQuinnThreadContinuity({
   const overlapRatio = countTokenOverlapRatio(currentTokens, priorTokens);
   const metaComplaintScore = hardMetaComplaintHits.score + lightMetaComplaintHits.score;
   const directComplaintAboutConversation = metaComplaintScore >= 0.95;
+  const explicitTopicPivotActive =
+    explicitTopicPivotHits.score > 0 && sameTopicContinuationHits.score === 0;
+  const substantiveAskShape =
+    /\?\s*$/.test(clean) ||
+    /\b(?:be straight with me|be honest with me|tell me straight)\b/i.test(clean);
+  const substantiveAskDominanceActive =
+    hasActiveThread &&
+    !explicitTopicPivotActive &&
+    lightweightSocialThreadHits.score >= 0.95 &&
+    substantiveAskShape &&
+    substantiveAskHits.score >= 1.15;
+  const lightweightSocialContinuationActive =
+    hasActiveThread &&
+    !explicitTopicPivotActive &&
+    !substantiveAskDominanceActive &&
+    lightweightSocialThreadHits.score >= 0.95 &&
+    freshSubjectHits.score > 0 &&
+    !/\?\s*$/.test(clean);
 
   let continuationScore = continuationHits.score;
+  continuationScore += sameTopicContinuationHits.score;
+  continuationScore += lightweightSocialContinuationActive ? 1 : 0;
   continuationScore +=
     hasActiveThread &&
     overlapRatio >= QUINN_THREAD_CONTINUITY_TUNING.continuation.overlapKeepThreshold
@@ -301,8 +376,13 @@ export function inferQuinnThreadContinuity({
       ? 0.45
       : 0;
   continuationScore -= directComplaintAboutConversation ? 0.9 : 0;
+  continuationScore -= explicitTopicPivotActive ? 0.45 : 0;
+  continuationScore -= substantiveAskDominanceActive ? 0.65 : 0;
 
-  let liveSubjectScore = freshSubjectHits.score + pivotHits.score;
+  let liveSubjectScore =
+    freshSubjectHits.score +
+    pivotHits.score +
+    (explicitTopicPivotActive ? explicitTopicPivotHits.score : 0);
   liveSubjectScore += wordCount >= 10 ? 0.3 : 0;
   liveSubjectScore +=
     hasActiveThread &&
@@ -315,6 +395,7 @@ export function inferQuinnThreadContinuity({
       ? 0.45
       : 0;
   liveSubjectScore += metaComplaintScore;
+  liveSubjectScore += substantiveAskDominanceActive ? 1.05 : 0;
   liveSubjectScore -= continuationHits.score > 0 ? 0.35 : 0;
 
   let staleFrameRiskScore = hasActiveThread ? 0.15 : 0;
@@ -327,8 +408,11 @@ export function inferQuinnThreadContinuity({
       ? 0.7
       : 0;
   staleFrameRiskScore += pivotHits.score > 0 ? 0.3 : 0;
+  staleFrameRiskScore += explicitTopicPivotActive ? 0.55 : 0;
+  staleFrameRiskScore += substantiveAskDominanceActive ? 0.75 : 0;
   staleFrameRiskScore += directComplaintAboutConversation ? 0.95 : 0;
   staleFrameRiskScore -= continuationScore >= QUINN_THREAD_CONTINUITY_TUNING.continuation.keepThreshold ? 0.6 : 0;
+  staleFrameRiskScore -= lightweightSocialContinuationActive ? 0.65 : 0;
 
   const staleTemplateInterruptScore =
     metaComplaintScore +
@@ -371,13 +455,20 @@ export function inferQuinnThreadContinuity({
   const frameContinuation =
     hasActiveThread &&
     staleTemplateInterruptId !== 'hard' &&
-    (continuationScore >= QUINN_THREAD_CONTINUITY_TUNING.continuation.keepThreshold ||
+    !explicitTopicPivotActive &&
+    !substantiveAskDominanceActive &&
+    (lightweightSocialContinuationActive ||
+      continuationScore >= QUINN_THREAD_CONTINUITY_TUNING.continuation.keepThreshold ||
       (overlapRatio >= QUINN_THREAD_CONTINUITY_TUNING.continuation.overlapKeepThreshold &&
         liveSubjectDominanceId !== 'high'));
 
   const threadCarryoverModeId: QuinnThreadCarryoverModeId =
     !hasActiveThread
       ? 'keep'
+      : lightweightSocialContinuationActive
+        ? staleFrameRiskId === 'none'
+          ? 'keep'
+          : 'soften'
       : frameContinuation && staleFrameRiskId === 'none'
         ? 'keep'
         : staleTemplateInterruptId === 'hard' ||
@@ -388,11 +479,28 @@ export function inferQuinnThreadContinuity({
   const suppressTemplateReuse =
     hasActiveThread &&
     (staleTemplateInterruptId === 'hard' ||
+      explicitTopicPivotActive ||
+      substantiveAskDominanceActive ||
       (directComplaintAboutConversation &&
         (staleFrameRiskId !== 'none' || threadCarryoverModeId === 'drop')));
 
   const liveSubjectSignals = uniqueItems([
     ...freshSubjectHits.signals,
+    ...(explicitTopicPivotActive ? explicitTopicPivotHits.signals : []),
+    ...sameTopicContinuationHits.signals,
+    ...(substantiveAskDominanceActive
+      ? [
+          ...lightweightSocialThreadHits.signals,
+          ...substantiveAskHits.signals,
+          'the newest substantive ask should outrank the older social posture',
+        ]
+      : []),
+    ...(lightweightSocialContinuationActive
+      ? [
+          ...lightweightSocialThreadHits.signals,
+          'the newest turn is still answering inside the same lightweight social lane',
+        ]
+      : []),
     ...(hasActiveThread &&
     overlapRatio <= QUINN_THREAD_CONTINUITY_TUNING.continuation.overlapDropThreshold &&
     currentTokens.length >= 3
@@ -403,12 +511,19 @@ export function inferQuinnThreadContinuity({
 
   const carryoverSignals = uniqueItems([
     ...continuationHits.signals,
+    ...sameTopicContinuationHits.signals,
     ...(frameContinuation ? ['the current note still looks like the same live subject'] : []),
     ...(threadCarryoverModeId === 'soften'
       ? ['the same thread is active, but carryover should stay secondary']
       : []),
     ...(threadCarryoverModeId === 'drop'
       ? ['the thread continues, but the live subject has shifted']
+      : []),
+    ...(substantiveAskDominanceActive
+      ? ['the older lightweight check-in frame should not dominate the newer substantive ask']
+      : []),
+    ...(lightweightSocialContinuationActive
+      ? ['the same lightweight social thread is still live, even though the user added fresh status detail']
       : []),
   ]);
 
@@ -418,7 +533,13 @@ export function inferQuinnThreadContinuity({
       : []),
     ...hardMetaComplaintHits.signals,
     ...lightMetaComplaintHits.signals,
+    ...(explicitTopicPivotActive ? explicitTopicPivotHits.signals : []),
     ...(pivotHits.signals.length ? pivotHits.signals : []),
+    ...(substantiveAskDominanceActive
+      ? [
+          'a stale check-in or status posture could override the literal question if left unchecked',
+        ]
+      : []),
   ]);
   const staleTemplateInterruptSignals = uniqueItems([
     ...hardMetaComplaintHits.signals,
@@ -429,21 +550,31 @@ export function inferQuinnThreadContinuity({
   ]);
 
   const liveSubjectPromptGuidance =
-    liveSubjectDominanceId === 'high'
+    substantiveAskDominanceActive
+      ? 'The newest user turn is a substantive evaluative ask inside a lightweight social thread. Answer the question itself, not the old check-in posture.'
+      : lightweightSocialContinuationActive
+        ? 'The newest turn is still a direct status follow-up inside the same lightweight social thread. Keep the reply casual and in-lane.'
+      : liveSubjectDominanceId === 'high'
       ? 'The newest user turn clearly owns the live subject. Answer that directly and treat earlier thread material as background only.'
       : liveSubjectDominanceId === 'medium'
         ? 'The newest turn adds real live material. Let it lead, and keep thread callbacks light.'
         : 'The newest turn still looks close to the ongoing thread, so continuity can stay more active if it truly fits.';
 
   const carryoverPromptGuidance =
-    threadCarryoverModeId === 'drop'
+    substantiveAskDominanceActive
+      ? 'The thread may still be active, but the old social posture does not get to dominate. Keep continuity only as background and answer the substantive ask directly.'
+      : lightweightSocialContinuationActive
+        ? 'This is still the same lightweight social exchange. Carry the casual lane forward instead of treating the user’s status update as a separate topic reset.'
+      : threadCarryoverModeId === 'drop'
       ? 'Still the same thread, but not the same scene. Drop stale vibe, pet-name posture, and old semantic momentum. Respond to the live subject now.'
       : threadCarryoverModeId === 'soften'
         ? 'Same thread, but continuity is background support. Use it for calibration, not topic dominance.'
         : 'The thread still appears to be carrying the same live subject. Carry it forward only as far as the newest note keeps it alive.';
 
   const staleFramePromptGuidance =
-    staleFrameRiskId === 'strong'
+    substantiveAskDominanceActive
+      ? 'A lightweight check-in frame is still hanging around, but the newest turn is asking for a substantive read. Do not answer with another generic status beat.'
+      : staleFrameRiskId === 'strong'
       ? 'Stale-frame risk is strong. Do not keep roleplaying the earlier scene or meaning if the user has moved on.'
       : staleFrameRiskId === 'light'
         ? 'There is some stale-frame risk. Keep the old thread light unless the new note clearly calls back to it.'

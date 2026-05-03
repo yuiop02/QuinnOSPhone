@@ -68,7 +68,6 @@ function buildActiveThreadState({
   currentMemoryResonance,
   currentSessionArc,
   lastRunAt,
-  latestCompletedRun,
 }: {
   packetTitle: string;
   writtenResult: string;
@@ -76,46 +75,31 @@ function buildActiveThreadState({
   currentMemoryResonance: MemoryResonanceItem[];
   currentSessionArc: SessionArc | null;
   lastRunAt: string | null;
-  latestCompletedRun: RunHistoryItem | null;
 }) {
   const hasVisibleThreadState = Boolean(
     currentSessionArc ||
       String(writtenResult || '').trim() ||
       String(compressedSummary || '').trim() ||
-      currentMemoryResonance.length ||
-      latestCompletedRun
+      currentMemoryResonance.length
   );
   const source = currentSessionArc
     ? 'session-arc'
-    : latestCompletedRun
-      ? 'latest-run'
-      : hasVisibleThreadState
-        ? 'live-output'
-        : 'none';
+    : hasVisibleThreadState
+      ? 'live-output'
+      : 'none';
   const title =
     String(currentSessionArc?.title || '').trim() ||
-    String(latestCompletedRun?.sessionArcTitle || '').trim() ||
-    String(latestCompletedRun?.packetTitle || '').trim() ||
     String(packetTitle || '').trim();
 
   return {
     source,
-    id:
-      String(currentSessionArc?.id || '').trim() ||
-      String(latestCompletedRun?.sessionArcId || '').trim() ||
-      null,
+    id: String(currentSessionArc?.id || '').trim() || null,
     title,
     hasActiveThread: source !== 'none',
-    lastRunAt: lastRunAt || latestCompletedRun?.timestamp || null,
-    compressedSummary: String(compressedSummary || '').trim()
-      ? compressedSummary
-      : latestCompletedRun?.compressedSummary || '',
-    writtenResult: String(writtenResult || '').trim()
-      ? writtenResult
-      : latestCompletedRun?.writtenResult || '',
-    memoryResonance: currentMemoryResonance.length
-      ? currentMemoryResonance
-      : latestCompletedRun?.memoryResonance || [],
+    lastRunAt: source === 'none' ? null : lastRunAt || null,
+    compressedSummary: String(compressedSummary || '').trim() ? compressedSummary : '',
+    writtenResult: String(writtenResult || '').trim() ? writtenResult : '',
+    memoryResonance: currentMemoryResonance,
     sessionArc: currentSessionArc,
   } as const;
 }
@@ -163,7 +147,6 @@ export function buildExportBundle({
     currentMemoryResonance,
     currentSessionArc,
     lastRunAt,
-    latestCompletedRun,
   });
   const exportTitle =
     String(activeThread.title || '').trim() ||
