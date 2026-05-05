@@ -12,6 +12,7 @@ type LatencyRecord = {
   ok?: boolean;
   status?: number;
   error?: string;
+  backendTimings?: any;
 };
 
 type Subscriber = (records: LatencyRecord[]) => void;
@@ -105,12 +106,25 @@ export function installQuinnLatencyDiagnostics() {
       const response = await originalFetch(input as any, init as any);
       const endedAt = Date.now();
 
+      let backendTimings = null;
+
+      if (label === 'run') {
+        try {
+          const clonedResponse = typeof response.clone === 'function' ? response.clone() : null;
+          const json = clonedResponse ? await clonedResponse.json() : null;
+          backendTimings = json?.timings || null;
+        } catch {
+          backendTimings = null;
+        }
+      }
+
       upsert({
         ...record,
         endedAt,
         durationMs: endedAt - startedAt,
         ok: response.ok,
         status: response.status,
+        backendTimings,
       });
 
       return response;
@@ -159,6 +173,16 @@ function runToVoiceGap(items: LatencyRecord[]) {
   if (!voice) return undefined;
 
   return voice.startedAt - run.endedAt;
+}
+
+
+function backendTimingMark(record: LatencyRecord | undefined, label: string) {
+  const marks = record?.backendTimings?.marks;
+
+  if (!Array.isArray(marks)) return undefined;
+
+  const found = marks.find((mark: any) => mark?.label === label);
+  return typeof found?.atMs === 'number' ? found.atMs : undefined;
 }
 
 function statusText(record?: LatencyRecord) {
@@ -237,6 +261,13 @@ export function QuinnLatencyDiagnosticsPanel() {
       ? voice.endedAt - run.startedAt
       : undefined;
 
+  const backendTimings = run?.backendTimings;
+  const providerMs = backendTimings?.providerMs;
+  const backendTotalMs = backendTimings?.totalMs;
+  const memoryReadMs = backendTimingMark(run, 'memory_read');
+  const inputBuiltMs = backendTimingMark(run, 'input_built');
+  const providerReturnedMs = backendTimingMark(run, 'provider_returned');
+
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
       <Pressable style={styles.card} onPress={() => setExpanded((value) => !value)}>
@@ -256,6 +287,8 @@ export function QuinnLatencyDiagnosticsPanel() {
             <Text style={styles.detail}>Backend: {QUINN_BACKEND_BASE_URL}</Text>
             <Text style={styles.detail}>Provider: {health.provider || '—'} • Model: {health.model || '—'}</Text>
             <Text style={styles.detail}>Run → voice gap: {formatMs(gap)}</Text>
+            <Text style={styles.detail}>Backend total: {formatMs(backendTotalMs)} • Provider: {formatMs(providerMs)}</Text>
+            <Text style={styles.detail}>Memory: {formatMs(memoryReadMs)} • Input: {formatMs(inputBuiltMs)} • Provider returned: {formatMs(providerReturnedMs)}</Text>
             {items.slice(0, 7).map((item) => (
               <Text key={item.id} style={styles.detail}>
                 {item.label}: {formatMs(item.durationMs)} {item.ok === false ? 'error' : ''}
