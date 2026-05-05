@@ -954,6 +954,49 @@ const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
   );
 });
 
+
+function isContextHygieneTestText(...parts: Array<string | null | undefined>) {
+  const text = parts
+    .map((part) => String(part || ''))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  if (!text) return false;
+
+  return [
+    /\bspeed\s*v?\d*\s*check\b/,
+    /\bspeed\s*pass\b/,
+    /\bren\s+(?:app\s+)?(?:route\s+)?check\b/,
+    /\bsmoke\s+test\b/,
+    /\brollback\s+check\b/,
+    /\bproduction\s+(?:voice\s+)?check\b/,
+    /\bdevelopment\s+(?:build\s+)?(?:routing\s+)?check\b/,
+    /\belevenlabs\s+production\s+check\b/,
+    /\bvoice\s+health\b/,
+    /\blocal\s+env\s+check\b/,
+    /\bcontext\s+hygiene\s+check\b/,
+    /\bjust answer one short sentence so i know you(?:'re| are) alive\b/,
+    /\bgive me a quick ren response that would feel good while showing this app to someone\b/,
+    /\banswer in one short ren paragraph and speak it\b/,
+    /\btest whether\b/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function filterContextHygieneRuns<T extends Record<string, any>>(items: T[]) {
+  return items.filter((item) => {
+    return !isContextHygieneTestText(
+      item.title,
+      item.summary,
+      item.packetTitle,
+      item.packetText,
+      item.body
+    );
+  });
+}
+
+
 const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
   const aura = useRef(new Animated.Value(0)).current;
   const drift = useRef(new Animated.Value(0)).current;
@@ -2942,9 +2985,28 @@ export default function App() {
       setCurrentSessionArc(nextSessionArc);
       setLastRunAt(timestamp);
       setRecentRuns((prev) =>
-        sanitizeRunHistoryItemsForDisplay([runItem, ...prev]).slice(0, 24)
+        filterContextHygieneRuns(
+          sanitizeRunHistoryItemsForDisplay([runItem, ...prev])
+        ).slice(0, 24)
       );
-      setMemories((prev) => [memoryItem, ...prev].slice(0, 12));
+      const shouldKeepReusableMemoryForContextHygiene = !isContextHygieneTestText(
+
+        effectiveTitle,
+
+        nextText,
+
+        cleanWrittenResult,
+
+        cleanCompressedSummary
+
+      );
+
+
+      if (shouldKeepReusableMemoryForContextHygiene) {
+
+        setMemories((prev) => [memoryItem, ...prev].slice(0, 12));
+
+      }
 
       pushNotification({
         title: 'Run landed',
@@ -3094,7 +3156,7 @@ export default function App() {
 
     pushNotification({
       title: 'Fresh thread ready',
-      body: 'Quinn will treat the next run as a new topic with no carryover from the prior thread.',
+      body: 'Ren will treat the next run as a clean topic with no test residue or carryover.',
       target: 'QuinnConversation',
       tone: 'gold',
     });
