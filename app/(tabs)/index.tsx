@@ -101,6 +101,7 @@ import { loadQuinnSnapshot, saveQuinnSnapshot } from '../../components/quinn/qui
 import { TOKENS } from '../../components/quinn/quinnSystem';
 import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
+import { QuinnLatencyDiagnosticsPanel } from '@/components/quinn/QuinnLatencyDiagnosticsPanel';
 import type {
   AppScreen,
   MemoryItem,
@@ -3390,6 +3391,7 @@ export default function App() {
         />
 
         <View style={styles.systemHubGrid}>
+      <QuinnLatencyDiagnosticsPanel />
           <Pressable style={styles.systemHubCard} onPress={() => setScreen('HomeTileGrid')}>
             <Text style={styles.systemHubEyebrow}>SYSTEM DECK</Text>
             <Text style={styles.systemHubTitle}>Surface index</Text>
