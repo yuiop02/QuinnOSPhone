@@ -981,6 +981,11 @@ function isContextHygieneTestText(...parts: Array<string | null | undefined>) {
     /\bgive me a quick ren response that would feel good while showing this app to someone\b/,
     /\banswer in one short ren paragraph and speak it\b/,
     /\btest whether\b/,
+      /\bno extra mythology\b/,
+      /\bdo not add\b.*\bmeaning\b/,
+      /\btest energy\b/,
+      /\bdo not infer\b/,
+      /\banswer only what i actually said\b/,
   ].some((pattern) => pattern.test(text));
 }
 
