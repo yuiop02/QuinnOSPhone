@@ -3305,16 +3305,11 @@ export default function App() {
     content = (
       <ScrollView contentContainerStyle={styles.systemScroll} showsVerticalScrollIndicator={false}>
         <QuinnSurfaceShell
-          eyebrow="SYSTEM LAYER"
-          title="Everything around the conversation, kept precise."
-          description="Ren stays at the center. This layer is where memory, voice, exports, signals, and control stay organized without turning the app into a cluttered dashboard."
+          eyebrow="START HERE"
+          title="What do you need right now?"
+          description="Start with the conversation. Memory, voice, and save/share are here when they help, not because you need to manage the machine."
           onBack={() => setScreen('QuinnConversation')}
-          backLabel="Back to Ren"
-          actions={[
-            { label: `${recentRuns.length} runs`, tone: 'secondary' },
-            { label: `${memories.length} memory items`, tone: 'ghost' },
-            { label: unreadCount ? `${unreadCount} active alerts` : 'Signals quiet', tone: 'primary' },
-          ]}
+          backLabel="Back to Quinn"
         />
 
         <View style={styles.systemHubGrid}>
