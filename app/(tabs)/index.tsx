@@ -85,7 +85,6 @@ import {
 } from '../../components/quinn/quinnLenses';
 import {
   buildSpokenSummary,
-  getSingleReplySpeechPolicy,
   prepareQuinnVoiceSpeech,
 } from '../../components/quinn/quinnSpeechText';
 import {
@@ -1761,77 +1760,6 @@ function QuinnConversationSurface({
       }
     },
     [player, prepareSpeechPlaybackSource, warmUpcomingSpeechChunks]
-  );
-
-  const tryPlaySingleReplySpeech = useCallback(
-    async (clean: string, prosodyHint: QuinnVoiceTtsHint | null) => {
-      const policy = getSingleReplySpeechPolicy(clean);
-
-      if (!policy.shouldAttemptSingleFile) {
-        return false;
-      }
-
-      speechChunksRef.current = [clean];
-      speechActiveChunkIndexRef.current = -1;
-      speechSessionRef.current += 1;
-      speechProsodyHintRef.current = prosodyHint;
-
-      const sessionId = speechSessionRef.current;
-
-      setVoiceStatus('Quinn voice loading full reply...');
-      const timeoutMessage = 'Full reply voice preparation timed out.';
-      const prepareFullReplySource = () =>
-        prepareSpeechPlaybackSource(
-          clean,
-          {
-            previousText: '',
-            nextText: '',
-            prosodyHint,
-          },
-          sessionId
-        );
-
-      try {
-        try {
-          await withTimeout(
-            prepareFullReplySource(),
-            policy.initialPrepareTimeoutMs,
-            timeoutMessage
-          );
-        } catch (error) {
-          const timedOut = error instanceof Error && error.message === timeoutMessage;
-
-          if (!timedOut || policy.gracePrepareTimeoutMs <= 0) {
-            throw error;
-          }
-
-          setVoiceStatus('Quinn voice still loading full reply...');
-          await withTimeout(
-            prepareFullReplySource(),
-            policy.gracePrepareTimeoutMs,
-            timeoutMessage
-          );
-        }
-
-        if (sessionId !== speechSessionRef.current) {
-          return true;
-        }
-
-        const started = await playSpeechChunkAtIndex(sessionId, 0);
-
-        if (started) {
-          return true;
-        }
-      } catch {}
-
-      if (sessionId === speechSessionRef.current) {
-        clearSpeechQueue();
-        player.pause();
-      }
-
-      return false;
-    },
-    [player, playSpeechChunkAtIndex, prepareSpeechPlaybackSource]
   );
 
   async function interruptQuinnPlayback() {
