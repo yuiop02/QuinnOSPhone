@@ -957,7 +957,7 @@ const AmbientGalaxyMotion = React.memo(function AmbientGalaxyMotion() {
 });
 
 
-function isContextHygieneTestText(...parts: Array<string | null | undefined>) {
+function isContextHygieneTestText(...parts: (string | null | undefined)[]) {
   const text = parts
     .map((part) => String(part || ''))
     .join(' ')
