@@ -100,8 +100,6 @@ import { loadQuinnSnapshot, saveQuinnSnapshot } from '../../components/quinn/qui
 import { TOKENS } from '../../components/quinn/quinnSystem';
 import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
-import { QuinnLatencyDiagnosticsPanel } from '@/components/quinn/QuinnLatencyDiagnosticsPanel';
-import { QuinnStreamTestPanel } from '@/components/quinn/QuinnStreamTestPanel';
 import type {
   AppScreen,
   MemoryItem,
@@ -3373,9 +3371,7 @@ export default function App() {
             <Text style={styles.systemHubTitle}>Surface switcher</Text>
             <Text style={styles.systemHubBody}>
               Move between QuinnOS layers instantly when you already know where you need to land.
-            </Text>
-            <QuinnLatencyDiagnosticsPanel />
-            <QuinnStreamTestPanel />
+            </Text>
           </Pressable>
         </View>
       </ScrollView>
