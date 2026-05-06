@@ -102,6 +102,7 @@ import { TOKENS } from '../../components/quinn/quinnSystem';
 import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
 import { QuinnLatencyDiagnosticsPanel } from '@/components/quinn/QuinnLatencyDiagnosticsPanel';
+import { QuinnStreamTestPanel } from '@/components/quinn/QuinnStreamTestPanel';
 import type {
   AppScreen,
   MemoryItem,
@@ -3446,6 +3447,7 @@ export default function App() {
               Move between QuinnOS layers instantly when you already know where you need to land.
             </Text>
             <QuinnLatencyDiagnosticsPanel />
+            <QuinnStreamTestPanel />
           </Pressable>
         </View>
       </ScrollView>
