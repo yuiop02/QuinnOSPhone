@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { buildQuinnBackendUrl, QUINN_BACKEND_BASE_URL } from './quinnEndpoints';
 
 type LatencyRecord = {
@@ -270,7 +270,7 @@ export function QuinnLatencyDiagnosticsPanel() {
 
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
-      <Pressable style={styles.card} onPress={() => setExpanded((value) => !value)}>
+      <Pressable style={[styles.card, expanded ? styles.cardExpanded : styles.cardCollapsed]} onPress={() => setExpanded((value) => !value)}>
         <View style={styles.row}>
           <Text style={styles.title}>LATENCY DEBUG</Text>
           <Text style={styles.status}>
@@ -289,7 +289,7 @@ export function QuinnLatencyDiagnosticsPanel() {
             <Text style={styles.detail}>Run → voice gap: {formatMs(gap)}</Text>
             <Text style={styles.detail}>Backend total: {formatMs(backendTotalMs)} • Provider: {formatMs(providerMs)}</Text>
             <Text style={styles.detail}>Memory: {formatMs(memoryReadMs)} • Input: {formatMs(inputBuiltMs)} • Provider returned: {formatMs(providerReturnedMs)}</Text>
-            {items.slice(0, 7).map((item) => (
+            {items.slice(0, 5).map((item) => (
               <Text key={item.id} style={styles.detail}>
                 {item.label}: {formatMs(item.durationMs)} {item.ok === false ? 'error' : ''}
               </Text>
