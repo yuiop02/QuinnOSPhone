@@ -489,7 +489,7 @@ export async function runQuinnPacketStreamLite({
 
       if (event === 'done') {
         doneData = data || {};
-        const written = sanitizeQuinnVisibleReplyText(`${debugPrefix}${doneData?.output || liveOutput}`);
+        const written = sanitizeQuinnVisibleReplyText(doneData?.output || liveOutput);
         const summary = buildCompressionSummary(written || packetText);
         const timestamp = String(doneData?.timestamp || doneData?.ranAt || new Date().toISOString());
 
