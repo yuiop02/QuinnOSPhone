@@ -49,13 +49,13 @@ export function QuinnStreamTestPanel() {
 
   async function runStreamTest() {
     setIsRunning(true);
-    setStatus('Starting XHR stream...');
+    setStatus('Starting real Ren stream...');
     setOutput('');
     setTimings(null);
     setReaderMode('xhr');
 
     const startedAt = Date.now();
-    const url = buildQuinnBackendUrl('/stream-test');
+    const url = buildQuinnBackendUrl('/run-stream-lite');
 
     let processedLength = 0;
     let buffer = '';
@@ -136,7 +136,7 @@ export function QuinnStreamTestPanel() {
               if (xhr.status < 200 || xhr.status >= 300) {
                 reject(
                   new Error(
-                    `XHR stream failed: ${xhr.status} ${String(xhr.responseText || '').slice(0, 180)}`
+                    `XHR run stream failed: ${xhr.status} ${String(xhr.responseText || '').slice(0, 180)}`
                   )
                 );
                 return;
@@ -160,23 +160,26 @@ export function QuinnStreamTestPanel() {
         };
 
         xhr.onerror = () => {
-          reject(new Error('XHR stream network error'));
+          reject(new Error('XHR run stream network error'));
         };
 
         xhr.ontimeout = () => {
-          reject(new Error('XHR stream timed out'));
+          reject(new Error('XHR run stream timed out'));
         };
 
         xhr.send(
           JSON.stringify({
-            prompt:
-              'Give me one short Ren paragraph about why streaming makes QuinnOS feel faster. Keep it conversational.',
+            packet:
+              'Run-stream-lite in-app check: give me one short Ren paragraph about XHR streaming working inside QuinnOS now. Keep it casual and not too technical.',
+            prompt: 'Reply naturally as Ren. One short paragraph. No list.',
+            projectTag: 'QuinnOS',
+            threadId: 'in-app-run-stream-lite-test',
           })
         );
       });
     } catch (error: any) {
       setReaderMode('error');
-      setStatus(error?.message || 'Stream test failed');
+      setStatus(error?.message || 'Run stream test failed');
     } finally {
       setIsRunning(false);
     }
@@ -186,16 +189,16 @@ export function QuinnStreamTestPanel() {
     <View style={styles.wrap}>
       <View style={styles.card}>
         <View style={styles.row}>
-          <Text style={styles.kicker}>XHR STREAM TEST</Text>
+          <Text style={styles.kicker}>RUN STREAM LITE</Text>
           <Text style={styles.status}>{readerMode}</Text>
         </View>
 
         <Text style={styles.description}>
-          Tests whether QuinnOS can display Ren’s response while chunks are still arriving.
+          Tests the real lightweight Ren streaming route before we wire it into the main conversation flow.
         </Text>
 
         <Pressable style={styles.button} onPress={runStreamTest} disabled={isRunning}>
-          <Text style={styles.buttonText}>{isRunning ? 'Streaming...' : 'Run XHR stream test'}</Text>
+          <Text style={styles.buttonText}>{isRunning ? 'Streaming...' : 'Run real stream test'}</Text>
         </Pressable>
 
         <Text style={styles.statusLine}>{status}</Text>
