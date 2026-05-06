@@ -7,22 +7,12 @@ type StreamTiming = {
   firstDeltaMs?: number | null;
 };
 
-function decodeChunk(value: Uint8Array) {
-  const decoder = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8') : null;
+type ParsedSseEvent = {
+  event: string;
+  data: any;
+};
 
-  if (decoder) {
-    return decoder.decode(value, { stream: true });
-  }
-
-  let result = '';
-  for (let index = 0; index < value.length; index += 1) {
-    result += String.fromCharCode(value[index]);
-  }
-
-  return result;
-}
-
-function parseSseBlock(block: string) {
+function parseSseBlock(block: string): ParsedSseEvent {
   const lines = block.split(/\r?\n/);
   let event = 'message';
   let dataText = '';
@@ -53,90 +43,134 @@ export function QuinnStreamTestPanel() {
   const [status, setStatus] = React.useState('Idle');
   const [output, setOutput] = React.useState('');
   const [timings, setTimings] = React.useState<StreamTiming | null>(null);
-  const [readerMode, setReaderMode] = React.useState<'unknown' | 'streaming' | 'fallback'>('unknown');
+  const [readerMode, setReaderMode] = React.useState<'idle' | 'xhr' | 'xhr-live' | 'xhr-full-end' | 'error'>('idle');
 
   async function runStreamTest() {
     setIsRunning(true);
-    setStatus('Starting stream...');
+    setStatus('Starting XHR stream...');
     setOutput('');
     setTimings(null);
-    setReaderMode('unknown');
+    setReaderMode('xhr');
+
+    const startedAt = Date.now();
+    const url = buildQuinnBackendUrl('/stream-test');
+
+    let processedLength = 0;
+    let buffer = '';
+    let liveOutput = '';
+    let sawDeltaBeforeDone = false;
+    let isDone = false;
+
+    function handleBlock(block: string) {
+      if (!block.trim()) return;
+
+      const { event, data } = parseSseBlock(block);
+
+      if (event === 'ready') {
+        setStatus('Stream ready...');
+      }
+
+      if (event === 'delta' && data?.text) {
+        liveOutput += data.text;
+        sawDeltaBeforeDone = true;
+        setReaderMode('xhr-live');
+        setOutput(liveOutput);
+        setStatus(`Streaming... ${data.elapsedMs || Date.now() - startedAt}ms`);
+      }
+
+      if (event === 'done') {
+        isDone = true;
+        setOutput(data?.output || liveOutput);
+        setTimings(data?.timings || null);
+        setReaderMode(sawDeltaBeforeDone ? 'xhr-live' : 'xhr-full-end');
+        setStatus(sawDeltaBeforeDone ? 'Done, streamed live' : 'Done, but arrived all at end');
+      }
+
+      if (event === 'error') {
+        throw new Error(data?.error || 'Streaming error');
+      }
+    }
+
+    function consumeResponseText(responseText: string) {
+      if (responseText.length <= processedLength) return;
+
+      const nextChunk = responseText.slice(processedLength);
+      processedLength = responseText.length;
+
+      buffer += nextChunk;
+
+      const blocks = buffer.split(/\r?\n\r?\n/);
+      buffer = blocks.pop() || '';
+
+      for (const block of blocks) {
+        handleBlock(block);
+      }
+    }
 
     try {
-      const response = await fetch(buildQuinnBackendUrl('/stream-test'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt:
-            'Give me one short Ren paragraph about why streaming makes QuinnOS feel faster. Keep it conversational.',
-        }),
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.open('POST', url, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Accept', 'text/event-stream');
+
+        xhr.onprogress = () => {
+          try {
+            consumeResponseText(xhr.responseText || '');
+          } catch (error) {
+            reject(error);
+          }
+        };
+
+        xhr.onreadystatechange = () => {
+          try {
+            if (xhr.readyState === 3 || xhr.readyState === 4) {
+              consumeResponseText(xhr.responseText || '');
+            }
+
+            if (xhr.readyState === 4) {
+              if (xhr.status < 200 || xhr.status >= 300) {
+                reject(new Error(`XHR stream failed: ${xhr.status} ${String(xhr.responseText || '').slice(0, 180)}`));
+                return;
+              }
+
+              if (buffer.trim()) {
+                handleBlock(buffer);
+                buffer = '';
+              }
+
+              if (!isDone) {
+                setReaderMode(sawDeltaBeforeDone ? 'xhr-live' : 'xhr-full-end');
+                setStatus(sawDeltaBeforeDone ? 'Stream ended' : 'Stream ended without live deltas');
+              }
+
+              resolve();
+            }
+          } catch (error) {
+            reject(error);
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error('XHR stream network error'));
+        };
+
+        xhr.ontimeout = () => {
+          reject(new Error('XHR stream timed out'));
+        };
+
+        xhr.timeout = 60000;
+
+        xhr.send(
+          JSON.stringify({
+            prompt:
+              'Give me one short Ren paragraph about why streaming makes QuinnOS feel faster. Keep it conversational.',
+          })
+        );
       });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Stream test failed: ${response.status} ${text.slice(0, 160)}`);
-      }
-
-      const body: any = response.body;
-
-      if (!body || typeof body.getReader !== 'function') {
-        setReaderMode('fallback');
-        setStatus('No streaming reader available in this build; showing full response at end.');
-        const text = await response.text();
-        setOutput(text);
-        return;
-      }
-
-      setReaderMode('streaming');
-      setStatus('Streaming...');
-      const reader = body.getReader();
-
-      let buffer = '';
-      let liveOutput = '';
-
-      while (true) {
-        const result = await reader.read();
-
-        if (result.done) {
-          break;
-        }
-
-        buffer += decodeChunk(result.value);
-
-        const blocks = buffer.split(/\r?\n\r?\n/);
-        buffer = blocks.pop() || '';
-
-        for (const block of blocks) {
-          if (!block.trim()) continue;
-
-          const { event, data } = parseSseBlock(block);
-
-          if (event === 'ready') {
-            setStatus('Stream ready...');
-          }
-
-          if (event === 'delta' && data?.text) {
-            liveOutput += data.text;
-            setOutput(liveOutput);
-            setStatus(`Streaming... ${data.elapsedMs || ''}ms`);
-          }
-
-          if (event === 'done') {
-            setOutput(data?.output || liveOutput);
-            setTimings(data?.timings || null);
-            setStatus('Done');
-          }
-
-          if (event === 'error') {
-            throw new Error(data?.error || 'Streaming error');
-          }
-        }
-      }
-
-      setStatus((current) => (current === 'Done' ? current : 'Done'));
     } catch (error: any) {
+      setReaderMode('error');
       setStatus(error?.message || 'Stream test failed');
     } finally {
       setIsRunning(false);
@@ -148,15 +182,15 @@ export function QuinnStreamTestPanel() {
       <View style={styles.card}>
         <View style={styles.row}>
           <Text style={styles.kicker}>STREAM TEST</Text>
-          <Text style={styles.status}>{readerMode === 'streaming' ? 'live' : readerMode}</Text>
+          <Text style={styles.status}>{readerMode}</Text>
         </View>
 
         <Text style={styles.description}>
-          Checks whether the app can show Ren text as chunks arrive instead of waiting for the full response.
+          Tests whether QuinnOS can display Ren’s response while chunks are still arriving.
         </Text>
 
         <Pressable style={styles.button} onPress={runStreamTest} disabled={isRunning}>
-          <Text style={styles.buttonText}>{isRunning ? 'Streaming...' : 'Run stream test'}</Text>
+          <Text style={styles.buttonText}>{isRunning ? 'Streaming...' : 'Run XHR stream test'}</Text>
         </Pressable>
 
         <Text style={styles.statusLine}>{status}</Text>
