@@ -3305,19 +3305,19 @@ export default function App() {
     content = (
       <ScrollView contentContainerStyle={styles.systemScroll} showsVerticalScrollIndicator={false}>
         <QuinnSurfaceShell
-          eyebrow="START HERE"
+          eyebrow="QUINN HOME"
           title="What do you need right now?"
-          description="Start with the conversation. Memory, voice, and save/share are here when they help, not because you need to manage the machine."
+          description="Open the conversation, use voice when typing is too much, or save the parts you want to keep."
           onBack={() => setScreen('QuinnConversation')}
           backLabel="Back to Quinn"
         />
 
         <View style={styles.systemHubGrid}>
           <Pressable style={styles.systemHubCardWide} onPress={() => setScreen('QuinnConversation')}>
-            <Text style={styles.systemHubEyebrow}>START HERE</Text>
+            <Text style={styles.systemHubEyebrow}>CONVERSATION</Text>
             <Text style={styles.systemHubTitle}>Talk to Quinn</Text>
             <Text style={styles.systemHubBody}>
-              Open the main conversation and say what is actually going on.
+              Start a thread, continue the current one, or say the thing plainly.
             </Text>
           </Pressable>
 
@@ -3333,7 +3333,7 @@ export default function App() {
             <Text style={styles.systemHubEyebrow}>VOICE</Text>
             <Text style={styles.systemHubTitle}>Speak it out</Text>
             <Text style={styles.systemHubBody}>
-              Use voice when typing is too much or the thought needs air.
+              Talk it out when typing is too much.
             </Text>
           </Pressable>
 
