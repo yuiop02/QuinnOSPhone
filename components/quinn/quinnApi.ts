@@ -636,7 +636,7 @@ export async function runQuinnPacket({
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      packet: currentPacketForRun,
+      packet: builtPacket,
       prompt:
       'Answer the CURRENT RAW USER TEXT first. Obey explicit output constraints exactly. Do not reality-check, reinterpret, diagnose, or get clever unless the raw text asks for that. If the raw text is a technical check, answer the technical check plainly. Keep Ren voice natural, direct, concise, warm, and conversational. Do not use "if you want" endings.',
       packetTitle,
