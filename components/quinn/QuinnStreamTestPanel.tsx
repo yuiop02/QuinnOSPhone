@@ -43,7 +43,9 @@ export function QuinnStreamTestPanel() {
   const [status, setStatus] = React.useState('Idle');
   const [output, setOutput] = React.useState('');
   const [timings, setTimings] = React.useState<StreamTiming | null>(null);
-  const [readerMode, setReaderMode] = React.useState<'idle' | 'xhr' | 'xhr-live' | 'xhr-full-end' | 'error'>('idle');
+  const [readerMode, setReaderMode] = React.useState<
+    'idle' | 'xhr' | 'xhr-live' | 'xhr-full-end' | 'error'
+  >('idle');
 
   async function runStreamTest() {
     setIsRunning(true);
@@ -75,7 +77,7 @@ export function QuinnStreamTestPanel() {
         sawDeltaBeforeDone = true;
         setReaderMode('xhr-live');
         setOutput(liveOutput);
-        setStatus(`Streaming... ${data.elapsedMs || Date.now() - startedAt}ms`);
+        setStatus(`Streaming live... ${data.elapsedMs || Date.now() - startedAt}ms`);
       }
 
       if (event === 'done') {
@@ -114,6 +116,7 @@ export function QuinnStreamTestPanel() {
         xhr.open('POST', url, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.setRequestHeader('Accept', 'text/event-stream');
+        xhr.timeout = 60000;
 
         xhr.onprogress = () => {
           try {
@@ -131,7 +134,11 @@ export function QuinnStreamTestPanel() {
 
             if (xhr.readyState === 4) {
               if (xhr.status < 200 || xhr.status >= 300) {
-                reject(new Error(`XHR stream failed: ${xhr.status} ${String(xhr.responseText || '').slice(0, 180)}`));
+                reject(
+                  new Error(
+                    `XHR stream failed: ${xhr.status} ${String(xhr.responseText || '').slice(0, 180)}`
+                  )
+                );
                 return;
               }
 
@@ -160,8 +167,6 @@ export function QuinnStreamTestPanel() {
           reject(new Error('XHR stream timed out'));
         };
 
-        xhr.timeout = 60000;
-
         xhr.send(
           JSON.stringify({
             prompt:
@@ -181,7 +186,7 @@ export function QuinnStreamTestPanel() {
     <View style={styles.wrap}>
       <View style={styles.card}>
         <View style={styles.row}>
-          <Text style={styles.kicker}>STREAM TEST</Text>
+          <Text style={styles.kicker}>XHR STREAM TEST</Text>
           <Text style={styles.status}>{readerMode}</Text>
         </View>
 
