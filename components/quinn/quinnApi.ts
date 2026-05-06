@@ -451,6 +451,16 @@ export async function runQuinnPacketStreamLite({
   });
   const cleanPreviousAssistantReply = sanitizeQuinnVisibleReplyText(previousAssistantReply);
 
+  // STREAM_LITE_RAW_CURRENT_PACKET_V1
+  const currentPacketForStreamLite = [
+    'CURRENT RAW USER TEXT - ANSWER THIS FIRST AND LITERALLY',
+    String(packetText || '').trim(),
+    'PACKET TITLE',
+    String(packetTitle || '').trim(),
+    'FULL QUINNOS PACKET - USE ONLY AFTER THE RAW USER TEXT IS ANSWERED',
+    builtPacket,
+  ].join('\n\n');
+
   return new Promise<RunPacketResult>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
@@ -587,9 +597,9 @@ export async function runQuinnPacketStreamLite({
 
     xhr.send(
       JSON.stringify({
-        packet: builtPacket,
+        packet: currentPacketForStreamLite,
         prompt:
-          'Reply like another me in the same headspace, not like someone helping from the outside. Stay natural, direct, warm, specific, and conversational. Use prose unless structure is clearly asked for. Do not use "if you want" endings.',
+          'Answer the CURRENT RAW USER TEXT first. Obey explicit output constraints exactly. Do not reality-check, reinterpret, or get clever unless the raw text asks for that. Keep Ren voice natural, direct, concise, and conversational.',
         packetTitle,
         packetText,
         previousAssistantReply: cleanPreviousAssistantReply,
