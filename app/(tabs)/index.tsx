@@ -3391,7 +3391,6 @@ export default function App() {
         />
 
         <View style={styles.systemHubGrid}>
-      <QuinnLatencyDiagnosticsPanel />
           <Pressable style={styles.systemHubCard} onPress={() => setScreen('HomeTileGrid')}>
             <Text style={styles.systemHubEyebrow}>SYSTEM DECK</Text>
             <Text style={styles.systemHubTitle}>Surface index</Text>
@@ -3446,6 +3445,7 @@ export default function App() {
             <Text style={styles.systemHubBody}>
               Move between QuinnOS layers instantly when you already know where you need to land.
             </Text>
+            <QuinnLatencyDiagnosticsPanel />
           </Pressable>
         </View>
       </ScrollView>

@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { buildQuinnBackendUrl, QUINN_BACKEND_BASE_URL } from './quinnEndpoints';
 
 type LatencyRecord = {
@@ -268,40 +268,38 @@ export function QuinnLatencyDiagnosticsPanel() {
   const providerReturnedMs = backendTimingMark(run, 'provider_returned');
 
   return (
-    <View pointerEvents="box-none" style={styles.wrap}>
+    <View style={styles.wrap}>
       <Pressable
         style={[styles.card, expanded ? styles.cardExpanded : styles.cardCollapsed]}
         onPress={() => setExpanded((value) => !value)}
       >
         <View style={styles.row}>
-          <Text style={styles.title}>LATENCY</Text>
+          <Text style={styles.kicker}>LATENCY</Text>
           <Text style={styles.status}>
             API {health.api || statusText(apiHealth)} • Voice {health.voice || statusText(voiceHealth)}
           </Text>
         </View>
 
-        <Text style={styles.line}>
+        <Text style={styles.summary}>
           Run {formatMs(run?.durationMs)} • Voice {formatMs(voice?.durationMs)} • Total {formatMs(total)}
         </Text>
 
         {expanded ? (
-          <ScrollView
-            style={styles.detailsScroll}
-            contentContainerStyle={styles.details}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={false}
-          >
+          <View style={styles.details}>
             <Text style={styles.detail}>Backend: {QUINN_BACKEND_BASE_URL}</Text>
             <Text style={styles.detail}>Provider: {health.provider || '—'} • Model: {health.model || '—'}</Text>
             <Text style={styles.detail}>Run → voice gap: {formatMs(gap)}</Text>
             <Text style={styles.detail}>Backend total: {formatMs(backendTotalMs)} • Provider: {formatMs(providerMs)}</Text>
             <Text style={styles.detail}>Memory: {formatMs(memoryReadMs)} • Input: {formatMs(inputBuiltMs)} • Provider returned: {formatMs(providerReturnedMs)}</Text>
-            {items.slice(0, 5).map((item) => (
-              <Text key={item.id} style={styles.detail}>
-                {item.label}: {formatMs(item.durationMs)} {item.ok === false ? 'error' : ''}
-              </Text>
-            ))}
-          </ScrollView>
+
+            <View style={styles.history}>
+              {items.slice(0, 8).map((item) => (
+                <Text key={item.id} style={styles.detail}>
+                  {item.label}: {formatMs(item.durationMs)} {item.ok === false ? 'error' : ''}
+                </Text>
+              ))}
+            </View>
+          </View>
         ) : null}
       </Pressable>
     </View>
@@ -310,64 +308,55 @@ export function QuinnLatencyDiagnosticsPanel() {
 
 const styles = StyleSheet.create({
   wrap: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 92,
-    zIndex: 999999,
-    elevation: 999999,
-    alignItems: 'flex-end',
+    width: '100%',
+    marginTop: 16,
   },
   card: {
+    width: '100%',
     borderWidth: 1,
-    borderColor: 'rgba(255, 230, 120, 0.9)',
-    backgroundColor: 'rgba(35, 0, 55, 0.94)',
-    borderRadius: 16,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    borderColor: 'rgba(255, 230, 120, 0.78)',
+    backgroundColor: 'rgba(35, 0, 55, 0.72)',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     overflow: 'hidden',
   },
-  cardCollapsed: {
-    alignSelf: 'flex-end',
-    maxWidth: 285,
-  },
-  cardExpanded: {
-    alignSelf: 'stretch',
-    maxHeight: 245,
-  },
+  cardCollapsed: {},
+  cardExpanded: {},
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
-  title: {
-    color: '#f5d7ff',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+  kicker: {
+    color: '#ffd7ff',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 2.4,
   },
   status: {
-    color: '#c8b6d8',
-    fontSize: 9,
-    fontWeight: '700',
+    color: '#dac7e8',
+    fontSize: 12,
+    fontWeight: '800',
   },
-  line: {
+  summary: {
     color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 3,
-  },
-  detailsScroll: {
-    maxHeight: 140,
-    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '900',
+    marginTop: 6,
   },
   details: {
+    marginTop: 10,
+    gap: 4,
+  },
+  history: {
+    marginTop: 5,
     gap: 3,
-    paddingBottom: 2,
   },
   detail: {
-    color: '#c8b6d8',
-    fontSize: 9,
-    lineHeight: 12,
+    color: '#d2bfdc',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
   },
 });
