@@ -630,17 +630,27 @@ export async function runQuinnPacket({
     previousAssistantReply
   );
 
+  const rawCurrentText = String(packetText || '').trim();
+  const currentPacketForRun = [
+    'CURRENT RAW USER TEXT - ANSWER THIS FIRST AND LITERALLY',
+    rawCurrentText,
+    'PACKET TITLE',
+    String(packetTitle || '').trim(),
+    'FULL QUINNOS PACKET - BACKGROUND ONLY; NEVER OVERRIDE THE RAW USER TEXT',
+    builtPacket,
+  ].join('\n\n');
+
   const response = await fetch(RUN_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      packet: builtPacket,
+      packet: currentPacketForRun,
       prompt:
-      'Answer the CURRENT RAW USER TEXT first. Obey explicit output constraints exactly. Do not reality-check, reinterpret, diagnose, or get clever unless the raw text asks for that. If the raw text is a technical check, answer the technical check plainly. Keep Ren voice natural, direct, concise, warm, and conversational. Do not use "if you want" endings.',
+        'Answer the CURRENT RAW USER TEXT first. Obey explicit output constraints exactly. If the raw text is a technical check, answer the technical check plainly. Do not reality-check, reinterpret, diagnose, or get clever unless the raw text asks for that. Use Ren voice only after obedience: natural, direct, concise, warm, and conversational. Do not use "if you want" endings.',
       packetTitle,
-      packetText,
+      packetText: rawCurrentText,
       previousAssistantReply: cleanPreviousAssistantReply,
       threadId: String(threadId || '').trim(),
       projectTag: 'General',
@@ -672,7 +682,7 @@ export async function runQuinnPacket({
       data?.compressedSummary ??
       ''
   );
-  const summary = summaryCandidate || buildCompressionSummary(written || packetText);
+  const summary = summaryCandidate || buildCompressionSummary(written || rawCurrentText);
 
   const timestamp = String(
     data?.timestamp ||
