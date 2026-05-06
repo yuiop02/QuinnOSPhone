@@ -8,6 +8,7 @@ import type { MemoryResonanceItem, SessionArc } from './quinnTypes';
 
 export const BACKEND_BASE_URL = QUINN_BACKEND_BASE_URL;
 export const RUN_ENDPOINT = buildQuinnBackendUrl('/run');
+export const RUN_STREAM_LITE_ENDPOINT = buildQuinnBackendUrl('/run-stream-lite');
 export const TRANSCRIBE_ENDPOINT = buildQuinnBackendUrl('/transcribe');
 export const FOLLOWUP_PACKET_ENDPOINT = buildQuinnBackendUrl('/followup-packet');
 
@@ -25,6 +26,11 @@ type RunPacketResult = {
   summary: string;
   timestamp: string;
   memoryResonance: MemoryResonanceItem[];
+};
+
+type RunPacketStreamLiteArgs = RunPacketArgs & {
+  onDelta?: (text: string) => void;
+  onStatus?: (status: string) => void;
 };
 
 type TranscribeAudioArgs = {
@@ -393,6 +399,207 @@ export function buildCompressionSummary(text: string) {
 
   return joined.length > 180 ? `${joined.slice(0, 177)}...` : joined;
 }
+
+
+type ParsedSseEvent = {
+  event: string;
+  data: any;
+};
+
+function parseRunStreamSseBlock(block: string): ParsedSseEvent {
+  const lines = block.split(/\r?\n/);
+  let event = 'message';
+  let dataText = '';
+
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      event = line.slice('event:'.length).trim();
+    }
+
+    if (line.startsWith('data:')) {
+      dataText += line.slice('data:'.length).trim();
+    }
+  }
+
+  let data: any = null;
+
+  try {
+    data = dataText ? JSON.parse(dataText) : null;
+  } catch {
+    data = dataText;
+  }
+
+  return { event, data };
+}
+
+export async function runQuinnPacketStreamLite({
+  packetTitle,
+  packetText,
+  lensId = DEFAULT_QUINN_LENS_ID,
+  sessionArc = null,
+  previousAssistantReply = '',
+  threadId = '',
+  onDelta,
+  onStatus,
+}: RunPacketStreamLiteArgs): Promise<RunPacketResult> {
+  const builtPacket = buildQuinnPacket({
+    packetTitle,
+    packetText,
+    lensId,
+    sessionArc,
+    previousAssistantReply,
+  });
+  const cleanPreviousAssistantReply = sanitizeQuinnVisibleReplyText(previousAssistantReply);
+
+  return new Promise<RunPacketResult>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    let processedLength = 0;
+    let buffer = '';
+    let liveOutput = '';
+    let doneData: any = null;
+    let settled = false;
+
+    function settleResolve(result: RunPacketResult) {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    }
+
+    function settleReject(error: Error) {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    }
+
+    function handleBlock(block: string) {
+      if (!block.trim()) return;
+
+      const { event, data } = parseRunStreamSseBlock(block);
+
+      if (event === 'ready') {
+        onStatus?.('Stream ready...');
+      }
+
+      if (event === 'delta' && data?.text) {
+        liveOutput += String(data.text || '');
+        onDelta?.(liveOutput);
+        onStatus?.(`Streaming... ${data.elapsedMs || ''}ms`);
+      }
+
+      if (event === 'done') {
+        doneData = data || {};
+        const written = sanitizeQuinnVisibleReplyText(doneData?.output || liveOutput);
+        const summary = buildCompressionSummary(written || packetText);
+        const timestamp = String(doneData?.timestamp || doneData?.ranAt || new Date().toISOString());
+
+        settleResolve({
+          written,
+          summary,
+          timestamp,
+          memoryResonance: Array.isArray(doneData?.memoryResonance)
+            ? doneData.memoryResonance
+                .map((item: any): MemoryResonanceItem => ({
+                  label: String(item?.label || '').trim(),
+                  preview: String(item?.preview || '').trim(),
+                }))
+                .filter((item: MemoryResonanceItem) => item.label || item.preview)
+            : [],
+        });
+      }
+
+      if (event === 'error') {
+        settleReject(new Error(String(data?.error || 'Run stream failed')));
+      }
+    }
+
+    function consumeResponseText(responseText: string) {
+      if (responseText.length <= processedLength) return;
+
+      const nextChunk = responseText.slice(processedLength);
+      processedLength = responseText.length;
+      buffer += nextChunk;
+
+      const blocks = buffer.split(/\r?\n\r?\n/);
+      buffer = blocks.pop() || '';
+
+      for (const block of blocks) {
+        handleBlock(block);
+      }
+    }
+
+    xhr.open('POST', RUN_STREAM_LITE_ENDPOINT, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Accept', 'text/event-stream');
+    xhr.timeout = 60000;
+
+    xhr.onprogress = () => {
+      try {
+        consumeResponseText(xhr.responseText || '');
+      } catch (error: any) {
+        settleReject(error instanceof Error ? error : new Error(String(error || 'Stream parse failed')));
+      }
+    };
+
+    xhr.onreadystatechange = () => {
+      try {
+        if (xhr.readyState === 3 || xhr.readyState === 4) {
+          consumeResponseText(xhr.responseText || '');
+        }
+
+        if (xhr.readyState === 4) {
+          if (xhr.status < 200 || xhr.status >= 300) {
+            settleReject(
+              new Error(
+                `Run stream failed: ${xhr.status} ${String(xhr.responseText || '').slice(0, 180)}`
+              )
+            );
+            return;
+          }
+
+          if (buffer.trim()) {
+            handleBlock(buffer);
+            buffer = '';
+          }
+
+          if (!doneData && !settled) {
+            const written = sanitizeQuinnVisibleReplyText(liveOutput);
+            settleResolve({
+              written,
+              summary: buildCompressionSummary(written || packetText),
+              timestamp: new Date().toISOString(),
+              memoryResonance: [],
+            });
+          }
+        }
+      } catch (error: any) {
+        settleReject(error instanceof Error ? error : new Error(String(error || 'Stream failed')));
+      }
+    };
+
+    xhr.onerror = () => {
+      settleReject(new Error('Run stream network error'));
+    };
+
+    xhr.ontimeout = () => {
+      settleReject(new Error('Run stream timed out'));
+    };
+
+    xhr.send(
+      JSON.stringify({
+        packet: builtPacket,
+        prompt:
+          'Reply like another me in the same headspace, not like someone helping from the outside. Stay natural, direct, warm, specific, and conversational. Use prose unless structure is clearly asked for. Do not use "if you want" endings.',
+        packetTitle,
+        packetText,
+        previousAssistantReply: cleanPreviousAssistantReply,
+        threadId: String(threadId || '').trim(),
+        projectTag: 'General',
+      })
+    );
+  });
+}
+
 
 export async function runQuinnPacket({
   packetTitle,
