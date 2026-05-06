@@ -3318,60 +3318,36 @@ export default function App() {
         />
 
         <View style={styles.systemHubGrid}>
-          <Pressable style={styles.systemHubCard} onPress={() => setScreen('HomeTileGrid')}>
-            <Text style={styles.systemHubEyebrow}>SYSTEM DECK</Text>
-            <Text style={styles.systemHubTitle}>Surface index</Text>
+          <Pressable style={styles.systemHubCardWide} onPress={() => setScreen('QuinnConversation')}>
+            <Text style={styles.systemHubEyebrow}>START HERE</Text>
+            <Text style={styles.systemHubTitle}>Talk to Quinn</Text>
             <Text style={styles.systemHubBody}>
-              See the current signal, restore recent runs, and open the right layer fast.
+              Open the main conversation and say what is actually going on.
             </Text>
           </Pressable>
 
           <Pressable style={styles.systemHubCard} onPress={() => setScreen('MemoryPanel')}>
             <Text style={styles.systemHubEyebrow}>MEMORY</Text>
-            <Text style={styles.systemHubTitle}>Deck</Text>
+            <Text style={styles.systemHubTitle}>What stays</Text>
             <Text style={styles.systemHubBody}>
-              {memories.length} kept items ready for Quinn when they genuinely matter.
+              {memories.length} saved item{memories.length === 1 ? '' : 's'} ready when they matter.
             </Text>
           </Pressable>
 
           <Pressable style={styles.systemHubCard} onPress={() => setScreen('VoiceMode')}>
             <Text style={styles.systemHubEyebrow}>VOICE</Text>
-            <Text style={styles.systemHubTitle}>Studio</Text>
+            <Text style={styles.systemHubTitle}>Speak it out</Text>
             <Text style={styles.systemHubBody}>
-              Build spoken handoffs, check the live route, and save audio sessions.
+              Use voice when typing is too much or the thought needs air.
             </Text>
           </Pressable>
 
-          <Pressable style={styles.systemHubCard} onPress={() => setScreen('ExportsPanel')}>
-            <Text style={styles.systemHubEyebrow}>EXPORTS</Text>
-            <Text style={styles.systemHubTitle}>Studio</Text>
+          <Pressable style={styles.systemHubCardWide} onPress={() => setScreen('ExportsPanel')}>
+            <Text style={styles.systemHubEyebrow}>SAVE</Text>
+            <Text style={styles.systemHubTitle}>Save or share</Text>
             <Text style={styles.systemHubBody}>
-              Pull clean JSON, Markdown, or plain-text bundles from the current Quinn state.
+              Copy the current thread when you need it somewhere else.
             </Text>
-          </Pressable>
-
-          <Pressable style={styles.systemHubCard} onPress={() => setScreen('NotificationsPanel')}>
-            <Text style={styles.systemHubEyebrow}>SIGNALS</Text>
-            <Text style={styles.systemHubTitle}>Stack</Text>
-            <Text style={styles.systemHubBody}>
-              {unreadCount} unread items waiting across runs, memory, and system changes.
-            </Text>
-          </Pressable>
-
-          <Pressable style={styles.systemHubCard} onPress={() => setScreen('ControlCenter')}>
-            <Text style={styles.systemHubEyebrow}>CONTROL</Text>
-            <Text style={styles.systemHubTitle}>Center</Text>
-            <Text style={styles.systemHubBody}>
-              Focus {settings.focusMode ? 'on' : 'off'} • motion {settings.reduceMotion ? 'reduced' : 'live'} • alerts {settings.quietNotifications ? 'quiet' : 'live'}.
-            </Text>
-          </Pressable>
-
-          <Pressable style={styles.systemHubCardWide} onPress={() => setScreen('AppSwitcher')}>
-            <Text style={styles.systemHubEyebrow}>QUICK JUMP</Text>
-            <Text style={styles.systemHubTitle}>Surface switcher</Text>
-            <Text style={styles.systemHubBody}>
-              Move between QuinnOS layers instantly when you already know where you need to land.
-            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -3518,11 +3494,11 @@ export default function App() {
               <View pointerEvents="none" style={styles.systemBrandGlow} />
               <View pointerEvents="none" style={styles.systemBrandWarmGlow} />
               <View pointerEvents="none" style={styles.systemBrandRing} />
-              <Text style={styles.systemBrandOverline}>QUINNOS SYSTEM</Text>
+              <Text style={styles.systemBrandOverline}>QUINN PORTAL</Text>
               <Text style={styles.brand}>
                 Quinn <Text style={styles.brandVersion}>2.0</Text>
               </Text>
-              <Text style={styles.systemBrandSubcopy}>Memory. Voice. Export. Control.</Text>
+              <Text style={styles.systemBrandSubcopy}>Talk. Remember. Save what matters.</Text>
             </View>
           </View>
         </>
