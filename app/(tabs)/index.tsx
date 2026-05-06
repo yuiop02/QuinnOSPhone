@@ -2986,7 +2986,7 @@ export default function App() {
 
       activeThreadIdRef.current = nextThreadId;
       primeThreadContinuity(nextThreadId, cleanWrittenResult);
-      setWrittenResult(visibleWrittenResult);
+      setWrittenResult(`${streamDebugReceipt}${cleanWrittenResult}`);
       setCompressedSummary(cleanCompressedSummary);
       setCurrentMemoryResonance(result.memoryResonance);
       setCurrentSessionArc(nextSessionArc);
