@@ -1,4 +1,4 @@
-﻿import { Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 const PRODUCTION_BACKEND_BASE_URL = 'https://quinnosbackend-production.up.railway.app';
 const LOCAL_WEB_BACKEND_BASE_URL = 'http://127.0.0.1:8787';
