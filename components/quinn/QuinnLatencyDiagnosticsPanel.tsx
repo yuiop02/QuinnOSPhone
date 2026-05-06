@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { buildQuinnBackendUrl, QUINN_BACKEND_BASE_URL } from './quinnEndpoints';
 
 type LatencyRecord = {
@@ -18,7 +18,7 @@ type LatencyRecord = {
 type Subscriber = (records: LatencyRecord[]) => void;
 
 const subscribers = new Set<Subscriber>();
-const MAX_RECORDS = 20;
+const MAX_RECORDS = 18;
 
 let installed = false;
 let records: LatencyRecord[] = [];
@@ -175,7 +175,6 @@ function runToVoiceGap(items: LatencyRecord[]) {
   return voice.startedAt - run.endedAt;
 }
 
-
 function backendTimingMark(record: LatencyRecord | undefined, label: string) {
   const marks = record?.backendTimings?.marks;
 
@@ -262,17 +261,20 @@ export function QuinnLatencyDiagnosticsPanel() {
       : undefined;
 
   const backendTimings = run?.backendTimings;
-  const providerMs = backendTimings?.providerMs;
   const backendTotalMs = backendTimings?.totalMs;
+  const providerMs = backendTimings?.providerMs;
   const memoryReadMs = backendTimingMark(run, 'memory_read');
   const inputBuiltMs = backendTimingMark(run, 'input_built');
   const providerReturnedMs = backendTimingMark(run, 'provider_returned');
 
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
-      <Pressable style={[styles.card, expanded ? styles.cardExpanded : styles.cardCollapsed]} onPress={() => setExpanded((value) => !value)}>
+      <Pressable
+        style={[styles.card, expanded ? styles.cardExpanded : styles.cardCollapsed]}
+        onPress={() => setExpanded((value) => !value)}
+      >
         <View style={styles.row}>
-          <Text style={styles.title}>LATENCY DEBUG</Text>
+          <Text style={styles.title}>LATENCY</Text>
           <Text style={styles.status}>
             API {health.api || statusText(apiHealth)} • Voice {health.voice || statusText(voiceHealth)}
           </Text>
@@ -283,7 +285,12 @@ export function QuinnLatencyDiagnosticsPanel() {
         </Text>
 
         {expanded ? (
-          <View style={styles.details}>
+          <ScrollView
+            style={styles.detailsScroll}
+            contentContainerStyle={styles.details}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={styles.detail}>Backend: {QUINN_BACKEND_BASE_URL}</Text>
             <Text style={styles.detail}>Provider: {health.provider || '—'} • Model: {health.model || '—'}</Text>
             <Text style={styles.detail}>Run → voice gap: {formatMs(gap)}</Text>
@@ -294,7 +301,7 @@ export function QuinnLatencyDiagnosticsPanel() {
                 {item.label}: {formatMs(item.durationMs)} {item.ok === false ? 'error' : ''}
               </Text>
             ))}
-          </View>
+          </ScrollView>
         ) : null}
       </Pressable>
     </View>
@@ -304,50 +311,63 @@ export function QuinnLatencyDiagnosticsPanel() {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    left: 8,
-    right: 8,
-    top: 34,
+    left: 12,
+    right: 12,
+    bottom: 92,
     zIndex: 999999,
     elevation: 999999,
+    alignItems: 'flex-end',
   },
   card: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 230, 120, 0.95)',
-    backgroundColor: 'rgba(35, 0, 55, 0.97)',
+    borderColor: 'rgba(255, 230, 120, 0.9)',
+    backgroundColor: 'rgba(35, 0, 55, 0.94)',
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    maxHeight: 190,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    overflow: 'hidden',
+  },
+  cardCollapsed: {
+    alignSelf: 'flex-end',
+    maxWidth: 285,
+  },
+  cardExpanded: {
+    alignSelf: 'stretch',
+    maxHeight: 245,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
   title: {
     color: '#f5d7ff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
   },
   status: {
     color: '#c8b6d8',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
   },
   line: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     marginTop: 3,
   },
-  details: {
+  detailsScroll: {
+    maxHeight: 140,
     marginTop: 8,
+  },
+  details: {
     gap: 3,
+    paddingBottom: 2,
   },
   detail: {
     color: '#c8b6d8',
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 9,
+    lineHeight: 12,
   },
 });
