@@ -52,11 +52,11 @@ export default function AppSwitcher({
       },
       {
         key: 'HomeTileGrid',
-        eyebrow: 'SYSTEM',
-        title: 'System deck',
+        eyebrow: 'HOME',
+        title: 'Quinn Home',
         body:
           lastSummary ||
-          'See the live thread, recent runs, memory, alerts, and control at a glance.',
+          'Return to the simple home view for conversation, memory, voice, and saving.',
       },
       {
         key: 'VoiceMode',
@@ -86,12 +86,12 @@ export default function AppSwitcher({
         title: 'Alerts',
         body: notificationCount
           ? `${notificationCount} live alert${notificationCount === 1 ? '' : 's'} in the stack.`
-          : 'Runs, memory actions, and system signals land here.',
+          : 'Updates and saved moments land here.',
       },
       {
         key: 'ControlCenter',
-        eyebrow: 'CONTROL',
-        title: 'Control center',
+        eyebrow: 'PREFERENCES',
+        title: 'Preferences',
         body: `Focus ${settings.focusMode ? 'on' : 'off'} • Motion ${
           settings.reduceMotion ? 'reduced' : 'live'
         }`,
@@ -111,9 +111,9 @@ export default function AppSwitcher({
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <QuinnSurfaceShell
-        eyebrow="SURFACE INDEX"
-        title="Move across QuinnOS without losing the thread."
-        description="The homepage stays central. This index is the fast, quiet way to step into memory, voice, exports, alerts, or control when the moment needs more than the main conversation surface."
+        eyebrow="QUINN HOME"
+        title="Choose where to go."
+        description="Start with the conversation. Memory, voice, and save/share are here when they help."
         onBack={onBack}
         actions={[
           { label: `${recentRunCount} runs`, tone: 'secondary' },
