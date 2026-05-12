@@ -3207,7 +3207,7 @@ export default function App() {
 
     pushNotification({
       title: `${key} ${nextValue ? 'enabled' : 'disabled'}`,
-      body: `Control Center changed ${key} to ${nextValue ? 'on' : 'off'}.`,
+      body: `Preferences changed ${key} to ${nextValue ? 'on' : 'off'}.`,
       target: 'ControlCenter',
       tone: 'gold',
     });

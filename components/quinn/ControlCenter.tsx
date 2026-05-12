@@ -53,38 +53,38 @@ export default function ControlCenter({
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <QuinnSurfaceShell
-        eyebrow="CONTROL CENTER"
-        title="Control, without clutter."
-        description="Tune the QuinnOS surface here. These switches affect motion, alerts, and focus without turning the product into a settings swamp."
+        eyebrow="PREFERENCES"
+        title="Make it feel right."
+        description="Adjust the small things that change how QuinnOS feels: motion, quieter updates, and focus."
         onBack={onBack}
         actions={[
           { label: settings.focusMode ? 'Focus on' : 'Focus off', tone: 'secondary' },
           { label: settings.reduceMotion ? 'Motion reduced' : 'Motion live', tone: 'ghost' },
-          { label: unreadCount ? `${unreadCount} alerts waiting` : 'Alerts quiet', tone: 'primary' },
+          { label: unreadCount ? `${unreadCount} updates waiting` : 'Quiet right now', tone: 'primary' },
         ]}
       />
 
       <View style={styles.utilityRow}>
         <Pressable style={styles.utilityPill} onPress={onOpenSettings}>
-          <Text style={styles.utilityPillText}>Open Settings</Text>
+          <Text style={styles.utilityPillText}>Quinn Home</Text>
         </Pressable>
 
         <Pressable style={styles.utilityPill} onPress={onOpenNotifications}>
-          <Text style={styles.utilityPillText}>Alerts {unreadCount ? `(${unreadCount})` : ''}</Text>
+          <Text style={styles.utilityPillText}>Updates {unreadCount ? `(${unreadCount})` : ''}</Text>
         </Pressable>
       </View>
 
       <View style={styles.grid}>
         <ToggleCard
           title="Reduce motion"
-          body="The homepage atmosphere shifts to a stiller version so the surface stays quieter."
+          body="Softens motion so the app feels calmer."
           active={settings.reduceMotion}
           onPress={() => onToggleSetting('reduceMotion')}
         />
 
         <ToggleCard
-          title="Quiet notifications"
-          body="Alerts still land, but the system shifts into a softer mode."
+          title="Quiet updates"
+          body="Updates still save, but they stop waving for attention."
           active={settings.quietNotifications}
           onPress={() => onToggleSetting('quietNotifications')}
         />
@@ -98,13 +98,13 @@ export default function ControlCenter({
       </View>
 
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryEyebrow}>SYSTEM SUMMARY</Text>
-        <Text style={styles.summaryTitle}>Current state</Text>
+        <Text style={styles.summaryEyebrow}>CURRENT FEEL</Text>
+        <Text style={styles.summaryTitle}>How QuinnOS is set</Text>
         <Text style={styles.summaryBody}>
           Reduce motion: {settings.reduceMotion ? 'on' : 'off'}
         </Text>
         <Text style={styles.summaryBody}>
-          Quiet notifications: {settings.quietNotifications ? 'on' : 'off'}
+          Quiet updates: {settings.quietNotifications ? 'on' : 'off'}
         </Text>
         <Text style={styles.summaryBody}>
           Focus mode: {settings.focusMode ? 'on' : 'off'}
