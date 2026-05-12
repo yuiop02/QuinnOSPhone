@@ -1338,19 +1338,19 @@ function QuinnConversationSurface({
       value: responseLens.label,
     },
     {
-      label: 'Carryover',
+      label: 'Chat',
       value: sessionArc
         ? `${sessionArc.title}${sessionArcMeta.stepLabel ? ` • ${sessionArcMeta.stepLabel}` : ''}`
-        : 'Fresh thread',
+        : 'New chat',
     },
     {
-      label: 'Memory pull',
+      label: 'Memory',
       value: memoryResonance.length
         ? `${memoryResonance.length} signal${memoryResonance.length === 1 ? '' : 's'} shaping this reply`
         : 'No extra pull needed',
     },
   ];
-  const responseMetaLine = sessionArc ? 'Thread carried' : 'Fresh thread';
+  const responseMetaLine = sessionArc ? 'Continuing chat' : 'New chat';
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -1940,7 +1940,7 @@ function QuinnConversationSurface({
       setVoiceStatus('Transcript ready. Sending to Quinn...');
 
       const runResult = await onRunPacket({
-        packetTitle: packetTitle || 'Quinn Thread',
+        packetTitle: packetTitle || 'Quinn Chat',
         packetText: transcript,
         stayOnScreen: true,
         syncVisibleInput: false,
@@ -2002,7 +2002,7 @@ function QuinnConversationSurface({
     onTriggerWave();
 
     const runResult = await onRunPacket({
-      packetTitle: packetTitle || 'Quinn Thread',
+      packetTitle: packetTitle || 'Quinn Chat',
       packetText,
       stayOnScreen: true,
       syncVisibleInput: true,
@@ -2181,7 +2181,7 @@ function QuinnConversationSurface({
 
               {showThreadTitle ? (
                 <View style={styles.threadTitleWrap}>
-                  <Text style={styles.threadTitleEyebrow}>Current thread</Text>
+                  <Text style={styles.threadTitleEyebrow}>Conversation</Text>
                   <Text style={styles.threadTitleText} numberOfLines={1}>
                     {displayThreadTitle}
                   </Text>
@@ -2214,7 +2214,7 @@ function QuinnConversationSurface({
                 <View style={styles.threadManagerRail}>
                   <View style={styles.threadManagerRow}>
                     <View style={styles.threadManagerCopy}>
-                      <Text style={styles.threadManagerEyebrow}>Thread</Text>
+                      <Text style={styles.threadManagerEyebrow}>Current chat</Text>
                       <Text style={styles.threadManagerTitle} numberOfLines={1}>
                         {sessionArc.title}
                       </Text>
@@ -2233,7 +2233,7 @@ function QuinnConversationSurface({
                           onPress={() => setShowThreadDetails((prev) => !prev)}
                         >
                           <Text style={styles.threadManagerActionChipText}>
-                            {showThreadDetails ? 'Hide details' : 'Details'}
+                            {showThreadDetails ? 'Hide context' : 'Context'}
                           </Text>
                           <Feather
                             name={showThreadDetails ? 'chevron-up' : 'chevron-down'}
@@ -2244,7 +2244,7 @@ function QuinnConversationSurface({
                       ) : null}
 
                       <Pressable style={styles.threadManagerResetChip} onPress={onStartFreshArc}>
-                        <Text style={styles.threadManagerResetChipText}>New thread</Text>
+                        <Text style={styles.threadManagerResetChipText}>New chat</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -2284,7 +2284,7 @@ function QuinnConversationSurface({
                     onChangeText={onChangePacketText}
                     onFocus={() => setInputFocused(true)}
                     onBlur={() => setInputFocused(false)}
-                    placeholder="Type what's actually going on..."
+                    placeholder="Message Quinn..."
                     placeholderTextColor="rgba(232, 220, 236, 0.32)"
                     style={styles.composerInput}
                     textAlignVertical="top"
@@ -2432,7 +2432,7 @@ function QuinnConversationSurface({
                   onPress={() => setShowResponseDetails((prev) => !prev)}
                 >
                   <Text style={styles.responseDetailsToggleText}>
-                    {showResponseDetails ? 'Hide details' : 'Details'}
+                    {showResponseDetails ? 'Hide context' : 'Context'}
                   </Text>
                   <Feather
                     name={showResponseDetails ? 'chevron-up' : 'chevron-down'}
@@ -2450,7 +2450,7 @@ function QuinnConversationSurface({
 
             {showResponseDetails && hasResponseDetails ? (
               <View style={styles.responseDetailsPanel}>
-                <Text style={styles.responseDetailsEyebrow}>Thread details</Text>
+                <Text style={styles.responseDetailsEyebrow}>Context used</Text>
                 {responseContextItems.map((item) => (
                   <View key={item.label} style={styles.responseDetailRow}>
                     <Text style={styles.responseDetailLabel}>{item.label}</Text>
@@ -2460,7 +2460,7 @@ function QuinnConversationSurface({
 
                 {memoryResonance.length ? (
                   <View style={styles.responseDetailsSection}>
-                    <Text style={styles.memoryResonanceEyebrow}>Why this felt personal</Text>
+                    <Text style={styles.memoryResonanceEyebrow}>Memory used</Text>
                     <View style={styles.memoryResonanceRow}>
                       {memoryResonance.slice(0, 4).map((item, index) => (
                         <View
@@ -3088,8 +3088,8 @@ export default function App() {
     });
 
     pushNotification({
-      title: 'Fresh thread ready',
-      body: 'Ren will treat the next run as a clean topic with no test residue or carryover.',
+      title: 'New chat ready',
+      body: 'Ren will treat the next message as a clean topic.',
       target: 'QuinnConversation',
       tone: 'gold',
     });
@@ -3489,11 +3489,11 @@ export default function App() {
               <View pointerEvents="none" style={styles.systemBrandGlow} />
               <View pointerEvents="none" style={styles.systemBrandWarmGlow} />
               <View pointerEvents="none" style={styles.systemBrandRing} />
-              <Text style={styles.systemBrandOverline}>QUINN PORTAL</Text>
+              <Text style={styles.systemBrandOverline}>QUINN</Text>
               <Text style={styles.brand}>
                 Quinn <Text style={styles.brandVersion}>2.0</Text>
               </Text>
-              <Text style={styles.systemBrandSubcopy}>Talk. Remember. Save what matters.</Text>
+              <Text style={styles.systemBrandSubcopy}>Message. Remember. Keep what matters.</Text>
             </View>
           </View>
         </>
