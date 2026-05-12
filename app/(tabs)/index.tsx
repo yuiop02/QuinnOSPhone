@@ -3305,7 +3305,7 @@ export default function App() {
     content = (
       <ScrollView contentContainerStyle={styles.systemScroll} showsVerticalScrollIndicator={false}>
         <QuinnSurfaceShell
-          eyebrow="QUINN HOME"
+          eyebrow="QUINN MENU"
           title="What do you need right now?"
           description="Open the conversation, use voice when typing is too much, or save the parts you want to keep."
           onBack={() => setScreen('QuinnConversation')}
