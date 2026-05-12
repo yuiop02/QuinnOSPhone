@@ -3317,7 +3317,7 @@ export default function App() {
             <Text style={styles.systemHubEyebrow}>CONVERSATION</Text>
             <Text style={styles.systemHubTitle}>Talk to Quinn</Text>
             <Text style={styles.systemHubBody}>
-              Start a thread, continue the current one, or say the thing plainly.
+              Return to the main conversation.
             </Text>
           </Pressable>
 
@@ -3325,7 +3325,7 @@ export default function App() {
             <Text style={styles.systemHubEyebrow}>MEMORY</Text>
             <Text style={styles.systemHubTitle}>What stays</Text>
             <Text style={styles.systemHubBody}>
-              {memories.length} saved item{memories.length === 1 ? '' : 's'} ready when they matter.
+              Saved context QuinnOS can carry forward when it matters.
             </Text>
           </Pressable>
 
@@ -3333,7 +3333,7 @@ export default function App() {
             <Text style={styles.systemHubEyebrow}>VOICE</Text>
             <Text style={styles.systemHubTitle}>Speak it out</Text>
             <Text style={styles.systemHubBody}>
-              Talk it out when typing is too much.
+              Talk first. Untangle later.
             </Text>
           </Pressable>
 
@@ -3341,7 +3341,7 @@ export default function App() {
             <Text style={styles.systemHubEyebrow}>SAVE</Text>
             <Text style={styles.systemHubTitle}>Save or share</Text>
             <Text style={styles.systemHubBody}>
-              Copy the current thread when you need it somewhere else.
+              Copy or share the parts you want to keep.
             </Text>
           </Pressable>
         </View>
@@ -5558,3 +5558,4 @@ responseReplayButton: {
     fontWeight: '500',
   },
 });
+
