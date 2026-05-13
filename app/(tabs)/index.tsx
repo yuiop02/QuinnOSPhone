@@ -1166,7 +1166,7 @@ const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
 
         <View style={styles.headerOverlineRow}>
           <View style={styles.headerOverlineDot} />
-          <Text style={styles.headerOverline}>MAIN PORTAL</Text>
+          <Text style={styles.headerOverline}>QUINN</Text>
         </View>
 
         <Animated.View
@@ -1214,8 +1214,7 @@ const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
             },
           ]}
         >
-          Ren lives inside QuinnOS: memory-aware, emotionally accurate, funny on purpose,
-          and built to keep the thread from turning into soup.
+          Memory-aware. Voice-ready. Built for the thread you are in.
         </Animated.Text>
       </View>
     </View>
@@ -2189,7 +2188,7 @@ function QuinnConversationSurface({
               ) : null}
 
               <View style={styles.lensRailWrap}>
-                <Text style={styles.lensEyebrow}>Response mode</Text>
+                <Text style={styles.lensEyebrow}>Mode</Text>
                 <View style={styles.lensRail}>
                   {QUINN_LENSES.map((lens) => {
                     const selected = lens.id === activeLensId;
@@ -2445,7 +2444,7 @@ function QuinnConversationSurface({
 
             <Text style={styles.heroResponseBody}>
               {writtenResult ||
-                'Ask something outrageous, practical, or heartbreak-adjacent and Ren will answer here.'}
+                'Send a message and Ren will answer here.'}
             </Text>
 
             {showResponseDetails && hasResponseDetails ? (
@@ -3989,6 +3988,7 @@ headerVersionText: {
     height: 124,
     borderRadius: 999,
     backgroundColor: SURFACE_THEME.portalGlow,
+    opacity: 0.22,
   },
 
   systemBrandWarmGlow: {
@@ -3999,6 +3999,7 @@ headerVersionText: {
     height: 92,
     borderRadius: 999,
     backgroundColor: SURFACE_THEME.portalWarm,
+    opacity: 0.16,
   },
 
   systemBrandRing: {
@@ -4011,23 +4012,24 @@ headerVersionText: {
     borderWidth: 1,
     borderColor: 'rgba(255, 228, 241, 0.18)',
     transform: [{ rotate: '-12deg' }],
+    opacity: 0.20,
   },
 
   systemBrandOverline: {
-    color: SURFACE_THEME.eyebrow,
+    color: 'rgba(232, 218, 245, 0.52)',
     fontSize: 9.5,
-    lineHeight: 12,
-    fontWeight: '900',
-    letterSpacing: 1.9,
-    marginBottom: 6,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    marginBottom: 5,
   },
 
   brand: {
     color: '#F8FAFF',
-    fontSize: 38,
-    lineHeight: 40,
+    fontSize: 42,
+    lineHeight: 45,
     fontWeight: '700',
-    letterSpacing: -2.2,
+    letterSpacing: -1.8,
     textShadowColor: 'rgba(255, 188, 229, 0.34)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 18,
@@ -4035,18 +4037,19 @@ headerVersionText: {
 
   brandVersion: {
     color: '#CEC1FF',
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 17,
+    lineHeight: 21,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
 
   systemBrandSubcopy: {
-    color: SURFACE_THEME.textSoft,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '700',
+    color: 'rgba(246, 240, 252, 0.68)',
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontWeight: '600',
     marginTop: 6,
+    maxWidth: 300,
   },
 
   heroTitleWrap: {
@@ -4333,31 +4336,31 @@ headerVersionShine: {
   composerShell: {
     overflow: 'hidden',
     position: 'relative',
-    minHeight: 116,
-    borderRadius: 30,
+    minHeight: 112,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.11)',
-    backgroundColor: 'rgba(18, 13, 24, 0.96)',
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(16, 14, 20, 0.96)',
     padding: 1,
     shadowColor: '#05020A',
-    shadowOpacity: 0.26,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 7,
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
   },
 
   composerInnerShell: {
     overflow: 'hidden',
     position: 'relative',
-    minHeight: 108,
-    borderRadius: 28,
+    minHeight: 104,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.07)',
-    backgroundColor: 'rgba(8, 7, 12, 0.988)',
-    paddingLeft: 18,
-    paddingRight: 18,
-    paddingTop: 18,
-    paddingBottom: 14,
+    borderColor: 'rgba(255, 255, 255, 0.065)',
+    backgroundColor: 'rgba(8, 8, 12, 0.99)',
+    paddingLeft: 17,
+    paddingRight: 17,
+    paddingTop: 16,
+    paddingBottom: 13,
   },
 
   lensRailWrap: {
@@ -4387,12 +4390,12 @@ headerVersionShine: {
   },
 
   lensEyebrow: {
-    color: 'rgba(188, 196, 226, 0.56)',
-    fontSize: 10,
+    color: 'rgba(210, 216, 235, 0.42)',
+    fontSize: 9.5,
     lineHeight: 14,
     fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: 10,
+    letterSpacing: 1.1,
+    marginBottom: 8,
   },
 
   lensRail: {
@@ -4403,29 +4406,29 @@ headerVersionShine: {
 
   lensChip: {
     paddingHorizontal: 11,
-    paddingVertical: 8.5,
+    paddingVertical: 7.5,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(249, 221, 244, 0.10)',
-    backgroundColor: 'rgba(15, 7, 25, 0.76)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
     marginRight: 8,
     marginBottom: 8,
   },
 
   lensChipActive: {
-    borderColor: 'rgba(255, 224, 243, 0.20)',
-    backgroundColor: 'rgba(84, 40, 104, 0.84)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(107, 54, 136, 0.72)',
     shadowColor: '#C65BFF',
-    shadowOpacity: 0.14,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
   },
 
   lensChipText: {
-    color: 'rgba(233, 238, 255, 0.72)',
+    color: 'rgba(235, 238, 248, 0.72)',
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: 0.15,
   },
 
@@ -4434,9 +4437,9 @@ headerVersionShine: {
   },
 
   lensBlurb: {
-    color: 'rgba(204, 212, 236, 0.54)',
-    fontSize: 11.5,
-    lineHeight: 17,
+    color: 'rgba(204, 212, 236, 0.46)',
+    fontSize: 11,
+    lineHeight: 16,
     fontWeight: '500',
   },
 
@@ -4919,9 +4922,9 @@ cardOrbGlowWarm: {
   composerInput: {
   flex: 1,
   minHeight: 72,
-  color: 'rgba(251, 246, 255, 0.96)',
-  fontSize: 15.5,
-  lineHeight: 24,
+    color: 'rgba(250, 250, 252, 0.92)',
+    fontSize: 17,
+    lineHeight: 23,
   fontWeight: '500',
   letterSpacing: -0.08,
   padding: 0,
@@ -5077,19 +5080,19 @@ cardOrbGlowWarm: {
   overflow: 'hidden',
   position: 'relative',
   marginBottom: 14,
-  borderRadius: 34,
+    borderRadius: 28,
   borderWidth: 1,
-  borderColor: 'rgba(255, 223, 243, 0.18)',
-  backgroundColor: 'rgba(44, 15, 47, 0.92)',
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: 'rgba(8, 8, 12, 0.955)',
   padding: 2,
   width: '100%',
   maxWidth: 1560,
   alignSelf: 'center',
   shadowColor: '#120015',
-  shadowOpacity: 0.60,
-  shadowRadius: 38,
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
   shadowOffset: { width: 0, height: 18 },
-  elevation: 13,
+    elevation: 6,
 },
 
   spokenResponseCard: {
@@ -5109,15 +5112,15 @@ cardOrbGlowWarm: {
   },
 
   responseInnerFrame: {
-  overflow: 'hidden',
-  borderRadius: 32,
-  borderWidth: 1,
-  borderColor: 'rgba(255, 244, 247, 0.10)',
-  backgroundColor: 'rgba(12, 4, 19, 0.986)',
-  paddingHorizontal: 30,
-  paddingTop: 22,
-  paddingBottom: 22,
-},
+    overflow: 'hidden',
+    position: 'relative',
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 244, 247, 0.10)',
+    backgroundColor: 'rgba(12, 4, 19, 0.986)',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+  },
 
   spokenInnerFrame: {
     overflow: 'hidden',
@@ -5130,10 +5133,10 @@ cardOrbGlowWarm: {
   },
 
   heroResponseBody: {
-  color: 'rgba(245, 247, 253, 0.95)',
-  fontSize: 15.8,
-  lineHeight: 31,
-  fontWeight: '500',
+    color: 'rgba(250, 250, 252, 0.90)',
+    fontSize: 16.5,
+    lineHeight: 25,
+    fontWeight: '500',
   letterSpacing: 0.1,
   maxWidth: 900,
 },
@@ -5246,17 +5249,17 @@ cardOrbGlowWarm: {
   },
 
   responseLabel: {
-  color: 'rgba(255, 249, 253, 0.84)',
-  fontSize: 12.5,
+    color: 'rgba(245, 248, 255, 0.80)',
+    fontSize: 12,
   lineHeight: 18,
-  fontWeight: '800',
+    fontWeight: '700',
   letterSpacing: 0.9,
   marginBottom: 4,
 },
 
   responseMetaLine: {
-  color: 'rgba(210, 198, 226, 0.58)',
-  fontSize: 11.5,
+    color: 'rgba(205, 212, 234, 0.48)',
+    fontSize: 11,
   lineHeight: 16,
   fontWeight: '600',
   letterSpacing: 0.08,
@@ -5265,19 +5268,17 @@ cardOrbGlowWarm: {
   responseDetailsToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(252, 220, 243, 0.12)',
-    backgroundColor: 'rgba(17, 8, 25, 0.76)',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginLeft: 12,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
   },
 
   responseDetailsToggleText: {
-    color: 'rgba(227, 233, 248, 0.76)',
-    fontSize: 11.5,
+    color: 'rgba(235, 240, 255, 0.70)',
+    fontSize: 11,
     lineHeight: 15,
     fontWeight: '700',
     marginRight: 6,
