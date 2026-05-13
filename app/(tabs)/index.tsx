@@ -1214,7 +1214,7 @@ const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
             },
           ]}
         >
-          Memory-aware. Voice-ready. Built for the thread you are in.
+          Memory-aware. Voice-ready. Built for this thread.
         </Animated.Text>
       </View>
     </View>
@@ -3725,27 +3725,27 @@ appOrbitRingB: {
   left: 0,
   right: 0,
   zIndex: 26,
-  paddingHorizontal: 24,
-  paddingTop: 12,
-  paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 10,
 },
 
   headerPanel: {
   overflow: 'hidden',
   position: 'relative',
-  minHeight: 212,
-  borderRadius: 36,
+    minHeight: 190,
+    borderRadius: 28,
   borderWidth: 1,
-  borderColor: SURFACE_THEME.borderStrong,
-  backgroundColor: SURFACE_THEME.heroPanel,
-  paddingHorizontal: 20,
-  paddingTop: 16,
-  paddingBottom: 18,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(16, 12, 22, 0.76)',
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    paddingBottom: 20,
   shadowColor: SURFACE_THEME.shadow,
-  shadowOpacity: 0.54,
-  shadowRadius: 40,
+    shadowOpacity: 0.20,
+    shadowRadius: 20,
   shadowOffset: { width: 0, height: 24 },
-  elevation: 12,
+    elevation: 7,
 },
 
   headerPanelGlow: {
@@ -3756,6 +3756,7 @@ appOrbitRingB: {
   height: 236,
   borderRadius: 999,
   backgroundColor: SURFACE_THEME.plumGlow,
+    opacity: 0.30,
 },
 
   headerPanelWarmGlow: {
@@ -3766,6 +3767,7 @@ appOrbitRingB: {
   height: 160,
   borderRadius: 999,
   backgroundColor: SURFACE_THEME.portalWarm,
+    opacity: 0.18,
 },
 
   headerPanelCoreBloom: {
@@ -3776,6 +3778,7 @@ appOrbitRingB: {
   height: 124,
   borderRadius: 999,
   backgroundColor: SURFACE_THEME.portalHot,
+    opacity: 0.20,
 },
 
   headerPanelRingPrimary: {
@@ -3788,6 +3791,7 @@ appOrbitRingB: {
   borderWidth: 1,
   borderColor: SURFACE_THEME.orbital,
   transform: [{ rotate: '-14deg' }],
+    opacity: 0.18,
 },
 
   headerPanelRingSecondary: {
@@ -3800,6 +3804,7 @@ appOrbitRingB: {
   borderWidth: 1,
   borderColor: SURFACE_THEME.portalTail,
   transform: [{ rotate: '12deg' }],
+    opacity: 0.16,
 },
 
   headerPanelTailArc: {
@@ -3812,6 +3817,7 @@ appOrbitRingB: {
   borderWidth: 1,
   borderColor: 'rgba(255, 212, 233, 0.12)',
   transform: [{ rotate: '20deg' }],
+    opacity: 0.16,
 },
 
   headerPanelSheen: {
@@ -3822,6 +3828,7 @@ appOrbitRingB: {
   height: 24,
   borderRadius: 999,
   backgroundColor: SURFACE_THEME.glassHighlight,
+    opacity: 0.16,
 },
 
   headerAuraLarge: {
@@ -3891,7 +3898,7 @@ headerAuraSmall: {
   headerOverlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   headerOverlineDot: {
@@ -3903,11 +3910,11 @@ headerAuraSmall: {
   },
 
   headerOverline: {
-    color: 'rgba(222, 228, 246, 0.72)',
-    fontSize: 9.5,
+    color: 'rgba(232, 218, 245, 0.50)',
+    fontSize: 9,
     lineHeight: 12,
     fontWeight: '800',
-    letterSpacing: 2.1,
+    letterSpacing: 1.8,
   },
 
   headerTitleRow: {
@@ -3943,8 +3950,8 @@ headerAuraSmall: {
 
 headerVersionText: {
   color: '#FFF2FA',
-  fontSize: 13,
-  lineHeight: 15,
+    fontSize: 16,
+    lineHeight: 20,
   fontWeight: '900',
   letterSpacing: 0.8,
 },
@@ -4055,7 +4062,7 @@ headerVersionText: {
   heroTitleWrap: {
   position: 'relative',
   alignSelf: 'flex-start',
-  marginBottom: 8,
+    marginBottom: 8,
   paddingRight: 8,
 },
 
@@ -4336,35 +4343,35 @@ headerVersionShine: {
   composerShell: {
     overflow: 'hidden',
     position: 'relative',
-    minHeight: 112,
-    borderRadius: 28,
+    minHeight: 104,
+    borderRadius: 26,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.10)',
     backgroundColor: 'rgba(16, 14, 20, 0.96)',
     padding: 1,
     shadowColor: '#05020A',
-    shadowOpacity: 0.22,
-    shadowRadius: 20,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
-    elevation: 6,
+    elevation: 5,
   },
 
   composerInnerShell: {
     overflow: 'hidden',
     position: 'relative',
-    minHeight: 104,
-    borderRadius: 26,
+    minHeight: 96,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.065)',
     backgroundColor: 'rgba(8, 8, 12, 0.99)',
     paddingLeft: 17,
     paddingRight: 17,
-    paddingTop: 16,
-    paddingBottom: 13,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
 
   lensRailWrap: {
-    marginBottom: 10,
+    marginBottom: 8,
     paddingRight: 8,
   },
 
@@ -4441,6 +4448,8 @@ headerVersionShine: {
     fontSize: 11,
     lineHeight: 16,
     fontWeight: '500',
+    marginTop: 2,
+    marginBottom: 8,
   },
 
   threadManagerRail: {
@@ -4542,13 +4551,13 @@ headerVersionShine: {
   composerFieldShell: {
     overflow: 'hidden',
     position: 'relative',
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.10)',
     backgroundColor: 'rgba(18, 17, 23, 0.94)',
     paddingLeft: 14,
     paddingRight: 10,
-    paddingTop: 12,
+    paddingTop: 10,
     paddingBottom: 10,
   },
 
