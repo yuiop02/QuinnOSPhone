@@ -1214,7 +1214,7 @@ const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
             },
           ]}
         >
-          Memory-aware. Voice-ready. Built for this thread.
+          Memory-aware. Voice-ready. Here when you are.
         </Animated.Text>
       </View>
     </View>
@@ -3726,21 +3726,21 @@ appOrbitRingB: {
   right: 0,
   zIndex: 26,
     paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
 },
 
   headerPanel: {
   overflow: 'hidden',
   position: 'relative',
-    minHeight: 190,
+    minHeight: 160,
     borderRadius: 28,
   borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.10)',
     backgroundColor: 'rgba(16, 12, 22, 0.76)',
-    paddingHorizontal: 22,
-    paddingTop: 18,
-    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 16,
   shadowColor: SURFACE_THEME.shadow,
     shadowOpacity: 0.20,
     shadowRadius: 20,
@@ -3920,13 +3920,14 @@ headerAuraSmall: {
   headerTitleRow: {
   flexDirection: 'row',
   alignItems: 'flex-end',
+    marginBottom: 4,
 },
 
   headerQuinn: {
-  fontSize: 64,
-  lineHeight: 66,
+    fontSize: 58,
+    lineHeight: 62,
   fontWeight: '900',
-  letterSpacing: -3.8,
+    letterSpacing: -2.2,
   marginRight: 10,
 },
 
@@ -3950,10 +3951,10 @@ headerAuraSmall: {
 
 headerVersionText: {
   color: '#FFF2FA',
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 14,
   fontWeight: '900',
-  letterSpacing: 0.8,
+    letterSpacing: 0.5,
 },
 
   topFadeWall: {
@@ -4062,8 +4063,8 @@ headerVersionText: {
   heroTitleWrap: {
   position: 'relative',
   alignSelf: 'flex-start',
-    marginBottom: 8,
-  paddingRight: 8,
+    marginBottom: 6,
+    paddingRight: 4,
 },
 
 titleGlowBlobA: {
@@ -4074,6 +4075,7 @@ titleGlowBlobA: {
   height: 68,
   borderRadius: 30,
   backgroundColor: 'rgba(255, 120, 214, 0.14)',
+    opacity: 0.22,
 },
 
 titleGlowBlobB: {
@@ -4084,20 +4086,22 @@ titleGlowBlobB: {
   height: 72,
   borderRadius: 31,
   backgroundColor: 'rgba(179, 104, 255, 0.16)',
+    opacity: 0.16,
 },
 
 headerQuinnGlow: {
   position: 'absolute',
   left: 2,
   top: 4,
-  fontSize: 68,
-  lineHeight: 70,
+    fontSize: 58,
+    lineHeight: 62,
   fontWeight: '900',
-  letterSpacing: -4,
+    letterSpacing: -2.2,
   color: 'rgba(255, 207, 232, 0.22)',
   textShadowColor: 'rgba(255, 170, 224, 0.74)',
   textShadowOffset: { width: 0, height: 0 },
   textShadowRadius: 24,
+    opacity: 0.30,
 },
 
 headerQuinnQ: {
@@ -4105,6 +4109,8 @@ headerQuinnQ: {
   textShadowColor: 'rgba(255, 184, 227, 0.86)',
   textShadowOffset: { width: 0, height: 0 },
   textShadowRadius: 16,
+    fontSize: 58,
+    lineHeight: 62,
 },
 
 headerQuinnRest: {
@@ -4112,6 +4118,8 @@ headerQuinnRest: {
   textShadowColor: 'rgba(206, 159, 255, 0.78)',
   textShadowOffset: { width: 0, height: 0 },
   textShadowRadius: 16,
+    fontSize: 58,
+    lineHeight: 62,
 },
 
 headerVersionShine: {
