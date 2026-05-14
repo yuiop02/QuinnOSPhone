@@ -1350,7 +1350,13 @@ function QuinnConversationSurface({
     },
   ];
   const responseMetaLine = sessionArc ? 'Continuing chat' : 'New chat';
-  const visibleThreadMessages = recentRuns.slice(0, 6).reverse();
+  const currentSessionArcId = String(sessionArc?.id || '').trim();
+  const visibleThreadMessages = currentSessionArcId
+    ? recentRuns
+        .filter((run) => String(run.sessionArcId || '').trim() === currentSessionArcId)
+        .slice(0, 8)
+        .reverse()
+    : [];
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
