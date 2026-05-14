@@ -1282,6 +1282,7 @@ function QuinnConversationSurface({
   onStartFreshArc,
   onRunPacket,
 }: QuinnConversationSurfaceProps) {
+  const conversationScrollRef = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder, 250);
 
@@ -2068,8 +2069,10 @@ function QuinnConversationSurface({
 
   return (
     <ScrollView
-  style={styles.quinnConversationViewport}
-  contentContainerStyle={styles.quinnConversationScroll}
+      ref={conversationScrollRef}
+      keyboardShouldPersistTaps="handled"
+      style={styles.quinnConversationViewport}
+      contentContainerStyle={styles.quinnConversationScroll}
   showsVerticalScrollIndicator={false}
   scrollEventThrottle={16}
 >
