@@ -1214,7 +1214,7 @@ const FixedQuinnHeader = React.memo(function FixedQuinnHeader() {
             },
           ]}
         >
-          Memory-aware. Voice-ready. Here when you are.
+          QuinnOS
         </Animated.Text>
       </View>
     </View>
@@ -2444,7 +2444,7 @@ function QuinnConversationSurface({
 
             <Text style={styles.heroResponseBody}>
               {writtenResult ||
-                'Send a message and Ren will answer here.'}
+                'Messages will appear here.'}
             </Text>
 
             {showResponseDetails && hasResponseDetails ? (
@@ -3725,27 +3725,27 @@ appOrbitRingB: {
   left: 0,
   right: 0,
   zIndex: 26,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 6,
+    paddingBottom: 4,
 },
 
   headerPanel: {
   overflow: 'hidden',
   position: 'relative',
-    minHeight: 160,
-    borderRadius: 28,
+    minHeight: 96,
+    borderRadius: 24,
   borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
-    backgroundColor: 'rgba(16, 12, 22, 0.76)',
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 16,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(12, 10, 16, 0.72)',
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 12,
   shadowColor: SURFACE_THEME.shadow,
-    shadowOpacity: 0.20,
-    shadowRadius: 20,
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
   shadowOffset: { width: 0, height: 24 },
-    elevation: 7,
+    elevation: 4,
 },
 
   headerPanelGlow: {
@@ -3756,7 +3756,7 @@ appOrbitRingB: {
   height: 236,
   borderRadius: 999,
   backgroundColor: SURFACE_THEME.plumGlow,
-    opacity: 0.30,
+    opacity: 0.12,
 },
 
   headerPanelWarmGlow: {
@@ -3767,7 +3767,7 @@ appOrbitRingB: {
   height: 160,
   borderRadius: 999,
   backgroundColor: SURFACE_THEME.portalWarm,
-    opacity: 0.18,
+    opacity: 0.08,
 },
 
   headerPanelCoreBloom: {
@@ -3778,7 +3778,7 @@ appOrbitRingB: {
   height: 124,
   borderRadius: 999,
   backgroundColor: SURFACE_THEME.portalHot,
-    opacity: 0.20,
+    opacity: 0.08,
 },
 
   headerPanelRingPrimary: {
@@ -3791,7 +3791,7 @@ appOrbitRingB: {
   borderWidth: 1,
   borderColor: SURFACE_THEME.orbital,
   transform: [{ rotate: '-14deg' }],
-    opacity: 0.18,
+    opacity: 0.08,
 },
 
   headerPanelRingSecondary: {
@@ -3804,7 +3804,7 @@ appOrbitRingB: {
   borderWidth: 1,
   borderColor: SURFACE_THEME.portalTail,
   transform: [{ rotate: '12deg' }],
-    opacity: 0.16,
+    opacity: 0.06,
 },
 
   headerPanelTailArc: {
@@ -3817,7 +3817,7 @@ appOrbitRingB: {
   borderWidth: 1,
   borderColor: 'rgba(255, 212, 233, 0.12)',
   transform: [{ rotate: '20deg' }],
-    opacity: 0.16,
+    opacity: 0.06,
 },
 
   headerPanelSheen: {
@@ -3828,7 +3828,7 @@ appOrbitRingB: {
   height: 24,
   borderRadius: 999,
   backgroundColor: SURFACE_THEME.glassHighlight,
-    opacity: 0.16,
+    opacity: 0.08,
 },
 
   headerAuraLarge: {
@@ -3839,6 +3839,7 @@ appOrbitRingB: {
   height: 260,
   borderRadius: 130,
   backgroundColor: 'rgba(187, 90, 255, 0.24)',
+    opacity: 0.10,
 },
 
 headerAuraSmall: {
@@ -3849,6 +3850,7 @@ headerAuraSmall: {
   height: 118,
   borderRadius: 59,
   backgroundColor: 'rgba(255, 164, 220, 0.16)',
+    opacity: 0.08,
 },
 
   headerNebulaRing: {
@@ -3898,7 +3900,7 @@ headerAuraSmall: {
   headerOverlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 3,
   },
 
   headerOverlineDot: {
@@ -3910,38 +3912,38 @@ headerAuraSmall: {
   },
 
   headerOverline: {
-    color: 'rgba(232, 218, 245, 0.50)',
-    fontSize: 9,
-    lineHeight: 12,
+    color: 'rgba(232, 218, 245, 0.42)',
+    fontSize: 8.5,
+    lineHeight: 11,
     fontWeight: '800',
-    letterSpacing: 1.8,
+    letterSpacing: 1.5,
   },
 
   headerTitleRow: {
   flexDirection: 'row',
-  alignItems: 'flex-end',
-    marginBottom: 4,
+    alignItems: 'center',
+    marginBottom: 0,
 },
 
   headerQuinn: {
-    fontSize: 58,
-    lineHeight: 62,
+    fontSize: 34,
+    lineHeight: 38,
   fontWeight: '900',
-    letterSpacing: -2.2,
-  marginRight: 10,
+    letterSpacing: -1.4,
+    marginRight: 8,
 },
 
   headerVersionCapsule: {
   position: 'relative',
   overflow: 'hidden',
-  paddingHorizontal: 12,
-  paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   borderRadius: 999,
   marginLeft: 2,
   marginBottom: 10,
   borderWidth: 1,
-  borderColor: 'rgba(255, 226, 239, 0.40)',
-  backgroundColor: 'rgba(78, 24, 71, 0.82)',
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
   shadowColor: '#FF9AE0',
   shadowOpacity: 0.42,
   shadowRadius: 18,
@@ -3951,10 +3953,10 @@ headerAuraSmall: {
 
 headerVersionText: {
   color: '#FFF2FA',
-    fontSize: 12,
-    lineHeight: 14,
-  fontWeight: '900',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 0.4,
 },
 
   topFadeWall: {
@@ -4052,74 +4054,74 @@ headerVersionText: {
   },
 
   systemBrandSubcopy: {
-    color: 'rgba(246, 240, 252, 0.68)',
-    fontSize: 13.5,
-    lineHeight: 20,
-    fontWeight: '600',
+    color: 'rgba(246, 240, 252, 0.46)',
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: '500',
     marginTop: 6,
-    maxWidth: 300,
+    maxWidth: 240,
   },
 
   heroTitleWrap: {
   position: 'relative',
   alignSelf: 'flex-start',
-    marginBottom: 6,
-    paddingRight: 4,
+    marginBottom: 2,
+    paddingRight: 2,
 },
 
 titleGlowBlobA: {
   position: 'absolute',
   left: -4,
   top: 4,
-  width: 194,
-  height: 68,
+    width: 120,
+    height: 42,
   borderRadius: 30,
   backgroundColor: 'rgba(255, 120, 214, 0.14)',
-    opacity: 0.22,
+    opacity: 0.08,
 },
 
 titleGlowBlobB: {
   position: 'absolute',
   left: 88,
   top: -10,
-  width: 136,
-  height: 72,
+    width: 90,
+    height: 44,
   borderRadius: 31,
   backgroundColor: 'rgba(179, 104, 255, 0.16)',
-    opacity: 0.16,
+    opacity: 0.06,
 },
 
 headerQuinnGlow: {
   position: 'absolute',
   left: 2,
   top: 4,
-    fontSize: 58,
-    lineHeight: 62,
+    fontSize: 34,
+    lineHeight: 38,
   fontWeight: '900',
-    letterSpacing: -2.2,
+    letterSpacing: -1.4,
   color: 'rgba(255, 207, 232, 0.22)',
   textShadowColor: 'rgba(255, 170, 224, 0.74)',
   textShadowOffset: { width: 0, height: 0 },
   textShadowRadius: 24,
-    opacity: 0.30,
+    opacity: 0.18,
 },
 
 headerQuinnQ: {
   color: '#FFD2EA',
   textShadowColor: 'rgba(255, 184, 227, 0.86)',
   textShadowOffset: { width: 0, height: 0 },
-  textShadowRadius: 16,
-    fontSize: 58,
-    lineHeight: 62,
+    textShadowRadius: 8,
+    fontSize: 34,
+    lineHeight: 38,
 },
 
 headerQuinnRest: {
   color: '#FEF4FF',
   textShadowColor: 'rgba(206, 159, 255, 0.78)',
   textShadowOffset: { width: 0, height: 0 },
-  textShadowRadius: 16,
-    fontSize: 58,
-    lineHeight: 62,
+    textShadowRadius: 8,
+    fontSize: 34,
+    lineHeight: 38,
 },
 
 headerVersionShine: {
@@ -4142,9 +4144,9 @@ headerVersionShine: {
 },
 
   quinnConversationScroll: {
-    paddingHorizontal: 20,
-    paddingTop: HEADER_HEIGHT + 10,
-    paddingBottom: 108,
+    paddingHorizontal: 14,
+    paddingTop: 120,
+    paddingBottom: 24,
   },
 
   conversationStageShell: {
@@ -4152,11 +4154,17 @@ headerVersionShine: {
     width: '100%',
     maxWidth: 1600,
     alignSelf: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 0,
     paddingTop: 10,
     paddingBottom: 18,
     marginTop: 4,
     marginBottom: 8,
+    borderRadius: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+    shadowOpacity: 0,
+    elevation: 0,
   },
 
   conversationStageVeil: {
@@ -4173,6 +4181,7 @@ headerVersionShine: {
     shadowOpacity: 0.32,
     shadowRadius: 34,
     shadowOffset: { width: 0, height: 20 },
+    opacity: 0.20,
   },
 
   conversationStageGlowPrimary: {
@@ -4183,6 +4192,7 @@ headerVersionShine: {
     height: 240,
     borderRadius: 999,
     backgroundColor: SURFACE_THEME.portalGlow,
+    opacity: 0.10,
   },
 
   conversationStageGlowSecondary: {
@@ -4193,6 +4203,7 @@ headerVersionShine: {
     height: 280,
     borderRadius: 999,
     backgroundColor: SURFACE_THEME.violetCore,
+    opacity: 0.08,
   },
 
   conversationStageGlowWarm: {
@@ -4203,6 +4214,7 @@ headerVersionShine: {
     height: 180,
     borderRadius: 999,
     backgroundColor: SURFACE_THEME.portalWarm,
+    opacity: 0.06,
   },
 
   conversationStageRingPrimary: {
@@ -4215,6 +4227,7 @@ headerVersionShine: {
     borderWidth: 1,
     borderColor: SURFACE_THEME.orbital,
     transform: [{ rotate: '-12deg' }],
+    opacity: 0.06,
   },
 
   conversationStageRingSecondary: {
@@ -4227,6 +4240,7 @@ headerVersionShine: {
     borderWidth: 1,
     borderColor: SURFACE_THEME.portalTail,
     transform: [{ rotate: '14deg' }],
+    opacity: 0.05,
   },
 
   conversationStageTailArc: {
@@ -4239,6 +4253,7 @@ headerVersionShine: {
     borderWidth: 1,
     borderColor: 'rgba(255, 216, 236, 0.12)',
     transform: [{ rotate: '18deg' }],
+    opacity: 0.05,
   },
 
   conversationStageSheen: {
@@ -4249,6 +4264,7 @@ headerVersionShine: {
     height: 28,
     borderRadius: 999,
     backgroundColor: SURFACE_THEME.glassHighlight,
+    opacity: 0.06,
   },
 
   quinnScroll: {
@@ -4351,66 +4367,66 @@ headerVersionShine: {
   composerShell: {
     overflow: 'hidden',
     position: 'relative',
-    minHeight: 104,
-    borderRadius: 26,
+    minHeight: 92,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.10)',
-    backgroundColor: 'rgba(16, 14, 20, 0.96)',
+    backgroundColor: 'rgba(12, 12, 16, 0.96)',
     padding: 1,
     shadowColor: '#05020A',
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 5,
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
 
   composerInnerShell: {
     overflow: 'hidden',
     position: 'relative',
-    minHeight: 96,
-    borderRadius: 24,
+    minHeight: 86,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.065)',
-    backgroundColor: 'rgba(8, 8, 12, 0.99)',
-    paddingLeft: 17,
-    paddingRight: 17,
-    paddingTop: 14,
-    paddingBottom: 12,
+    borderColor: 'rgba(255, 255, 255, 0.055)',
+    backgroundColor: 'rgba(8, 8, 11, 0.99)',
+    paddingLeft: 13,
+    paddingRight: 13,
+    paddingTop: 12,
+    paddingBottom: 10,
   },
 
   lensRailWrap: {
-    marginBottom: 8,
-    paddingRight: 8,
+    marginBottom: 6,
+    paddingRight: 0,
   },
 
   threadTitleWrap: {
-    marginBottom: 10,
+    marginBottom: 6,
   },
 
   threadTitleEyebrow: {
-    color: 'rgba(188, 196, 226, 0.48)',
-    fontSize: 9.5,
-    lineHeight: 13,
+    color: 'rgba(210, 216, 235, 0.36)',
+    fontSize: 8.5,
+    lineHeight: 11,
     fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: 5,
+    letterSpacing: 1.0,
+    marginBottom: 3,
   },
 
   threadTitleText: {
     color: '#F5F8FF',
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: '800',
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700',
     letterSpacing: -0.3,
   },
 
   lensEyebrow: {
     color: 'rgba(210, 216, 235, 0.42)',
-    fontSize: 9.5,
-    lineHeight: 14,
+    fontSize: 8.5,
+    lineHeight: 11,
     fontWeight: '800',
-    letterSpacing: 1.1,
-    marginBottom: 8,
+    letterSpacing: 1.0,
+    marginBottom: 6,
   },
 
   lensRail: {
@@ -4420,29 +4436,29 @@ headerVersionShine: {
   },
 
   lensChip: {
-    paddingHorizontal: 11,
-    paddingVertical: 7.5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    marginRight: 8,
-    marginBottom: 8,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+    marginRight: 6,
+    marginBottom: 6,
   },
 
   lensChipActive: {
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    backgroundColor: 'rgba(107, 54, 136, 0.72)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(107, 54, 136, 0.56)',
     shadowColor: '#C65BFF',
-    shadowOpacity: 0.10,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
 
   lensChipText: {
     color: 'rgba(235, 238, 248, 0.72)',
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11.5,
+    lineHeight: 15,
     fontWeight: '600',
     letterSpacing: 0.15,
   },
@@ -4452,12 +4468,12 @@ headerVersionShine: {
   },
 
   lensBlurb: {
-    color: 'rgba(204, 212, 236, 0.46)',
-    fontSize: 11,
-    lineHeight: 16,
+    color: 'rgba(204, 212, 236, 0.40)',
+    fontSize: 10.5,
+    lineHeight: 15,
     fontWeight: '500',
-    marginTop: 2,
-    marginBottom: 8,
+    marginTop: 0,
+    marginBottom: 6,
   },
 
   threadManagerRail: {
@@ -4562,11 +4578,11 @@ headerVersionShine: {
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.10)',
-    backgroundColor: 'rgba(18, 17, 23, 0.94)',
-    paddingLeft: 14,
-    paddingRight: 10,
-    paddingTop: 10,
-    paddingBottom: 10,
+    backgroundColor: 'rgba(20, 20, 25, 0.94)',
+    paddingLeft: 13,
+    paddingRight: 9,
+    paddingTop: 9,
+    paddingBottom: 9,
   },
 
   composerFieldRow: {
@@ -4938,10 +4954,10 @@ cardOrbGlowWarm: {
 
   composerInput: {
   flex: 1,
-  minHeight: 72,
-    color: 'rgba(250, 250, 252, 0.92)',
-    fontSize: 17,
-    lineHeight: 23,
+    minHeight: 50,
+    color: 'rgba(250, 250, 252, 0.94)',
+    fontSize: 16,
+    lineHeight: 22,
   fontWeight: '500',
   letterSpacing: -0.08,
   padding: 0,
@@ -5097,19 +5113,19 @@ cardOrbGlowWarm: {
   overflow: 'hidden',
   position: 'relative',
   marginBottom: 14,
-    borderRadius: 28,
+    borderRadius: 24,
   borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
-    backgroundColor: 'rgba(8, 8, 12, 0.955)',
-  padding: 2,
+    borderColor: 'rgba(255, 255, 255, 0.075)',
+    backgroundColor: 'rgba(10, 10, 14, 0.94)',
+    padding: 1,
   width: '100%',
   maxWidth: 1560,
   alignSelf: 'center',
   shadowColor: '#120015',
-    shadowOpacity: 0.24,
-    shadowRadius: 22,
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
   shadowOffset: { width: 0, height: 18 },
-    elevation: 6,
+    elevation: 4,
 },
 
   spokenResponseCard: {
@@ -5131,12 +5147,12 @@ cardOrbGlowWarm: {
   responseInnerFrame: {
     overflow: 'hidden',
     position: 'relative',
-    borderRadius: 30,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255, 244, 247, 0.10)',
-    backgroundColor: 'rgba(12, 4, 19, 0.986)',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: 'rgba(12, 12, 16, 0.96)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
 
   spokenInnerFrame: {
@@ -5150,12 +5166,12 @@ cardOrbGlowWarm: {
   },
 
   heroResponseBody: {
-    color: 'rgba(250, 250, 252, 0.90)',
-    fontSize: 16.5,
-    lineHeight: 25,
+    color: 'rgba(250, 250, 252, 0.92)',
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '500',
   letterSpacing: 0.1,
-  maxWidth: 900,
+    maxWidth: 920,
 },
 
   sectionTitle: {
@@ -5171,7 +5187,7 @@ cardOrbGlowWarm: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   responseHeaderTextWrap: {
@@ -5267,18 +5283,18 @@ cardOrbGlowWarm: {
 
   responseLabel: {
     color: 'rgba(245, 248, 255, 0.80)',
-    fontSize: 12,
-  lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: '700',
-  letterSpacing: 0.9,
+    letterSpacing: 0.5,
   marginBottom: 4,
 },
 
   responseMetaLine: {
     color: 'rgba(205, 212, 234, 0.48)',
-    fontSize: 11,
-  lineHeight: 16,
-  fontWeight: '600',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '500',
   letterSpacing: 0.08,
 },
 
