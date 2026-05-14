@@ -20,6 +20,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import * as SafeAreaContext from 'react-native-safe-area-context';
 import Svg, {
   Circle,
@@ -2031,6 +2032,40 @@ function QuinnConversationSurface({
     await handleSpeakQuinnText(clean);
   }
 
+  async function handleThreadMessageCopy(text: string) {
+    const clean = String(text || '').trim();
+
+    if (!clean) {
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(clean);
+    } catch (error) {
+      console.warn('Failed to copy Ren message', error);
+    }
+  }
+
+  async function handleThreadMessageRegenerate(run: RunHistoryItem) {
+    const nextText = String(run.packetText || '').trim();
+
+    if (!nextText || isRunning) {
+      return;
+    }
+
+    await interruptQuinnPlayback();
+    onTriggerWave();
+
+    await onRunPacket({
+      packetTitle: run.packetTitle || packetTitle || 'Quinn Chat',
+      packetText: nextText,
+      lensId: run.lensId ? coerceQuinnLensId(run.lensId) : activeLensId,
+      stayOnScreen: true,
+      syncVisibleInput: false,
+      sessionArc,
+    });
+  }
+
   return (
     <ScrollView
   style={styles.quinnConversationViewport}
@@ -2471,6 +2506,53 @@ function QuinnConversationSurface({
                         <View style={styles.assistantMessageBubble}>
                           <Text style={styles.assistantMessageLabel}>Ren</Text>
                           <Text style={styles.assistantMessageText}>{assistantText}</Text>
+
+                          <View style={styles.threadMessageActionRow}>
+                            <Pressable
+                              style={styles.threadMessageActionChip}
+                              onPress={() => {
+                                void handleSpeakQuinnText(assistantText);
+                              }}
+                            >
+                              <Feather name="volume-2" size={13} color="rgba(235, 240, 255, 0.70)" />
+                              <Text style={styles.threadMessageActionText}>Speak</Text>
+                            </Pressable>
+
+                            <Pressable
+                              style={styles.threadMessageActionChip}
+                              onPress={() => {
+                                void handleThreadMessageCopy(assistantText);
+                              }}
+                            >
+                              <Feather name="copy" size={13} color="rgba(235, 240, 255, 0.70)" />
+                              <Text style={styles.threadMessageActionText}>Copy</Text>
+                            </Pressable>
+
+                            <Pressable
+                              style={[
+                                styles.threadMessageActionChip,
+                                isRunning && styles.threadMessageActionChipDisabled,
+                              ]}
+                              onPress={() => {
+                                void handleThreadMessageRegenerate(run);
+                              }}
+                              disabled={isRunning}
+                            >
+                              <Feather
+                                name="refresh-cw"
+                                size={13}
+                                color={isRunning ? 'rgba(235, 240, 255, 0.28)' : 'rgba(235, 240, 255, 0.70)'}
+                              />
+                              <Text
+                                style={[
+                                  styles.threadMessageActionText,
+                                  isRunning && styles.threadMessageActionTextDisabled,
+                                ]}
+                              >
+                                Again
+                              </Text>
+                            </Pressable>
+                          </View>
                         </View>
                       ) : null}
                     </View>
@@ -5553,6 +5635,45 @@ cardOrbGlowWarm: {
     fontWeight: '500',
     textAlign: 'center',
     paddingVertical: 18,
+  },
+
+  threadMessageActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 10,
+    paddingTop: 9,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.055)',
+  },
+
+  threadMessageActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    gap: 5,
+  },
+
+  threadMessageActionChipDisabled: {
+    opacity: 0.56,
+  },
+
+  threadMessageActionText: {
+    color: 'rgba(235, 240, 255, 0.70)',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '700',
+    letterSpacing: 0.15,
+  },
+
+  threadMessageActionTextDisabled: {
+    color: 'rgba(235, 240, 255, 0.28)',
   },
 
 responseReplayButton: {
