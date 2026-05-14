@@ -139,8 +139,6 @@ type VisibleReplySource = {
   packetText: string;
   lensId: QuinnLensId;
 };
-
-const HEADER_HEIGHT = 254;
 const FADE_WALL_HEIGHT = 324;
 const WINDOW_WIDTH = Dimensions.get('window').width;
 const QUINN_LENSES = getQuinnLenses();
@@ -1237,6 +1235,7 @@ type QuinnConversationSurfaceProps = {
   responsePacketTitle: string;
   responsePacketText: string;
   responseLensId: QuinnLensId;
+  recentRuns: RunHistoryItem[];
   writtenResult: string;
   compressedSummary: string;
   memoryResonance: MemoryResonanceItem[];
@@ -1266,6 +1265,7 @@ function QuinnConversationSurface({
   responsePacketTitle,
   responsePacketText,
   responseLensId,
+  recentRuns,
   writtenResult,
   compressedSummary,
   memoryResonance,
@@ -1350,6 +1350,7 @@ function QuinnConversationSurface({
     },
   ];
   const responseMetaLine = sessionArc ? 'Continuing chat' : 'New chat';
+  const visibleThreadMessages = recentRuns.slice(0, 6).reverse();
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -2422,7 +2423,7 @@ function QuinnConversationSurface({
           <View style={styles.responseInnerFrame}>
             <View style={styles.responseHeaderRow}>
               <View style={styles.responseHeaderTextWrap}>
-                <Text style={styles.responseLabel}>Ren reply</Text>
+                <Text style={styles.responseLabel}>Conversation</Text>
                 <Text style={styles.responseMetaLine}>{responseMetaLine}</Text>
               </View>
               {hasResponseDetails ? (
@@ -2442,10 +2443,37 @@ function QuinnConversationSurface({
               ) : null}
             </View>
 
-            <Text style={styles.heroResponseBody}>
-              {writtenResult ||
-                'Messages will appear here.'}
-            </Text>
+            {visibleThreadMessages.length ? (
+              <View style={styles.threadMessageStack}>
+                {visibleThreadMessages.map((run, index) => {
+                  const userText = String(run.packetText || '').trim();
+                  const assistantText = sanitizeQuinnVisibleReplyText(run.writtenResult || '');
+
+                  return (
+                    <View
+                      key={`${run.timestamp || run.packetTitle || 'run'}-${index}`}
+                      style={styles.threadMessagePair}
+                    >
+                      {userText ? (
+                        <View style={styles.userMessageBubble}>
+                          <Text style={styles.userMessageLabel}>You</Text>
+                          <Text style={styles.userMessageText}>{userText}</Text>
+                        </View>
+                      ) : null}
+
+                      {assistantText ? (
+                        <View style={styles.assistantMessageBubble}>
+                          <Text style={styles.assistantMessageLabel}>Ren</Text>
+                          <Text style={styles.assistantMessageText}>{assistantText}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.emptyThreadText}>Messages will appear here.</Text>
+            )}
 
             {showResponseDetails && hasResponseDetails ? (
               <View style={styles.responseDetailsPanel}>
@@ -3284,6 +3312,7 @@ export default function App() {
           responsePacketTitle={visibleReplySource.packetTitle}
           responsePacketText={visibleReplySource.packetText}
           responseLensId={visibleReplySource.lensId}
+          recentRuns={recentRuns}
           writtenResult={writtenResult}
         compressedSummary={compressedSummary}
         memoryResonance={currentMemoryResonance}
@@ -5115,15 +5144,15 @@ cardOrbGlowWarm: {
   marginBottom: 14,
     borderRadius: 24,
   borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.075)',
-    backgroundColor: 'rgba(10, 10, 14, 0.94)',
+    borderColor: 'rgba(255, 255, 255, 0.055)',
+    backgroundColor: 'rgba(10, 10, 14, 0.72)',
     padding: 1,
   width: '100%',
   maxWidth: 1560,
   alignSelf: 'center',
   shadowColor: '#120015',
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
   shadowOffset: { width: 0, height: 18 },
     elevation: 4,
 },
@@ -5151,8 +5180,8 @@ cardOrbGlowWarm: {
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.07)',
     backgroundColor: 'rgba(12, 12, 16, 0.96)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 13,
+    paddingVertical: 13,
   },
 
   spokenInnerFrame: {
@@ -5444,6 +5473,81 @@ cardOrbGlowWarm: {
   borderRadius: 21,
   backgroundColor: 'rgba(255, 130, 214, 0.16)',
 },
+
+  threadMessageStack: {
+    gap: 14,
+  },
+
+  threadMessagePair: {
+    gap: 9,
+  },
+
+  userMessageBubble: {
+    alignSelf: 'flex-end',
+    maxWidth: '88%',
+    borderRadius: 22,
+    borderBottomRightRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(70, 52, 90, 0.72)',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+
+  userMessageLabel: {
+    color: 'rgba(245, 248, 255, 0.58)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+
+  userMessageText: {
+    color: 'rgba(250, 250, 252, 0.94)',
+    fontSize: 15.5,
+    lineHeight: 22,
+    fontWeight: '500',
+    letterSpacing: -0.05,
+  },
+
+  assistantMessageBubble: {
+    alignSelf: 'flex-start',
+    maxWidth: '96%',
+    borderRadius: 22,
+    borderBottomLeftRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.075)',
+    backgroundColor: 'rgba(18, 18, 23, 0.92)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+
+  assistantMessageLabel: {
+    color: 'rgba(232, 218, 245, 0.62)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+
+  assistantMessageText: {
+    color: 'rgba(250, 250, 252, 0.92)',
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '500',
+    letterSpacing: 0.02,
+  },
+
+  emptyThreadText: {
+    color: 'rgba(220, 224, 238, 0.48)',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingVertical: 18,
+  },
 
 responseReplayButton: {
   width: 42,
