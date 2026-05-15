@@ -1283,6 +1283,60 @@ function QuinnConversationSurface({
   onRunPacket,
 }: QuinnConversationSurfaceProps) {
   const conversationScrollRef = useRef<React.ElementRef<typeof ScrollView> | null>(null);
+  const autoScrollTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const conversationContentHeightRef = useRef(0);
+  const conversationViewportHeightRef = useRef(0);
+  const conversationBottomAnchorYRef = useRef(0);
+
+  const forceConversationScrollToBottomAnchor = React.useCallback((animated = true) => {
+    const scrollView = conversationScrollRef.current;
+
+    if (!scrollView) {
+      return;
+    }
+
+    const contentHeight = conversationContentHeightRef.current;
+    const viewportHeight = conversationViewportHeightRef.current;
+    const bottomAnchorY = conversationBottomAnchorYRef.current;
+
+    const targetY = Math.max(
+      0,
+      bottomAnchorY - Math.max(0, viewportHeight - 24),
+      contentHeight - viewportHeight,
+      999999
+    );
+
+    scrollView.scrollTo({ y: targetY, animated });
+    scrollView.scrollToEnd({ animated });
+  }, []);
+
+  const scheduleConversationAutoScroll = React.useCallback((animated = true) => {
+    for (const timer of autoScrollTimersRef.current) {
+      clearTimeout(timer);
+    }
+
+    autoScrollTimersRef.current = [];
+
+    forceConversationScrollToBottomAnchor(animated);
+
+    for (const delay of [0, 50, 120, 220, 380, 650, 1000, 1500]) {
+      const timer = setTimeout(() => {
+        forceConversationScrollToBottomAnchor(animated);
+      }, delay);
+
+      autoScrollTimersRef.current.push(timer);
+    }
+  }, [forceConversationScrollToBottomAnchor]);
+
+  React.useEffect(() => {
+    return () => {
+      for (const timer of autoScrollTimersRef.current) {
+        clearTimeout(timer);
+      }
+
+      autoScrollTimersRef.current = [];
+    };
+  }, []);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder, 250);
 
@@ -1362,6 +1416,12 @@ function QuinnConversationSurface({
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
+
+  React.useEffect(() => {
+    if (isRunning || writtenResult) {
+      scheduleConversationAutoScroll(true);
+    }
+  }, [isRunning, scheduleConversationAutoScroll, writtenResult]);
   const {
     composerLift,
     responseLift,
@@ -2073,9 +2133,16 @@ function QuinnConversationSurface({
       keyboardShouldPersistTaps="handled"
       style={styles.quinnConversationViewport}
       contentContainerStyle={styles.quinnConversationScroll}
-  showsVerticalScrollIndicator={false}
-  scrollEventThrottle={16}
->
+      showsVerticalScrollIndicator={false}
+      scrollEventThrottle={16}
+      onContentSizeChange={(_, height) => {
+        conversationContentHeightRef.current = height;
+        scheduleConversationAutoScroll(true);
+      }}
+      onLayout={(event) => {
+        conversationViewportHeightRef.current = event.nativeEvent.layout.height;
+        scheduleConversationAutoScroll(false);
+      }}>
       <View style={styles.conversationStageShell}>
         <View pointerEvents="none" style={styles.conversationStageVeil} />
         <View pointerEvents="none" style={styles.conversationStageGlowPrimary} />
@@ -3639,6 +3706,11 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: SURFACE_THEME.bg,
+  },
+
+  conversationBottomAnchor: {
+    height: 32,
+    width: '100%',
   },
 
   quinnConversationViewport: {
