@@ -6196,7 +6196,7 @@ responseReplayButton: {
   literalChatScrollContent: {
     paddingHorizontal: 16,
     paddingTop: 18,
-    paddingBottom: 178,
+    paddingBottom: 260,
   },
 
   literalChatEmptyState: {
@@ -6322,8 +6322,8 @@ responseReplayButton: {
     right: 0,
     bottom: 0,
     paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 14,
+    paddingTop: 6,
+    paddingBottom: 82,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.07)',
     backgroundColor: 'rgba(8, 8, 11, 0.96)',
@@ -6331,7 +6331,7 @@ responseReplayButton: {
 
   literalLensRow: {
     paddingHorizontal: 2,
-    paddingBottom: 8,
+    paddingBottom: 6,
   },
 
   literalLensChip: {
@@ -6361,8 +6361,8 @@ responseReplayButton: {
   },
 
   literalComposerBox: {
-    minHeight: 58,
-    borderRadius: 28,
+    minHeight: 56,
+    borderRadius: 26,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     backgroundColor: 'rgba(28, 28, 32, 0.96)',
@@ -6370,13 +6370,13 @@ responseReplayButton: {
     alignItems: 'flex-end',
     paddingLeft: 16,
     paddingRight: 8,
-    paddingTop: 10,
+    paddingTop: 9,
     paddingBottom: 8,
   },
 
   literalComposerInput: {
     flex: 1,
-    minHeight: 38,
+    minHeight: 36,
     maxHeight: 128,
     color: 'rgba(250, 250, 252, 0.94)',
     fontSize: 16,
