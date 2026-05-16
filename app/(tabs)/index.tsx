@@ -2292,7 +2292,7 @@ function QuinnConversationSurface({
           style={[
             styles.literalComposerDock,
             literalKeyboardHeight > 0 && styles.literalComposerDockKeyboardOpen,
-            literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight + 32, 220) },
+            literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight + 56, 236) },
           ]}
         >
           <ScrollView
