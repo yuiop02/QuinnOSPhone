@@ -8,6 +8,7 @@ import {
 } from 'expo-audio';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
   Animated,
   Dimensions,
   Easing,
@@ -2127,6 +2128,23 @@ function QuinnConversationSurface({
     });
   }
 
+  const [literalKeyboardHeight, setLiteralKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
+      setLiteralKeyboardHeight(event.endCoordinates?.height ?? 0);
+    });
+
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setLiteralKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   const useLiteralChatShellPreview = true;
 
   if (useLiteralChatShellPreview) {
@@ -2155,7 +2173,10 @@ function QuinnConversationSurface({
           ref={conversationScrollRef}
           keyboardShouldPersistTaps="handled"
           style={styles.literalChatScroll}
-          contentContainerStyle={styles.literalChatScrollContent}
+          contentContainerStyle={[
+            styles.literalChatScrollContent,
+            literalKeyboardHeight > 0 && styles.literalChatScrollContentKeyboardOpen,
+          ]}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           onContentSizeChange={(_, height) => {
@@ -2260,7 +2281,13 @@ function QuinnConversationSurface({
           />
         </ScrollView>
 
-        <View style={styles.literalComposerDock}>
+        <View
+          style={[
+            styles.literalComposerDock,
+            literalKeyboardHeight > 0 && styles.literalComposerDockKeyboardOpen,
+            literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight - 8, 0) },
+          ]}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -6316,6 +6343,10 @@ responseReplayButton: {
     height: 1,
   },
 
+  literalChatScrollContentKeyboardOpen: {
+    paddingBottom: 230,
+  },
+
   literalComposerDock: {
     position: 'absolute',
     left: 0,
@@ -6327,6 +6358,10 @@ responseReplayButton: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.07)',
     backgroundColor: 'rgba(8, 8, 11, 0.96)',
+  },
+
+  literalComposerDockKeyboardOpen: {
+    paddingBottom: 12,
   },
 
   literalLensRow: {
