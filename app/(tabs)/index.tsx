@@ -2190,7 +2190,14 @@ function QuinnConversationSurface({
         >
           {!visibleThreadMessages.length && !writtenResult ? (
             <View style={styles.literalChatEmptyState}>
-              <Text style={styles.literalChatEmptyTitle}>What do you need?</Text>
+              <Text
+                style={styles.literalChatEmptyTitle}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+              >
+                What do you need?
+              </Text>
               <Text style={styles.literalChatEmptyBody}>
                 Message Quinn, use voice, or pick a lens when it helps.
               </Text>
@@ -2285,7 +2292,7 @@ function QuinnConversationSurface({
           style={[
             styles.literalComposerDock,
             literalKeyboardHeight > 0 && styles.literalComposerDockKeyboardOpen,
-            literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight + 140, 300) },
+            literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight + 32, 220) },
           ]}
         >
           <ScrollView
@@ -6234,29 +6241,31 @@ responseReplayButton: {
   },
 
   literalChatEmptyState: {
-    minHeight: 320,
+    minHeight: 300,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 12,
   },
 
   literalChatEmptyTitle: {
     color: 'rgba(250, 250, 252, 0.94)',
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 23,
+    lineHeight: 29,
     fontWeight: '700',
     letterSpacing: -0.6,
     textAlign: 'center',
     marginBottom: 8,
+    maxWidth: 360,
+    alignSelf: 'stretch',
   },
 
   literalChatEmptyBody: {
     color: 'rgba(210, 216, 235, 0.54)',
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13.5,
+    lineHeight: 20,
     fontWeight: '500',
     textAlign: 'center',
-    maxWidth: 300,
+    maxWidth: 320,
   },
 
   literalMessagePair: {
@@ -6351,7 +6360,7 @@ responseReplayButton: {
   },
 
   literalChatScrollContentKeyboardOpen: {
-    paddingBottom: 430,
+    paddingBottom: 330,
   },
 
   literalComposerDock: {
@@ -6368,7 +6377,7 @@ responseReplayButton: {
   },
 
   literalComposerDockKeyboardOpen: {
-    paddingBottom: 18,
+    paddingBottom: 8,
   },
 
   literalLensRow: {
