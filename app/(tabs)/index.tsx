@@ -2127,6 +2127,234 @@ function QuinnConversationSurface({
     });
   }
 
+  const useLiteralChatShellPreview = true;
+
+  if (useLiteralChatShellPreview) {
+    return (
+      <View style={styles.literalChatRoot}>
+        <View style={styles.literalChatTopBar}>
+          <View style={styles.literalChatTopLeft}>
+            <View style={styles.literalChatMenuButton}>
+              <Feather name="menu" size={18} color="rgba(245, 248, 255, 0.78)" />
+            </View>
+
+            <View style={styles.literalChatTitleWrap}>
+              <Text style={styles.literalChatTitle}>Quinn</Text>
+              <Text style={styles.literalChatSubtitle}>
+                {sessionArc ? 'Continuing chat' : 'New chat'}
+              </Text>
+            </View>
+          </View>
+
+          <Pressable style={styles.literalChatNewButton} onPress={onStartFreshArc}>
+            <Feather name="edit-3" size={16} color="rgba(245, 248, 255, 0.82)" />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          ref={conversationScrollRef}
+          keyboardShouldPersistTaps="handled"
+          style={styles.literalChatScroll}
+          contentContainerStyle={styles.literalChatScrollContent}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onContentSizeChange={(_, height) => {
+            conversationContentHeightRef.current = height;
+            scheduleConversationAutoScroll(true);
+          }}
+          onLayout={(event) => {
+            conversationViewportHeightRef.current = event.nativeEvent.layout.height;
+            scheduleConversationAutoScroll(false);
+          }}
+        >
+          {!visibleThreadMessages.length && !writtenResult ? (
+            <View style={styles.literalChatEmptyState}>
+              <Text style={styles.literalChatEmptyTitle}>What do you need?</Text>
+              <Text style={styles.literalChatEmptyBody}>
+                Message Quinn, use voice, or pick a lens when it helps.
+              </Text>
+            </View>
+          ) : null}
+
+          {visibleThreadMessages.map((run, index) => {
+            const userText = String(run.packetText || '').trim();
+            const assistantText = sanitizeQuinnVisibleReplyText(run.writtenResult || '');
+
+            return (
+              <View
+                key={`${run.timestamp || run.packetTitle || 'run'}-${index}`}
+                style={styles.literalMessagePair}
+              >
+                {userText ? (
+                  <View style={styles.literalUserBubble}>
+                    <Text style={styles.literalMessageText}>{userText}</Text>
+                  </View>
+                ) : null}
+
+                {assistantText ? (
+                  <View style={styles.literalAssistantBlock}>
+                    <View style={styles.literalAssistantAvatar}>
+                      <Text style={styles.literalAssistantAvatarText}>R</Text>
+                    </View>
+
+                    <View style={styles.literalAssistantContent}>
+                      <Text style={styles.literalAssistantName}>Ren</Text>
+                      <Text style={styles.literalMessageText}>{assistantText}</Text>
+
+                      <View style={styles.literalMessageActions}>
+                        <Pressable
+                          style={styles.literalMessageAction}
+                          onPress={() => {
+                            void handleSpeakQuinnText(assistantText);
+                          }}
+                        >
+                          <Feather name="volume-2" size={13} color="rgba(235, 240, 255, 0.68)" />
+                        </Pressable>
+
+                        <Pressable
+                          style={styles.literalMessageAction}
+                          onPress={() => {
+                            void handleThreadMessageCopy(assistantText);
+                          }}
+                        >
+                          <Feather name="copy" size={13} color="rgba(235, 240, 255, 0.68)" />
+                        </Pressable>
+
+                        <Pressable
+                          style={[
+                            styles.literalMessageAction,
+                            isRunning && styles.literalMessageActionDisabled,
+                          ]}
+                          disabled={isRunning}
+                          onPress={() => {
+                            void handleThreadMessageRegenerate(run);
+                          }}
+                        >
+                          <Feather name="refresh-cw" size={13} color="rgba(235, 240, 255, 0.68)" />
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+
+          {isRunning ? (
+            <View style={styles.literalAssistantBlock}>
+              <View style={styles.literalAssistantAvatar}>
+                <Text style={styles.literalAssistantAvatarText}>R</Text>
+              </View>
+              <View style={styles.literalAssistantContent}>
+                <Text style={styles.literalAssistantName}>Ren</Text>
+                <Text style={styles.literalTypingText}>Thinking…</Text>
+              </View>
+            </View>
+          ) : null}
+
+          <View
+            style={styles.literalChatBottomAnchor}
+            onLayout={(event) => {
+              conversationBottomAnchorYRef.current = event.nativeEvent.layout.y;
+            }}
+          />
+        </ScrollView>
+
+        <View style={styles.literalComposerDock}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.literalLensRow}
+          >
+            {QUINN_LENSES.map((lens) => {
+              const selected = lens.id === activeLensId;
+
+              return (
+                <Pressable
+                  key={lens.id}
+                  style={[styles.literalLensChip, selected && styles.literalLensChipActive]}
+                  onPress={() => onSelectLens(lens.id)}
+                >
+                  <Text
+                    style={[
+                      styles.literalLensChipText,
+                      selected && styles.literalLensChipTextActive,
+                    ]}
+                  >
+                    {lens.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {runError ? <Text style={styles.literalStatusText}>{runError}</Text> : null}
+          {voiceError ? <Text style={styles.literalStatusText}>{voiceError}</Text> : null}
+          {voiceStatus ? <Text style={styles.literalStatusText}>{voiceStatus}</Text> : null}
+
+          <View style={styles.literalComposerBox}>
+            <TextInput
+              multiline
+              value={packetText}
+              onChangeText={onChangePacketText}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
+              placeholder="Message Quinn..."
+              placeholderTextColor="rgba(245, 245, 247, 0.34)"
+              style={styles.literalComposerInput}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.literalComposerButtons}>
+              <Pressable
+                style={[
+                  styles.literalComposerIconButton,
+                  !canSend && styles.literalComposerIconButtonDisabled,
+                ]}
+                disabled={!canSend}
+                onPress={() => {
+                  void handleRunTypedQuinn();
+                }}
+              >
+                {isRunning ? (
+                  <Text style={styles.literalComposerLoading}>…</Text>
+                ) : (
+                  <Feather name="arrow-up" size={18} color="rgba(250, 250, 252, 0.92)" />
+                )}
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.literalComposerIconButton,
+                  recorderState.isRecording && styles.literalComposerIconButtonActive,
+                ]}
+                onPress={() => {
+                  if (recorderState.isRecording) {
+                    void handleStopRecording();
+                  } else {
+                    void handleStartRecording();
+                  }
+                }}
+              >
+                <Feather
+                  name={recorderState.isRecording ? 'square' : 'mic'}
+                  size={18}
+                  color="rgba(250, 250, 252, 0.92)"
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {recordingUri ? (
+            <Text style={styles.literalStatusText}>
+              Voice take attached • {formatDurationMillis(recordingDuration)}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       ref={conversationScrollRef}
@@ -5897,5 +6125,306 @@ responseReplayButton: {
     lineHeight: 21,
     fontWeight: '500',
   },
+  literalChatRoot: {
+    flex: 1,
+    minHeight: '100%',
+    backgroundColor: 'rgba(5, 5, 8, 0.96)',
+  },
+
+  literalChatTopBar: {
+    height: 74,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: 'rgba(8, 8, 11, 0.96)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  literalChatTopLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  literalChatMenuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+  },
+
+  literalChatTitleWrap: {
+    flex: 1,
+  },
+
+  literalChatTitle: {
+    color: 'rgba(250, 250, 252, 0.94)',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+
+  literalChatSubtitle: {
+    color: 'rgba(210, 216, 235, 0.46)',
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+
+  literalChatNewButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+  },
+
+  literalChatScroll: {
+    flex: 1,
+  },
+
+  literalChatScrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 178,
+  },
+
+  literalChatEmptyState: {
+    minHeight: 320,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+
+  literalChatEmptyTitle: {
+    color: 'rgba(250, 250, 252, 0.94)',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+
+  literalChatEmptyBody: {
+    color: 'rgba(210, 216, 235, 0.54)',
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '500',
+    textAlign: 'center',
+    maxWidth: 300,
+  },
+
+  literalMessagePair: {
+    marginBottom: 18,
+  },
+
+  literalUserBubble: {
+    alignSelf: 'flex-end',
+    maxWidth: '86%',
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: 'rgba(87, 48, 108, 0.74)',
+  },
+
+  literalAssistantBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 14,
+    marginBottom: 4,
+  },
+
+  literalAssistantAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+
+  literalAssistantAvatarText: {
+    color: 'rgba(255, 220, 243, 0.92)',
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '800',
+  },
+
+  literalAssistantContent: {
+    flex: 1,
+    paddingRight: 4,
+  },
+
+  literalAssistantName: {
+    color: 'rgba(250, 250, 252, 0.80)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+
+  literalMessageText: {
+    color: 'rgba(250, 250, 252, 0.92)',
+    fontSize: 15.5,
+    lineHeight: 23,
+    fontWeight: '500',
+    letterSpacing: -0.05,
+  },
+
+  literalTypingText: {
+    color: 'rgba(210, 216, 235, 0.58)',
+    fontSize: 15.5,
+    lineHeight: 23,
+    fontWeight: '500',
+  },
+
+  literalMessageActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    marginLeft: -4,
+  },
+
+  literalMessageAction: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+
+  literalMessageActionDisabled: {
+    opacity: 0.38,
+  },
+
+  literalChatBottomAnchor: {
+    height: 1,
+  },
+
+  literalComposerDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: 'rgba(8, 8, 11, 0.96)',
+  },
+
+  literalLensRow: {
+    paddingHorizontal: 2,
+    paddingBottom: 8,
+  },
+
+  literalLensChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginRight: 7,
+  },
+
+  literalLensChipActive: {
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(107, 54, 136, 0.68)',
+  },
+
+  literalLensChipText: {
+    color: 'rgba(235, 238, 248, 0.70)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+
+  literalLensChipTextActive: {
+    color: 'rgba(250, 250, 252, 0.96)',
+  },
+
+  literalComposerBox: {
+    minHeight: 58,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(28, 28, 32, 0.96)',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+
+  literalComposerInput: {
+    flex: 1,
+    minHeight: 38,
+    maxHeight: 128,
+    color: 'rgba(250, 250, 252, 0.94)',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '500',
+    padding: 0,
+    paddingRight: 10,
+  },
+
+  literalComposerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 1,
+  },
+
+  literalComposerIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+  },
+
+  literalComposerIconButtonActive: {
+    backgroundColor: 'rgba(196, 79, 129, 0.82)',
+  },
+
+  literalComposerIconButtonDisabled: {
+    opacity: 0.38,
+  },
+
+  literalComposerLoading: {
+    color: 'rgba(250, 250, 252, 0.92)',
+    fontSize: 18,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+
+  literalStatusText: {
+    color: 'rgba(220, 226, 244, 0.54)',
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '500',
+    marginBottom: 6,
+    paddingHorizontal: 8,
+  },
+
 });
 
