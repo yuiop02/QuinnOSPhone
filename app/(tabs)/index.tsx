@@ -2285,7 +2285,7 @@ function QuinnConversationSurface({
           style={[
             styles.literalComposerDock,
             literalKeyboardHeight > 0 && styles.literalComposerDockKeyboardOpen,
-            literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight - 8, 0) },
+            literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight + 140, 300) },
           ]}
         >
           <ScrollView
@@ -2314,6 +2314,13 @@ function QuinnConversationSurface({
               );
             })}
           </ScrollView>
+
+          <View style={styles.literalDockControlRow}>
+            <Pressable style={styles.literalNewChatDockButton} onPress={onStartFreshArc}>
+              <Feather name="plus" size={13} color="rgba(250, 250, 252, 0.86)" />
+              <Text style={styles.literalNewChatDockButtonText}>New chat</Text>
+            </Pressable>
+          </View>
 
           {runError ? <Text style={styles.literalStatusText}>{runError}</Text> : null}
           {voiceError ? <Text style={styles.literalStatusText}>{voiceError}</Text> : null}
@@ -6223,7 +6230,7 @@ responseReplayButton: {
   literalChatScrollContent: {
     paddingHorizontal: 16,
     paddingTop: 18,
-    paddingBottom: 260,
+    paddingBottom: 300,
   },
 
   literalChatEmptyState: {
@@ -6344,7 +6351,7 @@ responseReplayButton: {
   },
 
   literalChatScrollContentKeyboardOpen: {
-    paddingBottom: 230,
+    paddingBottom: 430,
   },
 
   literalComposerDock: {
@@ -6353,7 +6360,7 @@ responseReplayButton: {
     right: 0,
     bottom: 0,
     paddingHorizontal: 12,
-    paddingTop: 6,
+    paddingTop: 7,
     paddingBottom: 82,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.07)',
@@ -6361,7 +6368,7 @@ responseReplayButton: {
   },
 
   literalComposerDockKeyboardOpen: {
-    paddingBottom: 12,
+    paddingBottom: 18,
   },
 
   literalLensRow: {
@@ -6395,8 +6402,37 @@ responseReplayButton: {
     color: 'rgba(250, 250, 252, 0.96)',
   },
 
+  literalDockControlRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+    marginTop: -2,
+    marginBottom: 6,
+  },
+
+  literalNewChatDockButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 32,
+    borderRadius: 16,
+    paddingHorizontal: 11,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+  },
+
+  literalNewChatDockButtonText: {
+    color: 'rgba(250, 250, 252, 0.82)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    marginLeft: 5,
+  },
+
   literalComposerBox: {
-    minHeight: 56,
+    minHeight: 58,
     borderRadius: 26,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
@@ -6405,8 +6441,8 @@ responseReplayButton: {
     alignItems: 'flex-end',
     paddingLeft: 16,
     paddingRight: 8,
-    paddingTop: 9,
-    paddingBottom: 8,
+    paddingTop: 10,
+    paddingBottom: 9,
   },
 
   literalComposerInput: {
