@@ -2131,6 +2131,7 @@ function QuinnConversationSurface({
   }
 
   const [literalKeyboardHeight, setLiteralKeyboardHeight] = useState(0);
+  const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
@@ -2219,7 +2220,12 @@ function QuinnConversationSurface({
                   <Pressable
                     key={label}
                     style={styles.literalQuickPromptChip}
-                    onPress={() => onChangePacketText(prompt)}
+                    onPress={() => {
+                      onChangePacketText(prompt);
+                      setTimeout(() => {
+                        literalComposerInputRef.current?.focus();
+                      }, 80);
+                    }}
                   >
                     <Text style={styles.literalQuickPromptText}>{label}</Text>
                   </Pressable>
@@ -2352,6 +2358,7 @@ function QuinnConversationSurface({
 
           <View style={styles.literalComposerBox}>
             <TextInput
+              ref={literalComposerInputRef}
               multiline
               value={packetText}
               onChangeText={onChangePacketText}
