@@ -3915,7 +3915,7 @@ export default function App() {
     );
   }
 
-  const showFixedConversationHeader = screen === 'QuinnConversation';
+  const showFixedConversationHeader = false;
 
   return (
     <SafeArea edges={['top']} style={styles.safe}>
@@ -6173,13 +6173,13 @@ responseReplayButton: {
   },
 
   literalChatTopBar: {
-    height: 74,
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    height: 86,
+    paddingHorizontal: 14,
+    paddingTop: 32,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.07)',
-    backgroundColor: 'rgba(8, 8, 11, 0.96)',
+    backgroundColor: 'rgba(8, 8, 11, 0.98)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -6207,7 +6207,7 @@ responseReplayButton: {
 
   literalChatTitle: {
     color: 'rgba(250, 250, 252, 0.94)',
-    fontSize: 18,
+    fontSize: 17,
     lineHeight: 22,
     fontWeight: '700',
     letterSpacing: -0.3,
