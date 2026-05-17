@@ -2371,6 +2371,15 @@ function QuinnConversationSurface({
             />
 
             <View style={styles.literalComposerButtons}>
+              {packetText.trim() ? (
+                <Pressable
+                  style={styles.literalComposerGhostButton}
+                  onPress={() => onChangePacketText('')}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                >
+                  <Feather name="x" size={16} color="rgba(250, 250, 252, 0.70)" />
+                </Pressable>
+              ) : null}
               <Pressable
                 style={[
                   styles.literalComposerIconButton,
@@ -6632,6 +6641,16 @@ responseReplayButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingBottom: 1,
+  },
+
+  literalComposerGhostButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
   },
 
   literalComposerIconButton: {
