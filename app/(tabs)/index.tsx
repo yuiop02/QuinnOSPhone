@@ -1251,6 +1251,7 @@ type QuinnConversationSurfaceProps = {
   onSelectLens: (lensId: QuinnLensId) => void;
   onStageNextMove: () => Promise<void>;
   onStartFreshArc: () => void;
+  onOpenSettings: () => void;
   onRunPacket: (override?: {
     packetTitle: string;
     packetText: string;
@@ -1281,6 +1282,7 @@ function QuinnConversationSurface({
   onSelectLens,
   onStageNextMove,
   onStartFreshArc,
+  onOpenSettings,
   onRunPacket,
 }: QuinnConversationSurfaceProps) {
   const conversationScrollRef = useRef<React.ElementRef<typeof ScrollView> | null>(null);
@@ -2152,9 +2154,9 @@ function QuinnConversationSurface({
       <View style={styles.literalChatRoot}>
         <View style={styles.literalChatTopBar}>
           <View style={styles.literalChatTopLeft}>
-            <View style={styles.literalChatMenuButton}>
+            <Pressable style={styles.literalChatMenuButton} onPress={onOpenSettings}>
               <Feather name="menu" size={18} color="rgba(245, 248, 255, 0.78)" />
-            </View>
+            </Pressable>
 
             <View style={styles.literalChatTitleWrap}>
               <Text style={styles.literalChatTitle}>Quinn</Text>
@@ -2321,13 +2323,6 @@ function QuinnConversationSurface({
               );
             })}
           </ScrollView>
-
-          <View style={styles.literalDockControlRow}>
-            <Pressable style={styles.literalNewChatDockButton} onPress={onStartFreshArc}>
-              <Feather name="plus" size={13} color="rgba(250, 250, 252, 0.86)" />
-              <Text style={styles.literalNewChatDockButtonText}>New chat</Text>
-            </Pressable>
-          </View>
 
           {runError ? <Text style={styles.literalStatusText}>{runError}</Text> : null}
           {voiceError ? <Text style={styles.literalStatusText}>{voiceError}</Text> : null}
@@ -3962,6 +3957,7 @@ export default function App() {
         }
         style={[
           styles.floatingSettingsButton,
+          screen === 'QuinnConversation' && styles.floatingSettingsButtonHidden,
           screen !== 'QuinnConversation' && styles.floatingSettingsButtonActive,
         ]}
       >
@@ -6043,6 +6039,10 @@ responseReplayButton: {
     color: '#F7F9FF',
     fontSize: 16,
     fontWeight: '700',
+  },
+
+  floatingSettingsButtonHidden: {
+    display: 'none',
   },
 
   floatingSettingsButton: {
