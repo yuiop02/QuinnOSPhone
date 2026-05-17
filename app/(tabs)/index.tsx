@@ -3760,43 +3760,49 @@ export default function App() {
     content = (
       <ScrollView contentContainerStyle={styles.systemScroll} showsVerticalScrollIndicator={false}>
         <QuinnSurfaceShell
-          eyebrow="QUINN MENU"
-          title="What do you need right now?"
-          description="Open the conversation, use voice when typing is too much, or save the parts you want to keep."
+          eyebrow="QUINN"
+          title="Menu"
+          description="Chats, memory, voice, and the pieces worth keeping."
           onBack={() => setScreen('QuinnConversation')}
-          backLabel="Back to Quinn"
+          backLabel="Back to chat"
         />
 
         <View style={styles.systemHubGrid}>
-          <Pressable style={styles.systemHubCardWide} onPress={() => setScreen('QuinnConversation')}>
-            <Text style={styles.systemHubEyebrow}>CONVERSATION</Text>
-            <Text style={styles.systemHubTitle}>Talk to Quinn</Text>
+          <Pressable
+            style={styles.systemHubCardWide}
+            onPress={() => {
+              handleStartFreshArc();
+              setScreen('QuinnConversation');
+            }}
+          >
+            <Text style={styles.systemHubEyebrow}>CHAT</Text>
+            <Text style={styles.systemHubTitle}>New chat</Text>
             <Text style={styles.systemHubBody}>
-              Return to the main conversation.
+              Start clean. Same QuinnOS, fresh thread.
             </Text>
           </Pressable>
 
           <Pressable style={styles.systemHubCard} onPress={() => setScreen('MemoryPanel')}>
-            <Text style={styles.systemHubEyebrow}>MEMORY</Text>
-            <Text style={styles.systemHubTitle}>What stays</Text>
+            <Text style={styles.systemHubEyebrow}>CONTEXT</Text>
+            <Text style={styles.systemHubTitle}>Memory</Text>
             <Text style={styles.systemHubBody}>
-              Saved context QuinnOS can carry forward when it matters.
+              The details QuinnOS carries so you do not have to keep re-explaining.
             </Text>
           </Pressable>
 
           <Pressable style={styles.systemHubCard} onPress={() => setScreen('VoiceMode')}>
             <Text style={styles.systemHubEyebrow}>VOICE</Text>
-            <Text style={styles.systemHubTitle}>Speak it out</Text>
+            <Text style={styles.systemHubTitle}>Voice</Text>
             <Text style={styles.systemHubBody}>
-              Talk first. Untangle later.
+              Record when typing is too much.
             </Text>
           </Pressable>
 
           <Pressable style={styles.systemHubCardWide} onPress={() => setScreen('ExportsPanel')}>
-            <Text style={styles.systemHubEyebrow}>SAVE</Text>
-            <Text style={styles.systemHubTitle}>Save or share</Text>
+            <Text style={styles.systemHubEyebrow}>EXPORT</Text>
+            <Text style={styles.systemHubTitle}>Save / share</Text>
             <Text style={styles.systemHubBody}>
-              Copy or share the parts you want to keep.
+              Keep the useful bits or send them somewhere else.
             </Text>
           </Pressable>
         </View>
@@ -4750,53 +4756,53 @@ headerVersionShine: {
   },
 
   systemHubGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    width: '100%',
   },
 
   systemHubCard: {
-    width: '47.5%',
-    backgroundColor: SURFACE_THEME.panelAlt,
+    width: '100%',
+    backgroundColor: 'rgba(18, 18, 22, 0.94)',
     borderWidth: 1,
-    borderColor: SURFACE_THEME.border,
-    borderRadius: 26,
-    padding: 16,
-    marginBottom: 12,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    marginBottom: 10,
   },
 
   systemHubCardWide: {
     width: '100%',
-    backgroundColor: SURFACE_THEME.panel,
+    backgroundColor: 'rgba(28, 24, 34, 0.96)',
     borderWidth: 1,
-    borderColor: SURFACE_THEME.borderStrong,
-    borderRadius: 28,
-    padding: 18,
-    marginBottom: 12,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderRadius: 24,
+    paddingHorizontal: 17,
+    paddingVertical: 16,
+    marginBottom: 10,
   },
 
   systemHubEyebrow: {
-    color: SURFACE_THEME.eyebrow,
-    fontSize: 10.5,
-    lineHeight: 14,
-    fontWeight: '900',
-    letterSpacing: 1.25,
-    marginBottom: 8,
+    color: 'rgba(210, 216, 235, 0.46)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    marginBottom: 5,
   },
 
   systemHubTitle: {
-    color: SURFACE_THEME.text,
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: '900',
-    letterSpacing: -0.7,
-    marginBottom: 6,
+    color: 'rgba(250, 250, 252, 0.94)',
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '700',
+    letterSpacing: -0.35,
+    marginBottom: 4,
   },
 
   systemHubBody: {
-    color: SURFACE_THEME.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
+    color: 'rgba(210, 216, 235, 0.58)',
+    fontSize: 13.5,
+    lineHeight: 20,
     fontWeight: '500',
   },
 
