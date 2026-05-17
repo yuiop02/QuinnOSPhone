@@ -2153,10 +2153,14 @@ function QuinnConversationSurface({
     return (
       <View style={styles.literalChatRoot}>
         <View style={styles.literalChatTopBar}>
-          <View style={styles.literalChatTopLeft}>
-            <Pressable style={styles.literalChatMenuButton} onPress={onOpenSettings}>
+          <Pressable
+            style={styles.literalChatTopLeft}
+            onPress={onOpenSettings}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 18 }}
+          >
+            <View style={styles.literalChatMenuButton}>
               <Feather name="menu" size={18} color="rgba(245, 248, 255, 0.78)" />
-            </Pressable>
+            </View>
 
             <View style={styles.literalChatTitleWrap}>
               <Text style={styles.literalChatTitle}>Quinn</Text>
@@ -2164,7 +2168,7 @@ function QuinnConversationSurface({
                 {sessionArc ? 'Continuing chat' : 'New chat'}
               </Text>
             </View>
-          </View>
+          </Pressable>
 
           <Pressable style={styles.literalChatNewButton} onPress={onStartFreshArc}>
             <Feather name="edit-3" size={16} color="rgba(245, 248, 255, 0.82)" />
@@ -3748,6 +3752,7 @@ export default function App() {
         onSelectLens={setActiveLensId}
         onStageNextMove={handleStageNextMove}
         onStartFreshArc={handleStartFreshArc}
+          onOpenSettings={() => setScreen('SettingsHome')}
         onRunPacket={handleRunPacket}
       />
     );
