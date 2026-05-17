@@ -3939,7 +3939,7 @@ export default function App() {
             <View style={styles.appOrbitRingB} />
           </View>
 
-          <View style={styles.topBar}>
+          <View style={[styles.topBar, screen === 'QuinnConversation' && styles.topBarHidden]}>
             <View style={styles.systemBrandChip}>
               <View pointerEvents="none" style={styles.systemBrandGlow} />
               <View pointerEvents="none" style={styles.systemBrandWarmGlow} />
@@ -4428,6 +4428,10 @@ headerVersionText: {
   height: FADE_WALL_HEIGHT,
   zIndex: 25,
 },
+
+  topBarHidden: {
+    display: 'none',
+  },
 
   topBar: {
     paddingHorizontal: 20,
