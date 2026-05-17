@@ -3831,6 +3831,44 @@ export default function App() {
             </Text>
           </Pressable>
         </View>
+
+        {recentRuns.length ? (
+          <View style={styles.systemRecentSection}>
+            <Text style={styles.systemRecentHeading}>Recent</Text>
+
+            {recentRuns.slice(0, 5).map((run, index) => {
+              const recentTitle = run.packetTitle || 'Quinn chat';
+              const recentPreview = String(run.packetText || run.writtenResult || '').trim();
+
+              return (
+                <Pressable
+                  key={`${run.timestamp || recentTitle}-${index}`}
+                  style={styles.systemRecentRow}
+                  onPress={() => {
+                    if (run.packetText) {
+                      setPacketText(run.packetText);
+                    }
+
+                    setScreen('QuinnConversation');
+                  }}
+                >
+                  <View style={styles.systemRecentIcon}>
+                    <Feather name="message-square" size={14} color="rgba(245, 248, 255, 0.70)" />
+                  </View>
+
+                  <View style={styles.systemRecentCopy}>
+                    <Text style={styles.systemRecentTitle} numberOfLines={1}>
+                      {recentTitle}
+                    </Text>
+                    <Text style={styles.systemRecentPreview} numberOfLines={1}>
+                      {recentPreview || 'Return to this QuinnOS thread'}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </ScrollView>
     );
   } else if (screen === 'HomeTileGrid') {
@@ -4829,6 +4867,63 @@ headerVersionShine: {
     fontSize: 13.5,
     lineHeight: 20,
     fontWeight: '500',
+  },
+
+  systemRecentSection: {
+    marginTop: 12,
+    paddingTop: 8,
+  },
+
+  systemRecentHeading: {
+    color: 'rgba(210, 216, 235, 0.48)',
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+
+  systemRecentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+  },
+
+  systemRecentIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+  },
+
+  systemRecentCopy: {
+    flex: 1,
+  },
+
+  systemRecentTitle: {
+    color: 'rgba(250, 250, 252, 0.90)',
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+  },
+
+  systemRecentPreview: {
+    color: 'rgba(210, 216, 235, 0.48)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    marginTop: 2,
   },
 
   cardFloatWrap: {
