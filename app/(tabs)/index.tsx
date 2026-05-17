@@ -2207,6 +2207,24 @@ function QuinnConversationSurface({
               <Text style={styles.literalChatEmptyBody}>
                 Message Quinn, use voice, or pick a lens when it helps.
               </Text>
+
+              <View style={styles.literalQuickPromptGrid}>
+                {[
+                  ['Help me sort this', 'Help me sort what is happening without over-explaining it.'],
+                  ['Make it a packet', 'Turn this into a clear packet I can bring to someone else.'],
+                  ['Talk me down', 'Talk me down without flattening what I am feeling.'],
+                  ['Draft this', 'Help me draft this in my voice.'],
+                  ['QuinnOS mode', 'Help me turn this into QuinnOS format.'],
+                ].map(([label, prompt]) => (
+                  <Pressable
+                    key={label}
+                    style={styles.literalQuickPromptChip}
+                    onPress={() => onChangePacketText(prompt)}
+                  >
+                    <Text style={styles.literalQuickPromptText}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           ) : null}
 
@@ -6281,6 +6299,33 @@ responseReplayButton: {
     fontWeight: '500',
     textAlign: 'center',
     maxWidth: 320,
+  },
+
+  literalQuickPromptGrid: {
+    width: '100%',
+    maxWidth: 360,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 18,
+  },
+
+  literalQuickPromptChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 7,
+    marginBottom: 8,
+  },
+
+  literalQuickPromptText: {
+    color: 'rgba(245, 248, 255, 0.78)',
+    fontSize: 12.5,
+    lineHeight: 16,
+    fontWeight: '600',
   },
 
   literalMessagePair: {
