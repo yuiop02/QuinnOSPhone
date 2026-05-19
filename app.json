@@ -3,7 +3,7 @@
     "name": "QuinnOS",
     "slug": "quinnos",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/app icon.png",
     "scheme": "quinnosphone",
     "userInterfaceStyle": "dark",
@@ -51,8 +51,7 @@
           "enableBackgroundRecording": false,
           "enableBackgroundPlayback": true
         }
-      ]
-      ,
+      ],
       "./plugins/withEdgeToEdge.js"
     ],
     "experiments": {
