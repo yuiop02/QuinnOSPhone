@@ -2131,6 +2131,7 @@ function QuinnConversationSurface({
   }
 
   const [literalKeyboardHeight, setLiteralKeyboardHeight] = useState(0);
+  const [showLiteralTools, setShowLiteralTools] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
 
   useEffect(() => {
@@ -2147,6 +2148,70 @@ function QuinnConversationSurface({
       hideSubscription.remove();
     };
   }, []);
+  function loadDefaultMapForm() {
+    const defaultMapTemplate = [
+      'QUINNOS DEFAULT MAP INTAKE',
+      '',
+      'CONSTITUTION:',
+      'Quinn does not rise to her intentions. Quinn falls to her defaults.',
+      'Therefore QuinnOS does not command Quinn to try harder.',
+      'QuinnOS studies the slope, alters the terrain, and marks the next foothold.',
+      '',
+      'MODE: Strategist + Quinn Default Design',
+      'DOMAIN: Behavior / Pattern / Default Redesign',
+      '',
+      '1. CURRENT DEFAULT',
+      'What keeps happening?',
+      '',
+      '',
+      '2. TRIGGER FIELD',
+      'When, where, or under what emotional/internal conditions does it happen?',
+      '',
+      '',
+      '3. HIDDEN REWARD',
+      'What does this behavior give me immediately?',
+      '',
+      '',
+      '4. PROTECTED NEED',
+      'What valid need is hiding inside the messy behavior?',
+      '',
+      '',
+      '5. DELAYED COST',
+      'How does Future Quinn pay for this?',
+      '',
+      '',
+      '6. BETTER REPLACEMENT',
+      'What could meet the same need with less damage?',
+      '',
+      '',
+      '7. EASE PATH',
+      'How do we make the better behavior easier, smaller, closer, safer, or already-started?',
+      '',
+      '',
+      '8. FRICTION PATH',
+      'How do we make the old default slower, less automatic, or less convenient without punishment?',
+      '',
+      '',
+      '9. MINIMUM VIABLE RETURN',
+      'When I fall off, what is the smallest reset that counts?',
+      '',
+      '',
+      '10. NEXT BEST MOVE',
+      'What should I do next, specifically, in the next 5 to 15 minutes?',
+      '',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Turn this into a Default Map. Do not stop at insight. Give me the named pattern, hidden function, cost signal, protected need, replacement path, ease path, friction path, minimum viable return, and the next best move.',
+    ].join('\n');
+
+    onChangePacketText(defaultMapTemplate);
+    setShowLiteralTools(false);
+
+    setTimeout(() => {
+      literalComposerInputRef.current?.focus();
+    }, 80);
+  }
+
 
   const useLiteralChatShellPreview = true;
 
@@ -2356,13 +2421,70 @@ function QuinnConversationSurface({
           {voiceError ? <Text style={styles.literalStatusText}>{voiceError}</Text> : null}
           {voiceStatus ? <Text style={styles.literalStatusText}>{voiceStatus}</Text> : null}
 
+          {showLiteralTools ? (
+            <View style={styles.literalToolsTray}>
+              <Pressable
+                style={styles.literalToolChip}
+                onPress={loadDefaultMapForm}
+              >
+                <Feather name="file-text" size={14} color="rgba(245, 248, 255, 0.76)" />
+                <Text style={styles.literalToolChipText}>Default Map</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.literalToolChip}
+                onPress={() => {
+                  setShowLiteralTools(false);
+                  onOpenSettings();
+                }}
+              >
+                <Feather name="menu" size={14} color="rgba(245, 248, 255, 0.76)" />
+                <Text style={styles.literalToolChipText}>Menu</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.literalToolChip}
+                onPress={() => {
+                  setShowLiteralTools(false);
+                  onStartFreshArc();
+                }}
+              >
+                <Feather name="edit-3" size={14} color="rgba(245, 248, 255, 0.76)" />
+                <Text style={styles.literalToolChipText}>New chat</Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.literalToolChip,
+                  !packetText.trim() && styles.literalToolChipDisabled,
+                ]}
+                disabled={!packetText.trim()}
+                onPress={() => {
+                  onChangePacketText('');
+                  setShowLiteralTools(false);
+
+                  setTimeout(() => {
+                    literalComposerInputRef.current?.focus();
+                  }, 60);
+                }}
+              >
+                <Feather name="x-circle" size={14} color="rgba(245, 248, 255, 0.76)" />
+                <Text style={styles.literalToolChipText}>Clear</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           <View style={styles.literalComposerBox}>
             <Pressable
-              style={styles.literalComposerToolButton}
-              onPress={onOpenSettings}
+              style={[styles.literalComposerToolButton, showLiteralTools && styles.literalComposerToolButtonActive]}
+              onPress={() => setShowLiteralTools((prev) => !prev)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 8 }}
             >
-              <Feather name="plus" size={19} color="rgba(250, 250, 252, 0.84)" />
+              <Feather
+                name={showLiteralTools ? 'x' : 'plus'}
+                size={19}
+                color="rgba(250, 250, 252, 0.84)"
+              />
             </Pressable>
 
             <TextInput
@@ -6618,6 +6740,39 @@ responseReplayButton: {
     marginLeft: 5,
   },
 
+  literalToolsTray: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    marginBottom: 8,
+  },
+
+  literalToolChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    paddingHorizontal: 11,
+    marginRight: 7,
+    marginBottom: 7,
+  },
+
+  literalToolChipDisabled: {
+    opacity: 0.36,
+  },
+
+  literalToolChipText: {
+    color: 'rgba(245, 248, 255, 0.76)',
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+
   literalComposerBox: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -6635,6 +6790,11 @@ responseReplayButton: {
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 7,
+  },
+
+  literalComposerToolButtonActive: {
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
   },
 
   literalComposerInput: {
