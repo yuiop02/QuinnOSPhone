@@ -2357,6 +2357,14 @@ function QuinnConversationSurface({
           {voiceStatus ? <Text style={styles.literalStatusText}>{voiceStatus}</Text> : null}
 
           <View style={styles.literalComposerBox}>
+            <Pressable
+              style={styles.literalComposerToolButton}
+              onPress={onOpenSettings}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 8 }}
+            >
+              <Feather name="plus" size={19} color="rgba(250, 250, 252, 0.84)" />
+            </Pressable>
+
             <TextInput
               ref={literalComposerInputRef}
               multiline
@@ -2365,7 +2373,7 @@ function QuinnConversationSurface({
               onFocus={() => setInputFocused(true)}
               onBlur={() => setInputFocused(false)}
               placeholder="Message Quinn..."
-              placeholderTextColor="rgba(245, 245, 247, 0.34)"
+              placeholderTextColor="rgba(245, 245, 247, 0.42)"
               style={styles.literalComposerInput}
               textAlignVertical="top"
             />
@@ -2377,25 +2385,9 @@ function QuinnConversationSurface({
                   onPress={() => onChangePacketText('')}
                   hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
                 >
-                  <Feather name="x" size={16} color="rgba(250, 250, 252, 0.70)" />
+                  <Feather name="x" size={15} color="rgba(250, 250, 252, 0.66)" />
                 </Pressable>
               ) : null}
-              <Pressable
-                style={[
-                  styles.literalComposerIconButton,
-                  !canSend && styles.literalComposerIconButtonDisabled,
-                ]}
-                disabled={!canSend}
-                onPress={() => {
-                  void handleRunTypedQuinn();
-                }}
-              >
-                {isRunning ? (
-                  <Text style={styles.literalComposerLoading}>…</Text>
-                ) : (
-                  <Feather name="arrow-up" size={18} color="rgba(250, 250, 252, 0.92)" />
-                )}
-              </Pressable>
 
               <Pressable
                 style={[
@@ -2413,8 +2405,25 @@ function QuinnConversationSurface({
                 <Feather
                   name={recorderState.isRecording ? 'square' : 'mic'}
                   size={18}
-                  color="rgba(250, 250, 252, 0.92)"
+                  color="rgba(250, 250, 252, 0.90)"
                 />
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.literalComposerSendButton,
+                  !canSend && styles.literalComposerIconButtonDisabled,
+                ]}
+                disabled={!canSend}
+                onPress={() => {
+                  void handleRunTypedQuinn();
+                }}
+              >
+                {isRunning ? (
+                  <Text style={styles.literalComposerLoading}>…</Text>
+                ) : (
+                  <Feather name="arrow-up" size={18} color="rgba(250, 250, 252, 0.94)" />
+                )}
               </Pressable>
             </View>
           </View>
@@ -6538,22 +6547,20 @@ responseReplayButton: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 24,
     paddingHorizontal: 12,
-    paddingTop: 7,
-    paddingBottom: 82,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.07)',
-    backgroundColor: 'rgba(8, 8, 11, 0.96)',
+    paddingTop: 8,
+    paddingBottom: 8,
+    backgroundColor: 'rgba(7, 7, 10, 0.72)',
   },
 
   literalComposerDockKeyboardOpen: {
-    paddingBottom: 8,
+    backgroundColor: 'rgba(7, 7, 10, 0.88)',
   },
 
   literalLensRow: {
     paddingHorizontal: 2,
-    paddingBottom: 6,
+    paddingBottom: 8,
   },
 
   literalLensChip: {
@@ -6612,69 +6619,100 @@ responseReplayButton: {
   },
 
   literalComposerBox: {
-    minHeight: 58,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    backgroundColor: 'rgba(28, 28, 32, 0.96)',
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingLeft: 16,
-    paddingRight: 8,
-    paddingTop: 10,
-    paddingBottom: 9,
+    minHeight: 58,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    backgroundColor: 'rgba(31, 31, 35, 0.96)',
+    paddingLeft: 8,
+    paddingRight: 7,
+    paddingTop: 7,
+    paddingBottom: 7,
+    shadowColor: '#000000',
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 7,
   },
 
   literalComposerInput: {
     flex: 1,
-    minHeight: 36,
-    maxHeight: 128,
+    minHeight: 38,
+    maxHeight: 124,
     color: 'rgba(250, 250, 252, 0.94)',
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '500',
-    padding: 0,
-    paddingRight: 10,
+    letterSpacing: -0.08,
+    paddingTop: 8,
+    paddingBottom: 7,
+    paddingHorizontal: 0,
   },
 
   literalComposerButtons: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+
+  literalComposerToolButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
     alignItems: 'center',
-    paddingBottom: 1,
+    justifyContent: 'center',
+    marginRight: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
   },
 
   literalComposerGhostButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 38,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    marginRight: 4,
   },
 
   literalComposerIconButton: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    marginLeft: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
   },
 
   literalComposerIconButtonActive: {
-    backgroundColor: 'rgba(196, 79, 129, 0.82)',
+    borderColor: 'rgba(255, 116, 198, 0.38)',
+    backgroundColor: 'rgba(151, 45, 118, 0.40)',
+  },
+
+  literalComposerSendButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+    backgroundColor: 'rgba(250, 250, 252, 0.92)',
   },
 
   literalComposerIconButtonDisabled: {
-    opacity: 0.38,
+    opacity: 0.34,
   },
 
   literalComposerLoading: {
-    color: 'rgba(250, 250, 252, 0.92)',
+    color: 'rgba(12, 12, 16, 0.92)',
     fontSize: 18,
-    lineHeight: 18,
+    lineHeight: 20,
     fontWeight: '700',
   },
 
