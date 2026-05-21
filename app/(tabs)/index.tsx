@@ -2148,6 +2148,89 @@ function QuinnConversationSurface({
       hideSubscription.remove();
     };
   }, []);
+  function loadIntakeCompassForm() {
+    const intakeCompassTemplate = [
+      'QUINNOS INTAKE COMPASS',
+      '',
+      'PURPOSE:',
+      'Classify this material before shaping it. Do not forge everything. Choose the heat the material can survive.',
+      '',
+      'MATERIAL TYPE GUESS:',
+      '[identity / structure / language / judgment / removal / action / witness / not sure]',
+      '',
+      'DOMAIN:',
+      '[work / relationship / grief / body / money / app / creative / conflict / decision / behavior / other]',
+      '',
+      'RAW MATERIAL:',
+      '[Paste or describe the thing here.]',
+      '',
+      'CONTEXT:',
+      '[What happened? What matters? What is the situation around it?]',
+      '',
+      'STATE:',
+      '[What is my body/emotional weather right now? Activated, tired, avoidant, clear, grieving, wired, numb, etc.]',
+      '',
+      'RISK / TIME:',
+      '[Is this urgent, delicate, high-stakes, or safe to process slowly?]',
+      '',
+      'WHAT I THINK I WANT:',
+      '[The obvious ask.]',
+      '',
+      'WHAT I MAY ACTUALLY NEED:',
+      '[The deeper need, if I can sense it.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'First classify this as one of: Name, Framework, Rewrite, Critique, Cut, Next Move, Witness-Line, or Default Map. Then apply only the heat it can survive. Do not over-process it. End with either the cleanest witness-line, the next best move, or the exact form I should use next.',
+    ].join('\n');
+
+    onChangePacketText(intakeCompassTemplate);
+    setShowLiteralTools(false);
+
+    setTimeout(() => {
+      literalComposerInputRef.current?.focus();
+    }, 80);
+  }
+
+  function loadOutcomeLogForm() {
+    const outcomeLogTemplate = [
+      'QUINNOS OUTCOME LOG',
+      '',
+      'PURPOSE:',
+      'Feed the result back into QuinnOS so the system gets more accurate over time.',
+      '',
+      'ORIGINAL INTAKE / RECOMMENDATION:',
+      '[What did QuinnOS/Ren suggest or help me decide?]',
+      '',
+      'WHAT I ACTUALLY DID:',
+      '[What happened in real life?]',
+      '',
+      'IT CAUSED:',
+      '[What changed afterward?]',
+      '',
+      'DID IT HELP?',
+      '[yes / no / mixed / too soon to tell]',
+      '',
+      'WHAT WORKED:',
+      '[What was useful, accurate, grounding, clarifying, or effective?]',
+      '',
+      'WHAT MISSED:',
+      '[What was off, incomplete, too much, too little, generic, or badly timed?]',
+      '',
+      'WHAT QUINNOS SHOULD REMEMBER:',
+      '[What should be weighted more strongly next time this pattern appears?]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Turn this into a calibration note. Name what worked, what failed, what should change next time, and whether this should become a recurring pattern card.',
+    ].join('\n');
+
+    onChangePacketText(outcomeLogTemplate);
+    setShowLiteralTools(false);
+
+    setTimeout(() => {
+      literalComposerInputRef.current?.focus();
+    }, 80);
+  }
+
   function loadDefaultMapForm() {
     const defaultMapTemplate = [
       'QUINNOS DEFAULT MAP INTAKE',
@@ -2422,7 +2505,22 @@ function QuinnConversationSurface({
           {voiceStatus ? <Text style={styles.literalStatusText}>{voiceStatus}</Text> : null}
 
           {showLiteralTools ? (
-            <View style={styles.literalToolsTray}>
+            <View style={styles.literalToolsTray}>              <Pressable
+                style={styles.literalToolChip}
+                onPress={loadIntakeCompassForm}
+              >
+                <Feather name="compass" size={14} color="rgba(245, 248, 255, 0.76)" />
+                <Text style={styles.literalToolChipText}>Intake</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.literalToolChip}
+                onPress={loadOutcomeLogForm}
+              >
+                <Feather name="activity" size={14} color="rgba(245, 248, 255, 0.76)" />
+                <Text style={styles.literalToolChipText}>Outcome</Text>
+              </Pressable>
+
               <Pressable
                 style={styles.literalToolChip}
                 onPress={loadDefaultMapForm}
