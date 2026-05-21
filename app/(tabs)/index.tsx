@@ -141,6 +141,201 @@ type VisibleReplySource = {
   packetText: string;
   lensId: QuinnLensId;
 };
+type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+
+type QuinnIntakeFormId =
+  | 'intake-compass'
+  | 'decision-intake'
+  | 'default-map'
+  | 'outcome-log';
+
+type QuinnIntakeFormDefinition = {
+  id: QuinnIntakeFormId;
+  label: string;
+  icon: FeatherIconName;
+  template: string[];
+};
+
+const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
+  {
+    id: 'intake-compass',
+    label: 'Intake',
+    icon: 'compass',
+    template: [
+      'QUINNOS INTAKE COMPASS',
+      '',
+      'PURPOSE:',
+      'Classify this material before shaping it. Do not forge everything. Choose the heat the material can survive.',
+      '',
+      'MATERIAL TYPE GUESS:',
+      '[identity / structure / language / judgment / removal / action / witness / not sure]',
+      '',
+      'DOMAIN:',
+      '[work / relationship / grief / body / money / app / creative / conflict / decision / behavior / other]',
+      '',
+      'RAW MATERIAL:',
+      '[Paste or describe the thing here.]',
+      '',
+      'CONTEXT:',
+      '[What happened? What matters? What is the situation around it?]',
+      '',
+      'STATE:',
+      '[What is my body/emotional weather right now? Activated, tired, avoidant, clear, grieving, wired, numb, etc.]',
+      '',
+      'RISK / TIME:',
+      '[Is this urgent, delicate, high-stakes, or safe to process slowly?]',
+      '',
+      'WHAT I THINK I WANT:',
+      '[The obvious ask.]',
+      '',
+      'WHAT I MAY ACTUALLY NEED:',
+      '[The deeper need, if I can sense it.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'First classify this as one of: Name, Framework, Rewrite, Critique, Cut, Next Move, Witness-Line, or Default Map. Then apply only the heat it can survive. Do not over-process it. End with either the cleanest witness-line, the next best move, or the exact form I should use next.',
+    ],
+  },
+  {
+    id: 'decision-intake',
+    label: 'Decision',
+    icon: 'target',
+    template: [
+      'QUINNOS DECISION INTAKE',
+      '',
+      'PURPOSE:',
+      'Turn this decision into the most probable best next move without pretending certainty.',
+      '',
+      'DECISION:',
+      '[What am I deciding?]',
+      '',
+      'OPTIONS:',
+      '[What are the real options, including doing nothing or delaying?]',
+      '',
+      'CONTEXT:',
+      '[What happened? What matters around this decision?]',
+      '',
+      'STATE:',
+      '[What is my body/emotional weather right now? Tired, activated, hopeful, ashamed, pressured, clear, avoidant, etc.]',
+      '',
+      'WHAT I WANT:',
+      '[What do I want to happen?]',
+      '',
+      'WHAT FUTURE QUINN NEEDS PROTECTED:',
+      '[Time, money, dignity, stability, relationships, sleep, work, safety, clarity, momentum, etc.]',
+      '',
+      'RISKS / COSTS:',
+      '[What could each option cost later?]',
+      '',
+      'HIDDEN PULLS:',
+      '[What might be biasing me? Panic, longing, shame, novelty, revenge, relief, avoidance, being seen, proving something, etc.]',
+      '',
+      'TIMING:',
+      '[Does this need action now, later today, this week, or not yet?]',
+      '',
+      'WHAT WOULD CHANGE THE ANSWER:',
+      '[What missing information would matter?]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Give me the most probable best move, confidence level, what you are uncertain about, what Future Quinn needs protected, the smallest next action, and whether this decision should be acted on, delayed, or converted into another QuinnOS form.',
+    ],
+  },
+  {
+    id: 'default-map',
+    label: 'Default Map',
+    icon: 'file-text',
+    template: [
+      'QUINNOS DEFAULT MAP INTAKE',
+      '',
+      'CONSTITUTION:',
+      'Quinn does not rise to her intentions. Quinn falls to her defaults.',
+      'Therefore QuinnOS does not command Quinn to try harder.',
+      'QuinnOS studies the slope, alters the terrain, and marks the next foothold.',
+      '',
+      'MODE: Strategist + Quinn Default Design',
+      'DOMAIN: Behavior / Pattern / Default Redesign',
+      '',
+      '1. CURRENT DEFAULT',
+      'What keeps happening?',
+      '',
+      '',
+      '2. TRIGGER FIELD',
+      'When, where, or under what emotional/internal conditions does it happen?',
+      '',
+      '',
+      '3. HIDDEN REWARD',
+      'What does this behavior give me immediately?',
+      '',
+      '',
+      '4. PROTECTED NEED',
+      'What valid need is hiding inside the messy behavior?',
+      '',
+      '',
+      '5. DELAYED COST',
+      'How does Future Quinn pay for this?',
+      '',
+      '',
+      '6. BETTER REPLACEMENT',
+      'What could meet the same need with less damage?',
+      '',
+      '',
+      '7. EASE PATH',
+      'How do we make the better behavior easier, smaller, closer, safer, or already-started?',
+      '',
+      '',
+      '8. FRICTION PATH',
+      'How do we make the old default slower, less automatic, or less convenient without punishment?',
+      '',
+      '',
+      '9. MINIMUM VIABLE RETURN',
+      'When I fall off, what is the smallest reset that counts?',
+      '',
+      '',
+      '10. NEXT BEST MOVE',
+      'What should I do next, specifically, in the next 5 to 15 minutes?',
+      '',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Turn this into a Default Map. Do not stop at insight. Give me the named pattern, hidden function, cost signal, protected need, replacement path, ease path, friction path, minimum viable return, and the next best move.',
+    ],
+  },
+  {
+    id: 'outcome-log',
+    label: 'Outcome',
+    icon: 'activity',
+    template: [
+      'QUINNOS OUTCOME LOG',
+      '',
+      'PURPOSE:',
+      'Feed the result back into QuinnOS so the system gets more accurate over time.',
+      '',
+      'ORIGINAL INTAKE / RECOMMENDATION:',
+      '[What did QuinnOS/Ren suggest or help me decide?]',
+      '',
+      'WHAT I ACTUALLY DID:',
+      '[What happened in real life?]',
+      '',
+      'IT CAUSED:',
+      '[What changed afterward?]',
+      '',
+      'DID IT HELP?',
+      '[yes / no / mixed / too soon to tell]',
+      '',
+      'WHAT WORKED:',
+      '[What was useful, accurate, grounding, clarifying, or effective?]',
+      '',
+      'WHAT MISSED:',
+      '[What was off, incomplete, too much, too little, generic, or badly timed?]',
+      '',
+      'WHAT QUINNOS SHOULD REMEMBER:',
+      '[What should be weighted more strongly next time this pattern appears?]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Turn this into a calibration note. Name what worked, what failed, what should change next time, and whether this should become a recurring pattern card.',
+    ],
+  },
+];
+
+
 const FADE_WALL_HEIGHT = 324;
 const WINDOW_WIDTH = Dimensions.get('window').width;
 const QUINN_LENSES = getQuinnLenses();
@@ -2148,153 +2343,17 @@ function QuinnConversationSurface({
       hideSubscription.remove();
     };
   }, []);
-  function loadIntakeCompassForm() {
-    const intakeCompassTemplate = [
-      'QUINNOS INTAKE COMPASS',
-      '',
-      'PURPOSE:',
-      'Classify this material before shaping it. Do not forge everything. Choose the heat the material can survive.',
-      '',
-      'MATERIAL TYPE GUESS:',
-      '[identity / structure / language / judgment / removal / action / witness / not sure]',
-      '',
-      'DOMAIN:',
-      '[work / relationship / grief / body / money / app / creative / conflict / decision / behavior / other]',
-      '',
-      'RAW MATERIAL:',
-      '[Paste or describe the thing here.]',
-      '',
-      'CONTEXT:',
-      '[What happened? What matters? What is the situation around it?]',
-      '',
-      'STATE:',
-      '[What is my body/emotional weather right now? Activated, tired, avoidant, clear, grieving, wired, numb, etc.]',
-      '',
-      'RISK / TIME:',
-      '[Is this urgent, delicate, high-stakes, or safe to process slowly?]',
-      '',
-      'WHAT I THINK I WANT:',
-      '[The obvious ask.]',
-      '',
-      'WHAT I MAY ACTUALLY NEED:',
-      '[The deeper need, if I can sense it.]',
-      '',
-      'OUTPUT I NEED FROM REN:',
-      'First classify this as one of: Name, Framework, Rewrite, Critique, Cut, Next Move, Witness-Line, or Default Map. Then apply only the heat it can survive. Do not over-process it. End with either the cleanest witness-line, the next best move, or the exact form I should use next.',
-    ].join('\n');
-
-    onChangePacketText(intakeCompassTemplate);
-    setShowLiteralTools(false);
-
+  function focusLiteralComposerSoon(delay = 80) {
     setTimeout(() => {
       literalComposerInputRef.current?.focus();
-    }, 80);
+    }, delay);
   }
 
-  function loadOutcomeLogForm() {
-    const outcomeLogTemplate = [
-      'QUINNOS OUTCOME LOG',
-      '',
-      'PURPOSE:',
-      'Feed the result back into QuinnOS so the system gets more accurate over time.',
-      '',
-      'ORIGINAL INTAKE / RECOMMENDATION:',
-      '[What did QuinnOS/Ren suggest or help me decide?]',
-      '',
-      'WHAT I ACTUALLY DID:',
-      '[What happened in real life?]',
-      '',
-      'IT CAUSED:',
-      '[What changed afterward?]',
-      '',
-      'DID IT HELP?',
-      '[yes / no / mixed / too soon to tell]',
-      '',
-      'WHAT WORKED:',
-      '[What was useful, accurate, grounding, clarifying, or effective?]',
-      '',
-      'WHAT MISSED:',
-      '[What was off, incomplete, too much, too little, generic, or badly timed?]',
-      '',
-      'WHAT QUINNOS SHOULD REMEMBER:',
-      '[What should be weighted more strongly next time this pattern appears?]',
-      '',
-      'OUTPUT I NEED FROM REN:',
-      'Turn this into a calibration note. Name what worked, what failed, what should change next time, and whether this should become a recurring pattern card.',
-    ].join('\n');
-
-    onChangePacketText(outcomeLogTemplate);
+  function loadLiteralIntakeForm(form: QuinnIntakeFormDefinition) {
+    onChangePacketText(form.template.join('\n'));
     setShowLiteralTools(false);
-
-    setTimeout(() => {
-      literalComposerInputRef.current?.focus();
-    }, 80);
+    focusLiteralComposerSoon();
   }
-
-  function loadDefaultMapForm() {
-    const defaultMapTemplate = [
-      'QUINNOS DEFAULT MAP INTAKE',
-      '',
-      'CONSTITUTION:',
-      'Quinn does not rise to her intentions. Quinn falls to her defaults.',
-      'Therefore QuinnOS does not command Quinn to try harder.',
-      'QuinnOS studies the slope, alters the terrain, and marks the next foothold.',
-      '',
-      'MODE: Strategist + Quinn Default Design',
-      'DOMAIN: Behavior / Pattern / Default Redesign',
-      '',
-      '1. CURRENT DEFAULT',
-      'What keeps happening?',
-      '',
-      '',
-      '2. TRIGGER FIELD',
-      'When, where, or under what emotional/internal conditions does it happen?',
-      '',
-      '',
-      '3. HIDDEN REWARD',
-      'What does this behavior give me immediately?',
-      '',
-      '',
-      '4. PROTECTED NEED',
-      'What valid need is hiding inside the messy behavior?',
-      '',
-      '',
-      '5. DELAYED COST',
-      'How does Future Quinn pay for this?',
-      '',
-      '',
-      '6. BETTER REPLACEMENT',
-      'What could meet the same need with less damage?',
-      '',
-      '',
-      '7. EASE PATH',
-      'How do we make the better behavior easier, smaller, closer, safer, or already-started?',
-      '',
-      '',
-      '8. FRICTION PATH',
-      'How do we make the old default slower, less automatic, or less convenient without punishment?',
-      '',
-      '',
-      '9. MINIMUM VIABLE RETURN',
-      'When I fall off, what is the smallest reset that counts?',
-      '',
-      '',
-      '10. NEXT BEST MOVE',
-      'What should I do next, specifically, in the next 5 to 15 minutes?',
-      '',
-      '',
-      'OUTPUT I NEED FROM REN:',
-      'Turn this into a Default Map. Do not stop at insight. Give me the named pattern, hidden function, cost signal, protected need, replacement path, ease path, friction path, minimum viable return, and the next best move.',
-    ].join('\n');
-
-    onChangePacketText(defaultMapTemplate);
-    setShowLiteralTools(false);
-
-    setTimeout(() => {
-      literalComposerInputRef.current?.focus();
-    }, 80);
-  }
-
 
   const useLiteralChatShellPreview = true;
 
@@ -2505,30 +2564,17 @@ function QuinnConversationSurface({
           {voiceStatus ? <Text style={styles.literalStatusText}>{voiceStatus}</Text> : null}
 
           {showLiteralTools ? (
-            <View style={styles.literalToolsTray}>              <Pressable
-                style={styles.literalToolChip}
-                onPress={loadIntakeCompassForm}
-              >
-                <Feather name="compass" size={14} color="rgba(245, 248, 255, 0.76)" />
-                <Text style={styles.literalToolChipText}>Intake</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.literalToolChip}
-                onPress={loadOutcomeLogForm}
-              >
-                <Feather name="activity" size={14} color="rgba(245, 248, 255, 0.76)" />
-                <Text style={styles.literalToolChipText}>Outcome</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.literalToolChip}
-                onPress={loadDefaultMapForm}
-              >
-                <Feather name="file-text" size={14} color="rgba(245, 248, 255, 0.76)" />
-                <Text style={styles.literalToolChipText}>Default Map</Text>
-              </Pressable>
-
+            <View style={styles.literalToolsTray}>
+              {QUINNOS_INTAKE_FORMS.map((form) => (
+                <Pressable
+                  key={form.id}
+                  style={styles.literalToolChip}
+                  onPress={() => loadLiteralIntakeForm(form)}
+                >
+                  <Feather name={form.icon} size={14} color="rgba(245, 248, 255, 0.76)" />
+                  <Text style={styles.literalToolChipText}>{form.label}</Text>
+                </Pressable>
+              ))}
               <Pressable
                 style={styles.literalToolChip}
                 onPress={() => {
