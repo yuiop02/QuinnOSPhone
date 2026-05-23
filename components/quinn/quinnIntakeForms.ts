@@ -10,6 +10,7 @@ export type QuinnIntakeFormId =
   | 'feeling-intake'
   | 'work-situation-intake'
   | 'relationship-read-intake'
+  | 'therapy-packet-intake'
   | 'default-map'
   | 'outcome-log';
 
@@ -236,6 +237,44 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
       '',
       'OUTPUT I NEED FROM REN:',
       'Give me the cleanest read of this relationship situation. Separate facts from interpretation, name the likely pattern, identify what may be projection or old wound, tell me what Future Quinn needs protected, and give me the smallest next move: speak, wait, ask, document, repair, detach, or let it breathe.',
+    ],
+  },
+  {
+    id: 'therapy-packet-intake',
+    label: 'Therapy',
+    icon: 'clipboard',
+    template: [
+      'QUINNOS THERAPY PACKET INTAKE',
+      '',
+      'PURPOSE:',
+      'Turn raw internal material into a packet Ashley can read aloud so Quinn can receive the truth without having to perform it from inside the pressure.',
+      '',
+      'SESSION CONTEXT:',
+      '[What is happening today? Where am I emotionally, physically, practically, or relationally?]',
+      '',
+      'THE THING I NEED ASHLEY TO UNDERSTAND:',
+      '[What is the main truth, pattern, event, or pressure I do not want to lose in the room?]',
+      '',
+      'WHAT I MAY MINIMIZE OR JOKE AROUND:',
+      '[What might I make smaller, deflect, intellectualize, or turn into a bit?]',
+      '',
+      'WHAT FEELS HARD TO SAY DIRECTLY:',
+      '[The part that gets stuck, embarrassing, too intense, too tender, too complicated, or too alive.]',
+      '',
+      'WHAT I NEED READ ALOUD:',
+      '[The exact truth I may need Ashley to say out loud for me.]',
+      '',
+      'WHAT I NEED HELP SORTING:',
+      '[Pattern, decision, grief, relationship, work, body, avoidance, shame, anger, hope, fear, etc.]',
+      '',
+      'WHAT I DO NOT NEED:',
+      '[What would flatten this? Generic reassurance, over-analysis, premature advice, moralizing, minimizing, etc.]',
+      '',
+      'WHAT FUTURE QUINN NEEDS PROTECTED:',
+      '[Dignity, honesty, safety, agency, progress, softness, clarity, self-trust, recovery, momentum, etc.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Turn this into a therapy packet Ashley can read aloud. Keep Quinn\'s voice alive. Name the core pattern, the emotional truth, what Quinn may avoid saying, what Ashley should notice, and the most useful questions for the session. Do not flatten it into generic therapy language.',
     ],
   },
   {
