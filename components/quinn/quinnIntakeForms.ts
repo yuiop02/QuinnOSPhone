@@ -9,6 +9,7 @@ export type QuinnIntakeFormId =
   | 'decision-intake'
   | 'feeling-intake'
   | 'body-nervous-system-intake'
+  | 'grief-wave-intake'
   | 'work-situation-intake'
   | 'relationship-read-intake'
   | 'therapy-packet-intake'
@@ -185,6 +186,53 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
       '',
       'OUTPUT I NEED FROM REN:',
       'Separate body signal from story. Tell me what is probably physiology, what may be emotion, what urge should not drive the car, what need deserves care, and the smallest regulation move I can do in the next 5 to 15 minutes.',
+    ],
+  },
+  {
+    id: 'grief-wave-intake',
+    label: 'Grief',
+    icon: 'cloud-rain',
+    template: [
+      'QUINNOS GRIEF WAVE INTAKE',
+      '',
+      'PURPOSE:',
+      'Turn a grief wave into structured signal without treating it like a problem to solve, a text to send, or a truth Quinn has to obey.',
+      '',
+      'WHAT SET IT OFF:',
+      '[What triggered the wave? A place, song, memory, person, date, dream, smell, object, silence, body feeling, social media, work moment, etc.]',
+      '',
+      'WHO / WHAT THIS GRIEF IS ABOUT:',
+      '[Person, version of me, lost future, old home, relationship, safety, time, possibility, identity, etc.]',
+      '',
+      'WHAT I MISS:',
+      '[What exactly hurts to not have?]',
+      '',
+      'WHAT I AM REACHING FOR:',
+      '[Contact, proof, comfort, repair, explanation, fantasy, justice, being chosen, the old feeling, the old self, etc.]',
+      '',
+      'WHAT MY BODY IS DOING:',
+      '[Chest, throat, stomach, hands, fatigue, tears, numbness, buzzing, ache, heaviness, etc.]',
+      '',
+      'THE STORY MY BRAIN IS TELLING:',
+      '[What meaning is grief attaching to this?]',
+      '',
+      'WHAT IS TRUE EVEN IF THE STORY IS LOUD:',
+      '[Grounded facts, current reality, what I know when I am not inside the wave.]',
+      '',
+      'URGE:',
+      '[Text, check, search, reread, drive somewhere, isolate, spend, eat, smoke, spiral, romanticize, shut down, perform okay, etc.]',
+      '',
+      'RISK:',
+      '[What could this grief wave make me do that Future Quinn may have to clean up?]',
+      '',
+      'WHAT THIS GRIEF NEEDS INSTEAD:',
+      '[Witness, body care, ritual, music, crying, packet, walk, food, no action, Ashley, Ren, sleep, containment, memory without contact, etc.]',
+      '',
+      'WHAT FUTURE QUINN NEEDS PROTECTED:',
+      '[Dignity, boundaries, recovery, sleep, work, money, self-trust, emotional safety, current relationships, momentum, etc.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Name what kind of grief wave this is. Separate memory from current reality, longing from evidence, and contact-seeking from actual need. Give me one witness-line, one body-based care move, and the smallest next step that lets the grief move without letting it drive the car.',
     ],
   },
   {
