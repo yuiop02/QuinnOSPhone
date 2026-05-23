@@ -8,6 +8,7 @@ export type QuinnIntakeFormId =
   | 'intake-compass'
   | 'decision-intake'
   | 'feeling-intake'
+  | 'work-situation-intake'
   | 'default-map'
   | 'outcome-log';
 
@@ -137,6 +138,53 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
       '',
       'OUTPUT I NEED FROM REN:',
       'Name what this feeling probably is, what it is asking for, what urge should not drive the car, what need deserves care, and the smallest next move that honors the feeling without letting it hijack the day.',
+    ],
+  },
+  {
+    id: 'work-situation-intake',
+    label: 'Work',
+    icon: 'briefcase',
+    template: [
+      'QUINNOS WORK SITUATION INTAKE',
+      '',
+      'PURPOSE:',
+      'Turn a work situation into structured signal, clean judgment, and the next best move without collapsing into people-pleasing, over-functioning, or unnecessary escalation.',
+      '',
+      'SITUATION:',
+      '[What happened at work?]',
+      '',
+      'PEOPLE INVOLVED:',
+      '[Who is involved? Partners, customers, SSVs, ASM, SM, DM, etc.]',
+      '',
+      'ROLE I WAS IN:',
+      '[Shift supervisor, partner, customer-facing mode, training mode, conflict mode, cleanup mode, etc.]',
+      '',
+      'WHAT I NOTICED:',
+      '[What facts, patterns, behaviors, or inconsistencies stood out?]',
+      '',
+      'WHAT I FELT:',
+      '[What did it bring up emotionally or physically?]',
+      '',
+      'WHAT I THINK IT MEANS:',
+      '[The interpretation my brain is making.]',
+      '',
+      'WHAT ELSE COULD BE TRUE:',
+      '[Alternate explanations, missing context, operational pressures, emotional distortion, etc.]',
+      '',
+      'RISK / STAKES:',
+      '[What could go wrong if I act, avoid, escalate, confront, document, or let it go?]',
+      '',
+      'WHAT FUTURE QUINN NEEDS PROTECTED:',
+      '[Credibility, job stability, ASM path, energy, dignity, relationships, boundaries, money, schedule, nervous system, etc.]',
+      '',
+      'WHAT I WANT TO DO:',
+      '[My immediate urge or preferred move.]',
+      '',
+      'WHAT I NEED HELP DECIDING:',
+      '[Clarify the actual ask.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Give me the cleanest read of this work situation. Separate facts from interpretation, name the likely pattern, identify what Future Quinn needs protected, tell me whether to act, document, ask, wait, escalate, repair, or let it go, and give me the smallest professional next move.',
     ],
   },
   {
