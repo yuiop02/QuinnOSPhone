@@ -8,6 +8,7 @@ export type QuinnIntakeFormId =
   | 'intake-compass'
   | 'decision-intake'
   | 'feeling-intake'
+  | 'body-nervous-system-intake'
   | 'work-situation-intake'
   | 'relationship-read-intake'
   | 'therapy-packet-intake'
@@ -140,6 +141,50 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
       '',
       'OUTPUT I NEED FROM REN:',
       'Name what this feeling probably is, what it is asking for, what urge should not drive the car, what need deserves care, and the smallest next move that honors the feeling without letting it hijack the day.',
+    ],
+  },
+  {
+    id: 'body-nervous-system-intake',
+    label: 'Body',
+    icon: 'activity',
+    template: [
+      'QUINNOS BODY / NERVOUS SYSTEM INTAKE',
+      '',
+      'PURPOSE:',
+      'Turn body state into structured signal before Quinn mistakes physiology for prophecy, failure, danger, or truth.',
+      '',
+      'BODY STATE:',
+      '[What is happening physically? Tired, wired, hungry, heavy, shaky, tense, numb, restless, overstimulated, sick, sore, etc.]',
+      '',
+      'ENERGY LEVEL:',
+      '[Low, medium, high, unstable, crashing, artificially boosted, unknown.]',
+      '',
+      'SENSORY LOAD:',
+      '[Noise, light, touch, temperature, crowds, music, screen time, car time, work stimulation, etc.]',
+      '',
+      'FOOD / CAFFEINE / NICOTINE / MEDS:',
+      '[What have I eaten, drunk, smoked, taken, skipped, or overdone recently?]',
+      '',
+      'SLEEP / REST:',
+      '[How much rest did I get? What kind of sleep? Any naps, crashes, or insomnia?]',
+      '',
+      'EMOTIONAL WEATHER:',
+      '[What feelings are riding on top of the body state?]',
+      '',
+      'RECENT CONTEXT:',
+      '[Work shift, therapy, conflict, grief, social time, errands, spending, creative sprint, transition, etc.]',
+      '',
+      'URGE:',
+      '[What does my body want me to do right now? Collapse, scroll, spend, text, eat, avoid, clean, cry, drive, isolate, seek contact, etc.]',
+      '',
+      'RISK:',
+      '[What might go wrong if I obey the urge immediately? What might go wrong if I ignore the body?]',
+      '',
+      'WHAT FUTURE QUINN NEEDS PROTECTED:',
+      '[Food, sleep, money, work, dignity, recovery, emotional stability, safety, momentum, nervous system, etc.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Separate body signal from story. Tell me what is probably physiology, what may be emotion, what urge should not drive the car, what need deserves care, and the smallest regulation move I can do in the next 5 to 15 minutes.',
     ],
   },
   {
