@@ -7,6 +7,7 @@ export type QuinnIntakeFormIconName = ComponentProps<typeof Feather>['name'];
 export type QuinnIntakeFormId =
   | 'intake-compass'
   | 'decision-intake'
+  | 'feeling-intake'
   | 'default-map'
   | 'outcome-log';
 
@@ -98,6 +99,44 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
       '',
       'OUTPUT I NEED FROM REN:',
       'Give me the most probable best move, confidence level, what you are uncertain about, what Future Quinn needs protected, the smallest next action, and whether this decision should be acted on, delayed, or converted into another QuinnOS form.',
+    ],
+  },
+  {
+    id: 'feeling-intake',
+    label: 'Feeling',
+    icon: 'heart',
+    template: [
+      'QUINNOS FEELING INTAKE',
+      '',
+      'PURPOSE:',
+      'Turn this feeling into structured signal without flattening it or immediately forcing it into action.',
+      '',
+      'FEELING / MOOD:',
+      '[What am I feeling? Use messy words if needed.]',
+      '',
+      'BODY SIGNALS:',
+      '[Where is it in my body? Tension, heat, heaviness, buzzing, numbness, pressure, etc.]',
+      '',
+      'WHAT HAPPENED:',
+      '[What triggered or preceded this feeling?]',
+      '',
+      'WHAT I THINK IT MEANS:',
+      '[The story my brain is attaching to the feeling.]',
+      '',
+      'WHAT IT MAY ACTUALLY BE:',
+      '[Need, grief, fear, exhaustion, hope, shame, anger, loneliness, overstimulation, old pattern, etc.]',
+      '',
+      'URGE:',
+      '[What does this feeling want me to do right now? Text, withdraw, spend, eat, fix, confess, avoid, spiral, clean, sleep, etc.]',
+      '',
+      'RISK:',
+      '[Would acting from this feeling protect me, cost me, or both?]',
+      '',
+      'WHAT FUTURE QUINN NEEDS PROTECTED:',
+      '[Stability, dignity, money, sleep, work, relationships, recovery, momentum, truth, softness, etc.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Name what this feeling probably is, what it is asking for, what urge should not drive the car, what need deserves care, and the smallest next move that honors the feeling without letting it hijack the day.',
     ],
   },
   {
