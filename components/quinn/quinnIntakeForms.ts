@@ -13,6 +13,7 @@ export type QuinnIntakeFormId =
   | 'work-situation-intake'
   | 'relationship-read-intake'
   | 'creative-idea-intake'
+  | 'memory-capture-intake'
   | 'therapy-packet-intake'
   | 'default-map'
   | 'outcome-log';
@@ -372,6 +373,44 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
       '',
       'OUTPUT I NEED FROM REN:',
       'Classify what kind of creative material this is. Tell me what is alive in it, what heat it can survive, what not to do yet, and the smallest next creative move. If it only needs witnessing, give me the witness-line and do not over-process it.',
+    ],
+  },
+  {
+    id: 'memory-capture-intake',
+    label: 'Memory',
+    icon: 'bookmark',
+    template: [
+      'QUINNOS MEMORY CAPTURE INTAKE',
+      '',
+      'PURPOSE:',
+      'Save something that feels meaningful before Quinn forces it to become a conclusion, project, crisis, message, or performance too soon.',
+      '',
+      'WHAT I WANT TO SAVE:',
+      '[The moment, thought, image, phrase, quote, dream, detail, memory, feeling, pattern, coincidence, or tiny signal.]',
+      '',
+      'WHERE IT CAME FROM:',
+      '[When, where, who, what triggered it, what was happening around it?]',
+      '',
+      'WHY IT CAUGHT ME:',
+      '[What made it glow, sting, echo, feel funny, feel important, or refuse to leave?]',
+      '',
+      'WHAT IT MIGHT CONNECT TO:',
+      '[Person, place, pattern, project, grief, work, relationship, memoir, QuinnOS, old self, future self, unknown.]',
+      '',
+      'WHAT I DO NOT KNOW YET:',
+      '[What feels unclear, unfinished, unprocessed, or too early to name?]',
+      '',
+      'WHAT I AM TEMPTED TO DO WITH IT:',
+      '[Explain it, send it, archive it, overwork it, ignore it, turn it into art, make it a sign, make it a problem, etc.]',
+      '',
+      'WHAT IT DOES NOT NEED YET:',
+      '[Action, certainty, analysis, audience, decision, repair, message, moral, full meaning, or a finished shape.]',
+      '',
+      'WHAT FUTURE QUINN MAY NEED FROM THIS:',
+      '[Reminder, evidence, creative seed, pattern data, comfort, warning, title, therapy material, memory trace, etc.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Capture this cleanly. Tell me what kind of memory/signal this appears to be, what should be preserved exactly, what not to force yet, and where it should go next: leave it as a saved fragment, turn it into Creative, Therapy, Grief, Relationship, Default Map, or Outcome material.',
     ],
   },
   {
