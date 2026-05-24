@@ -12,6 +12,7 @@ export type QuinnIntakeFormId =
   | 'grief-wave-intake'
   | 'work-situation-intake'
   | 'relationship-read-intake'
+  | 'creative-idea-intake'
   | 'therapy-packet-intake'
   | 'default-map'
   | 'outcome-log';
@@ -330,6 +331,47 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
       '',
       'OUTPUT I NEED FROM REN:',
       'Give me the cleanest read of this relationship situation. Separate facts from interpretation, name the likely pattern, identify what may be projection or old wound, tell me what Future Quinn needs protected, and give me the smallest next move: speak, wait, ask, document, repair, detach, or let it breathe.',
+    ],
+  },
+  {
+    id: 'creative-idea-intake',
+    label: 'Creative',
+    icon: 'pen-tool',
+    template: [
+      'QUINNOS CREATIVE IDEA INTAKE',
+      '',
+      'PURPOSE:',
+      'Turn a creative spark into structured signal without overworking it, flattening it, or forcing it to become a finished thing too early.',
+      '',
+      'RAW IDEA:',
+      '[What is the idea, image, line, scene, concept, title, app feature, metaphor, or strange little signal?]',
+      '',
+      'WHERE IT CAME FROM:',
+      '[What triggered it? Conversation, dream, memory, work, grief, music, therapy, body state, joke, frustration, etc.]',
+      '',
+      'WHAT KIND OF MATERIAL THIS IS:',
+      '[Book/memoir, QuinnOS, essay, scene, poem, title, app feature, framework, joke, packet, visual, unknown.]',
+      '',
+      'WHAT FEELS ALIVE:',
+      '[What part has charge, texture, weirdness, truth, humor, beauty, ache, or momentum?]',
+      '',
+      'WHAT I THINK IT WANTS TO BECOME:',
+      '[If I can sense it: chapter, framework, post, form, scene, packet, feature, title, line, or nothing yet.]',
+      '',
+      'WHAT I AM AFRAID WILL HAPPEN:',
+      '[I will ruin it, over-explain it, forget it, make it too polished, make it too weird, never finish it, expose too much, etc.]',
+      '',
+      'WHAT IT DOES NOT NEED YET:',
+      '[Editing, explanation, judgment, audience, structure, polish, monetization, final title, moral, productivity pressure, etc.]',
+      '',
+      'WHAT KIND OF HELP I WANT:',
+      '[Name, Framework, Rewrite, Critique, Cut, Next Move, Witness-Line, Default Map, or not sure.]',
+      '',
+      'WHAT FUTURE QUINN NEEDS PROTECTED:',
+      '[Voice, originality, privacy, momentum, energy, time, emotional safety, coherence, play, honesty, weirdness, etc.]',
+      '',
+      'OUTPUT I NEED FROM REN:',
+      'Classify what kind of creative material this is. Tell me what is alive in it, what heat it can survive, what not to do yet, and the smallest next creative move. If it only needs witnessing, give me the witness-line and do not over-process it.',
     ],
   },
   {
