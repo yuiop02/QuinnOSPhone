@@ -2376,6 +2376,7 @@ function QuinnConversationSurface({
 
           {showLiteralTools ? (
             <View style={styles.literalToolsTray}>
+              <Text style={styles.literalToolSectionLabel}>Forms</Text>
               {QUINNOS_INTAKE_FORMS.map((form) => (
                 <Pressable
                   key={form.id}
@@ -2386,6 +2387,7 @@ function QuinnConversationSurface({
                   <Text style={styles.literalToolChipText}>{form.label}</Text>
                 </Pressable>
               ))}
+              <Text style={styles.literalToolSectionLabel}>Actions</Text>
               <Pressable
                 style={styles.literalToolChip}
                 onPress={() => {
@@ -6726,6 +6728,17 @@ responseReplayButton: {
     lineHeight: 15,
     fontWeight: '600',
     marginLeft: 6,
+  },
+
+  literalToolSectionLabel: {
+    width: '100%',
+    color: 'rgba(245, 248, 255, 0.42)',
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginBottom: 5,
+    marginTop: 1,
   },
 
   literalComposerBox: {
