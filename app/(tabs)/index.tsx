@@ -103,6 +103,7 @@ import { TOKENS } from '../../components/quinn/quinnSystem';
 import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
 import {
   QUINNOS_INTAKE_FORMS,
+  buildQuinnIntakeFormPacket,
   type QuinnIntakeFormDefinition,
 } from '../../components/quinn/quinnIntakeForms';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
@@ -2161,7 +2162,7 @@ function QuinnConversationSurface({
   }
 
   function loadLiteralIntakeForm(form: QuinnIntakeFormDefinition) {
-    onChangePacketText(form.template.join('\n'));
+    onChangePacketText(buildQuinnIntakeFormPacket(form));
     setShowLiteralTools(false);
     focusLiteralComposerSoon();
   }

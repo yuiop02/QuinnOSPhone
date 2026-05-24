@@ -25,6 +25,45 @@ export type QuinnIntakeFormDefinition = {
   template: string[];
 };
 
+export const QUINNOS_RESPONSE_PROTOCOL = [
+  '',
+  'QUINNOS RESPONSE PROTOCOL',
+  '',
+  'REN OUTPUT STRUCTURE:',
+  'Use the completed intake above as the source material. Do not flatten it into generic advice, perform certainty, or turn it into obedience machinery.',
+  '',
+  'CLEAN READ:',
+  '[The cleanest read of what is happening.]',
+  '',
+  'CORE PATTERN OR SIGNAL:',
+  '[The pattern, signal, hidden function, or material type QuinnOS should notice.]',
+  '',
+  'PROTECTED NEED:',
+  '[The valid need that deserves care or protection.]',
+  '',
+  'RISK / DISTORTION / UNCERTAINTY:',
+  '[What may be biased, incomplete, body-driven, old-wound-driven, high-cost, or genuinely uncertain.]',
+  '',
+  'MOST PROBABLE NEXT BEST MOVE:',
+  '[The move most likely to protect Future Quinn while honoring the real signal.]',
+  '',
+  'TINY VERSION:',
+  '[The smallest version Quinn can do if capacity is low.]',
+  '',
+  'RETURN PATH:',
+  '[If Quinn falls off, spirals, avoids, overdoes it, or cannot act, name the smallest way back.]',
+  '',
+  'CONFIDENCE LEVEL:',
+  '[Low / medium / high, with one sentence about why.]',
+  '',
+  'WHAT WOULD CHANGE THE ANSWER:',
+  '[The missing information, outcome, state change, or real-world signal that would recalibrate this read.]',
+];
+
+export function buildQuinnIntakeFormPacket(form: QuinnIntakeFormDefinition) {
+  return [...form.template, ...QUINNOS_RESPONSE_PROTOCOL].join('\n');
+}
+
 export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
   {
     id: 'intake-compass',
