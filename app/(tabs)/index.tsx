@@ -105,6 +105,7 @@ import {
   QUINNOS_INTAKE_FORMS,
   buildQuinnIntakeFormPacket,
   buildQuinnOutcomeLogPacketFromRun,
+  getQuinnOutcomeLogMinimumCaptureStatus,
   type QuinnIntakeFormDefinition,
 } from '../../components/quinn/quinnIntakeForms';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
@@ -1356,6 +1357,7 @@ function QuinnConversationSurface({
   const [, setPermissionState] = useState('Unknown');
   const [voiceStatus, setVoiceStatus] = useState('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [outcomeCaptureGuardMessage, setOutcomeCaptureGuardMessage] = useState('');
   const [, setQuinnVoiceReachable] = useState<boolean | null>(null);
   const [, setIsCheckingQuinnVoice] = useState(false);
   const [isPreparingQuinnVoice, setIsPreparingQuinnVoice] = useState(false);
@@ -1437,6 +1439,10 @@ function QuinnConversationSurface({
       scheduleConversationAutoScroll(true);
     }
   }, [isRunning, scheduleConversationAutoScroll, writtenResult]);
+
+  React.useEffect(() => {
+    setOutcomeCaptureGuardMessage('');
+  }, [packetText]);
   const {
     composerLift,
     responseLift,
@@ -2081,6 +2087,18 @@ function QuinnConversationSurface({
       return;
     }
 
+    const outcomeMinimumCaptureStatus = getQuinnOutcomeLogMinimumCaptureStatus(packetText);
+
+    if (outcomeMinimumCaptureStatus.isOutcomeLog && !outcomeMinimumCaptureStatus.hasMinimumData) {
+      setOutcomeCaptureGuardMessage(
+        'Outcome Log needs: WHAT I ACTUALLY DID, IT CAUSED, and DID IT HELP.'
+      );
+      focusLiteralComposerSoon();
+      return;
+    }
+
+    setOutcomeCaptureGuardMessage('');
+
     await interruptQuinnPlayback();
     onTriggerWave();
 
@@ -2388,6 +2406,11 @@ function QuinnConversationSurface({
 
           {runError ? <Text style={styles.literalStatusText}>{runError}</Text> : null}
           {voiceError ? <Text style={styles.literalStatusText}>{voiceError}</Text> : null}
+          {outcomeCaptureGuardMessage ? (
+            <Text style={[styles.literalStatusText, styles.literalGuardText]}>
+              {outcomeCaptureGuardMessage}
+            </Text>
+          ) : null}
           {voiceStatus ? <Text style={styles.literalStatusText}>{voiceStatus}</Text> : null}
 
           {showLiteralTools ? (
@@ -6902,6 +6925,10 @@ responseReplayButton: {
     fontWeight: '500',
     marginBottom: 6,
     paddingHorizontal: 8,
+  },
+
+  literalGuardText: {
+    color: 'rgba(255, 214, 153, 0.86)',
   },
 
 });

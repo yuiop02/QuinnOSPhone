@@ -69,6 +69,88 @@ export type QuinnOutcomeLogPrefillSource = {
   writtenResult?: string | null;
 };
 
+export type QuinnOutcomeLogMinimumCaptureField =
+  | 'WHAT I ACTUALLY DID:'
+  | 'IT CAUSED:'
+  | 'DID IT HELP?';
+
+export type QuinnOutcomeLogMinimumCaptureStatus = {
+  isOutcomeLog: boolean;
+  hasMinimumData: boolean;
+  missingRequiredFields: QuinnOutcomeLogMinimumCaptureField[];
+};
+
+const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
+
+const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
+  heading: QuinnOutcomeLogMinimumCaptureField;
+  placeholder: string;
+}[] = [
+  {
+    heading: 'WHAT I ACTUALLY DID:',
+    placeholder: '[What happened in real life?]',
+  },
+  {
+    heading: 'IT CAUSED:',
+    placeholder: '[What changed afterward?]',
+  },
+  {
+    heading: 'DID IT HELP?',
+    placeholder: '[yes / no / mixed / too soon to tell]',
+  },
+];
+
+function isQuinnPacketSectionHeading(line: string) {
+  const clean = line.trim();
+  return Boolean(clean && clean === clean.toUpperCase() && /^[A-Z0-9 /?'-]+:?$/.test(clean));
+}
+
+function getQuinnPacketSectionValue(lines: string[], heading: string) {
+  const headingIndex = lines.findIndex((line) => line.trim() === heading);
+
+  if (headingIndex < 0) {
+    return '';
+  }
+
+  const nextHeadingIndex = lines.findIndex(
+    (line, index) => index > headingIndex && isQuinnPacketSectionHeading(line)
+  );
+
+  return lines
+    .slice(headingIndex + 1, nextHeadingIndex < 0 ? undefined : nextHeadingIndex)
+    .join('\n')
+    .trim();
+}
+
+export function getQuinnOutcomeLogMinimumCaptureStatus(
+  packetText: string
+): QuinnOutcomeLogMinimumCaptureStatus {
+  const text = String(packetText || '');
+  const isOutcomeLog = text.includes(QUINN_OUTCOME_LOG_MARKER);
+
+  if (!isOutcomeLog) {
+    return {
+      isOutcomeLog: false,
+      hasMinimumData: true,
+      missingRequiredFields: [],
+    };
+  }
+
+  const lines = text.split(/\r?\n/);
+  const missingRequiredFields = QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS.filter(
+    ({ heading, placeholder }) => {
+      const value = getQuinnPacketSectionValue(lines, heading);
+      return !value || value.includes(placeholder);
+    }
+  ).map(({ heading }) => heading);
+
+  return {
+    isOutcomeLog: true,
+    hasMinimumData: missingRequiredFields.length === 0,
+    missingRequiredFields,
+  };
+}
+
 export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
   {
     id: 'intake-compass',
