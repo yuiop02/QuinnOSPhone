@@ -104,6 +104,7 @@ import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
 import {
   QUINNOS_INTAKE_FORMS,
   buildQuinnIntakeFormPacket,
+  buildQuinnOutcomeLogPacketFromRun,
   type QuinnIntakeFormDefinition,
 } from '../../components/quinn/quinnIntakeForms';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
@@ -1423,6 +1424,10 @@ function QuinnConversationSurface({
         .slice(0, 8)
         .reverse()
     : [];
+  const latestVisibleOutcomeSource =
+    [...visibleThreadMessages]
+      .reverse()
+      .find((run) => String(run.packetText || '').trim() || String(run.writtenResult || '').trim()) || null;
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -2167,6 +2172,16 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function loadLiteralOutcomeLogFromLatestRun() {
+    if (!latestVisibleOutcomeSource) {
+      return;
+    }
+
+    onChangePacketText(buildQuinnOutcomeLogPacketFromRun(latestVisibleOutcomeSource));
+    setShowLiteralTools(false);
+    focusLiteralComposerSoon();
+  }
+
   const useLiteralChatShellPreview = true;
 
   if (useLiteralChatShellPreview) {
@@ -2416,6 +2431,18 @@ function QuinnConversationSurface({
                   >
                     <Feather name="edit-3" size={14} color="rgba(245, 248, 255, 0.76)" />
                     <Text style={styles.literalToolChipText}>New chat</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.literalToolChip,
+                      !latestVisibleOutcomeSource && styles.literalToolChipDisabled,
+                    ]}
+                    disabled={!latestVisibleOutcomeSource}
+                    onPress={loadLiteralOutcomeLogFromLatestRun}
+                  >
+                    <Feather name="check-circle" size={14} color="rgba(245, 248, 255, 0.76)" />
+                    <Text style={styles.literalToolChipText}>Log outcome</Text>
                   </Pressable>
 
                   <Pressable

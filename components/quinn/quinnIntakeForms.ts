@@ -64,6 +64,11 @@ export function buildQuinnIntakeFormPacket(form: QuinnIntakeFormDefinition) {
   return [...form.template, ...QUINNOS_RESPONSE_PROTOCOL].join('\n');
 }
 
+export type QuinnOutcomeLogPrefillSource = {
+  packetText?: string | null;
+  writtenResult?: string | null;
+};
+
 export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
   {
     id: 'intake-compass',
@@ -585,3 +590,32 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
     ],
   },
 ];
+
+export function buildQuinnOutcomeLogPacketFromRun(source: QuinnOutcomeLogPrefillSource) {
+  const outcomeForm = QUINNOS_INTAKE_FORMS.find((form) => form.id === 'outcome-log');
+  if (!outcomeForm) {
+    return QUINNOS_RESPONSE_PROTOCOL.join('\n');
+  }
+
+  const originalIntake = String(source.packetText || '').trim();
+  const renRecommendation = String(source.writtenResult || '').trim();
+  const originalIntakePrompt = '[What did QuinnOS/Ren suggest or help me decide?]';
+  const prefilledOriginalIntake = [
+    'Original intake:',
+    originalIntake || '[No original intake available.]',
+    '',
+    'Ren recommendation:',
+    renRecommendation || '[No Ren recommendation available.]',
+  ];
+  const prefilledTemplate: string[] = [];
+
+  for (const line of outcomeForm.template) {
+    if (line === originalIntakePrompt) {
+      prefilledTemplate.push(...prefilledOriginalIntake);
+    } else {
+      prefilledTemplate.push(line);
+    }
+  }
+
+  return [...prefilledTemplate, ...QUINNOS_RESPONSE_PROTOCOL].join('\n');
+}
