@@ -2376,58 +2376,67 @@ function QuinnConversationSurface({
 
           {showLiteralTools ? (
             <View style={styles.literalToolsTray}>
-              <Text style={styles.literalToolSectionLabel}>Forms</Text>
-              {QUINNOS_INTAKE_FORMS.map((form) => (
-                <Pressable
-                  key={form.id}
-                  style={styles.literalToolChip}
-                  onPress={() => loadLiteralIntakeForm(form)}
-                >
-                  <Feather name={form.icon} size={14} color="rgba(245, 248, 255, 0.76)" />
-                  <Text style={styles.literalToolChipText}>{form.label}</Text>
-                </Pressable>
-              ))}
-              <Text style={styles.literalToolSectionLabel}>Actions</Text>
-              <Pressable
-                style={styles.literalToolChip}
-                onPress={() => {
-                  setShowLiteralTools(false);
-                  onOpenSettings();
-                }}
-              >
-                <Feather name="menu" size={14} color="rgba(245, 248, 255, 0.76)" />
-                <Text style={styles.literalToolChipText}>Menu</Text>
-              </Pressable>
+              <View style={styles.literalToolSection}>
+                <Text style={styles.literalToolSectionLabel}>Forms</Text>
+                <View style={styles.literalToolChipRow}>
+                  {QUINNOS_INTAKE_FORMS.map((form) => (
+                    <Pressable
+                      key={form.id}
+                      style={styles.literalToolChip}
+                      onPress={() => loadLiteralIntakeForm(form)}
+                    >
+                      <Feather name={form.icon} size={14} color="rgba(245, 248, 255, 0.76)" />
+                      <Text style={styles.literalToolChipText}>{form.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
 
-              <Pressable
-                style={styles.literalToolChip}
-                onPress={() => {
-                  setShowLiteralTools(false);
-                  onStartFreshArc();
-                }}
-              >
-                <Feather name="edit-3" size={14} color="rgba(245, 248, 255, 0.76)" />
-                <Text style={styles.literalToolChipText}>New chat</Text>
-              </Pressable>
+              <View style={[styles.literalToolSection, styles.literalToolSectionActions]}>
+                <Text style={styles.literalToolSectionLabel}>Actions</Text>
+                <View style={styles.literalToolChipRow}>
+                  <Pressable
+                    style={styles.literalToolChip}
+                    onPress={() => {
+                      setShowLiteralTools(false);
+                      onOpenSettings();
+                    }}
+                  >
+                    <Feather name="menu" size={14} color="rgba(245, 248, 255, 0.76)" />
+                    <Text style={styles.literalToolChipText}>Menu</Text>
+                  </Pressable>
 
-              <Pressable
-                style={[
-                  styles.literalToolChip,
-                  !packetText.trim() && styles.literalToolChipDisabled,
-                ]}
-                disabled={!packetText.trim()}
-                onPress={() => {
-                  onChangePacketText('');
-                  setShowLiteralTools(false);
+                  <Pressable
+                    style={styles.literalToolChip}
+                    onPress={() => {
+                      setShowLiteralTools(false);
+                      onStartFreshArc();
+                    }}
+                  >
+                    <Feather name="edit-3" size={14} color="rgba(245, 248, 255, 0.76)" />
+                    <Text style={styles.literalToolChipText}>New chat</Text>
+                  </Pressable>
 
-                  setTimeout(() => {
-                    literalComposerInputRef.current?.focus();
-                  }, 60);
-                }}
-              >
-                <Feather name="x-circle" size={14} color="rgba(245, 248, 255, 0.76)" />
-                <Text style={styles.literalToolChipText}>Clear</Text>
-              </Pressable>
+                  <Pressable
+                    style={[
+                      styles.literalToolChip,
+                      !packetText.trim() && styles.literalToolChipDisabled,
+                    ]}
+                    disabled={!packetText.trim()}
+                    onPress={() => {
+                      onChangePacketText('');
+                      setShowLiteralTools(false);
+
+                      setTimeout(() => {
+                        literalComposerInputRef.current?.focus();
+                      }, 60);
+                    }}
+                  >
+                    <Feather name="x-circle" size={14} color="rgba(245, 248, 255, 0.76)" />
+                    <Text style={styles.literalToolChipText}>Clear</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
           ) : null}
 
@@ -6698,24 +6707,40 @@ responseReplayButton: {
   },
 
   literalToolsTray: {
+    paddingTop: 2,
+    paddingHorizontal: 3,
+    marginBottom: 7,
+  },
+
+  literalToolSection: {
+    width: '100%',
+    marginBottom: 2,
+  },
+
+  literalToolSectionActions: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.055)',
+    paddingTop: 7,
+    marginTop: 1,
+  },
+
+  literalToolChipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    paddingHorizontal: 3,
-    marginBottom: 8,
   },
 
   literalToolChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 34,
+    height: 32,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.09)',
     backgroundColor: 'rgba(255, 255, 255, 0.045)',
-    paddingHorizontal: 11,
-    marginRight: 7,
-    marginBottom: 7,
+    paddingHorizontal: 10,
+    marginRight: 6,
+    marginBottom: 6,
   },
 
   literalToolChipDisabled: {
@@ -6731,14 +6756,12 @@ responseReplayButton: {
   },
 
   literalToolSectionLabel: {
-    width: '100%',
     color: 'rgba(245, 248, 255, 0.42)',
     fontSize: 10,
     lineHeight: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     marginBottom: 5,
-    marginTop: 1,
   },
 
   literalComposerBox: {
