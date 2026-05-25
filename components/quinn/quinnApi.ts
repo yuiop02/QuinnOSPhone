@@ -213,6 +213,14 @@ function extractStructuredAssistantText(
     return '';
   }
 
+  if (typeof record.text === 'string' && String(record.text || '').trim()) {
+    return String(record.text || '').trim();
+  }
+
+  if (typeof record.content === 'string' && String(record.content || '').trim()) {
+    return String(record.content || '').trim();
+  }
+
   if (type === 'message' && Array.isArray(record.content)) {
     return joinCleanParts(
       record.content.map((item) => extractStructuredAssistantText(item, seen))
@@ -256,6 +264,42 @@ function extractStructuredAssistantText(
 
     if (nested) {
       return nested;
+    }
+  }
+
+  return '';
+}
+
+function extractQuinnRunWrittenCandidate(data: any) {
+  const candidates = [
+    data?.written,
+    data?.writtenResult,
+    data?.result,
+    data?.output,
+    data?.output_text,
+    data?.message,
+    data?.message?.content,
+    data?.response,
+    data?.response?.written,
+    data?.response?.writtenResult,
+    data?.response?.result,
+    data?.response?.output,
+    data?.response?.output_text,
+    data?.response?.message,
+    data?.response?.message?.content,
+    data?.response?.content,
+    data?.data,
+    data?.content,
+    data,
+  ];
+
+  for (const candidate of candidates) {
+    const rawCandidate =
+      typeof candidate === 'string' ? candidate : extractStructuredAssistantText(candidate);
+    const cleanCandidate = sanitizeQuinnVisibleReplyText(rawCandidate);
+
+    if (cleanCandidate) {
+      return cleanCandidate;
     }
   }
 
@@ -669,13 +713,11 @@ export async function runQuinnPacket({
     );
   }
 
-  const written = sanitizeQuinnVisibleReplyText(
-    data?.written ??
-      data?.writtenResult ??
-      data?.result ??
-      data?.output ??
-      ''
-  );
+  const written = extractQuinnRunWrittenCandidate(data);
+
+  if (!written) {
+    throw new Error('Quinn returned no visible reply. Please try again.');
+  }
 
   const summaryCandidate = sanitizeQuinnVisibleReplyText(
     data?.summary ??
