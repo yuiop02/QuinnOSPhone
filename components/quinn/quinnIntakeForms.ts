@@ -94,6 +94,17 @@ export type QuinnOutcomeLogHistoryPreview = {
   didItHelp: string;
 };
 
+export type QuinnPatternCandidatePreview = {
+  actuallyDid: string;
+  itCaused: string;
+  didItHelp: string;
+  whatWorked: string;
+  whatMissed: string;
+  whatQuinnosShouldRemember: string;
+  candidateLine: string;
+  evidenceLine: string;
+};
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
@@ -192,6 +203,63 @@ export function getQuinnOutcomeLogHistoryPreview(
     ),
     itCaused: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'IT CAUSED:')),
     didItHelp: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'DID IT HELP?')),
+  };
+}
+
+function isQuinnPatternCandidateHelpValue(value: string) {
+  const clean = String(value || '').toLowerCase().trim();
+
+  return /\bno\b/.test(clean) || /\bmixed\b/.test(clean) || clean.includes('too soon');
+}
+
+export function getQuinnPatternCandidatePreview(
+  packetText: string
+): QuinnPatternCandidatePreview | null {
+  const text = String(packetText || '');
+
+  if (!text.includes(QUINN_OUTCOME_LOG_MARKER)) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const actuallyDid = cleanQuinnOutcomeHistoryValue(
+    getQuinnPacketSectionValue(lines, 'WHAT I ACTUALLY DID:')
+  );
+  const itCaused = cleanQuinnOutcomeHistoryValue(
+    getQuinnPacketSectionValue(lines, 'IT CAUSED:')
+  );
+  const didItHelp = cleanQuinnOutcomeHistoryValue(
+    getQuinnPacketSectionValue(lines, 'DID IT HELP?')
+  );
+  const whatWorked = cleanQuinnOutcomeHistoryValue(
+    getQuinnPacketSectionValue(lines, 'WHAT WORKED:')
+  );
+  const whatMissed = cleanQuinnOutcomeHistoryValue(
+    getQuinnPacketSectionValue(lines, 'WHAT MISSED:')
+  );
+  const whatQuinnosShouldRemember = cleanQuinnOutcomeHistoryValue(
+    getQuinnPacketSectionValue(lines, 'WHAT QUINNOS SHOULD REMEMBER:')
+  );
+  const isCandidate = Boolean(
+    whatQuinnosShouldRemember ||
+      whatMissed ||
+      isQuinnPatternCandidateHelpValue(didItHelp) ||
+      (actuallyDid && itCaused)
+  );
+
+  if (!isCandidate) {
+    return null;
+  }
+
+  return {
+    actuallyDid,
+    itCaused,
+    didItHelp,
+    whatWorked,
+    whatMissed,
+    whatQuinnosShouldRemember,
+    candidateLine: whatQuinnosShouldRemember || actuallyDid,
+    evidenceLine: whatMissed || itCaused || whatWorked,
   };
 }
 

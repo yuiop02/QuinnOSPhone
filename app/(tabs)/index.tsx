@@ -108,8 +108,10 @@ import {
   getQuinnIntakeFormKindFromPacketText,
   getQuinnOutcomeLogHistoryPreview,
   getQuinnOutcomeLogMinimumCaptureStatus,
+  getQuinnPatternCandidatePreview,
   type QuinnIntakeFormDefinition,
   type QuinnOutcomeLogHistoryPreview,
+  type QuinnPatternCandidatePreview,
 } from '../../components/quinn/quinnIntakeForms';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
 import type {
@@ -142,6 +144,11 @@ type QuinnRunResult = {
 };
 
 type QuinnOutcomeHistoryItem = QuinnOutcomeLogHistoryPreview & {
+  id: string;
+  timestamp: string;
+};
+
+type QuinnPatternCandidateItem = QuinnPatternCandidatePreview & {
   id: string;
   timestamp: string;
 };
@@ -1480,6 +1487,27 @@ function QuinnConversationSurface({
 
     return items;
   }, [recentRuns]);
+  const patternCandidateItems = React.useMemo<QuinnPatternCandidateItem[]>(() => {
+    const items: QuinnPatternCandidateItem[] = [];
+
+    for (const run of recentRuns) {
+      const preview = getQuinnPatternCandidatePreview(run.packetText || '');
+
+      if (preview) {
+        items.push({
+          id: String(run.id || run.timestamp || items.length),
+          timestamp: String(run.timestamp || ''),
+          ...preview,
+        });
+      }
+
+      if (items.length >= 5) {
+        break;
+      }
+    }
+
+    return items;
+  }, [recentRuns]);
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -2213,6 +2241,7 @@ function QuinnConversationSurface({
   const [literalKeyboardHeight, setLiteralKeyboardHeight] = useState(0);
   const [showLiteralTools, setShowLiteralTools] = useState(false);
   const [showOutcomeHistory, setShowOutcomeHistory] = useState(false);
+  const [showPatternCandidates, setShowPatternCandidates] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
 
   useEffect(() => {
@@ -2532,6 +2561,17 @@ function QuinnConversationSurface({
                   <Pressable
                     style={[
                       styles.literalToolChip,
+                      showPatternCandidates && styles.literalToolChipActive,
+                    ]}
+                    onPress={() => setShowPatternCandidates((prev) => !prev)}
+                  >
+                    <Feather name="trending-up" size={14} color="rgba(245, 248, 255, 0.76)" />
+                    <Text style={styles.literalToolChipText}>Patterns</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.literalToolChip,
                       !latestVisibleOutcomeSource && styles.literalToolChipDisabled,
                     ]}
                     disabled={!latestVisibleOutcomeSource}
@@ -2598,6 +2638,44 @@ function QuinnConversationSurface({
                 ))
               ) : (
                 <Text style={styles.literalOutcomeHistoryEmpty}>No logged outcomes yet.</Text>
+              )}
+            </View>
+          ) : null}
+
+          {showPatternCandidates ? (
+            <View style={styles.literalOutcomeHistoryPanel}>
+              <View style={styles.literalOutcomeHistoryHeader}>
+                <Text style={styles.literalOutcomeHistoryTitle}>Pattern candidates</Text>
+                <Text style={styles.literalOutcomeHistoryCount}>
+                  {patternCandidateItems.length ? `${patternCandidateItems.length} local` : 'Local'}
+                </Text>
+              </View>
+
+              {patternCandidateItems.length ? (
+                patternCandidateItems.map((item) => (
+                  <View key={item.id} style={styles.literalOutcomeHistoryRow}>
+                    <View style={styles.literalOutcomeHistoryRowHeader}>
+                      <Text style={styles.literalPatternCandidateStatus}>
+                        {item.didItHelp || 'Unknown'}
+                      </Text>
+                      {item.timestamp ? (
+                        <Text style={styles.literalOutcomeHistoryTime}>
+                          {formatOutcomeHistoryTimestamp(item.timestamp)}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.literalOutcomeHistoryLabel}>Candidate</Text>
+                    <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                      {item.candidateLine || 'No candidate line captured.'}
+                    </Text>
+                    <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
+                    <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                      {item.evidenceLine || 'No evidence captured.'}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.literalOutcomeHistoryEmpty}>No pattern candidates yet.</Text>
               )}
             </View>
           ) : null}
@@ -7032,6 +7110,13 @@ responseReplayButton: {
 
   literalOutcomeHistoryHelp: {
     color: 'rgba(255, 214, 153, 0.86)',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+
+  literalPatternCandidateStatus: {
+    color: 'rgba(190, 225, 255, 0.86)',
     fontSize: 11.5,
     lineHeight: 15,
     fontWeight: '800',
