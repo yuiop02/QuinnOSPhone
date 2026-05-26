@@ -106,8 +106,10 @@ import {
   buildQuinnIntakeFormPacket,
   buildQuinnOutcomeLogPacketFromRun,
   getQuinnIntakeFormKindFromPacketText,
+  getQuinnOutcomeLogHistoryPreview,
   getQuinnOutcomeLogMinimumCaptureStatus,
   type QuinnIntakeFormDefinition,
+  type QuinnOutcomeLogHistoryPreview,
 } from '../../components/quinn/quinnIntakeForms';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
 import type {
@@ -137,6 +139,11 @@ type QuinnRunResult = {
   summary: string;
   timestamp: string;
   memoryResonance?: MemoryResonanceItem[];
+};
+
+type QuinnOutcomeHistoryItem = QuinnOutcomeLogHistoryPreview & {
+  id: string;
+  timestamp: string;
 };
 
 type NumberedOption = {
@@ -366,6 +373,27 @@ function sanitizeRunHistoryItemForDisplay(item: RunHistoryItem): RunHistoryItem 
 
 function sanitizeRunHistoryItemsForDisplay(items: RunHistoryItem[]) {
   return items.map(sanitizeRunHistoryItemForDisplay);
+}
+
+function formatOutcomeHistoryTimestamp(value: string) {
+  const clean = String(value || '').trim();
+
+  if (!clean) {
+    return '';
+  }
+
+  const date = new Date(clean);
+
+  if (Number.isNaN(date.getTime())) {
+    return clean;
+  }
+
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 const TopFadeWall = React.memo(function TopFadeWall() {
@@ -1431,6 +1459,27 @@ function QuinnConversationSurface({
     [...visibleThreadMessages]
       .reverse()
       .find((run) => String(run.packetText || '').trim() || String(run.writtenResult || '').trim()) || null;
+  const outcomeHistoryItems = React.useMemo<QuinnOutcomeHistoryItem[]>(() => {
+    const items: QuinnOutcomeHistoryItem[] = [];
+
+    for (const run of recentRuns) {
+      const preview = getQuinnOutcomeLogHistoryPreview(run.packetText || '');
+
+      if (preview) {
+        items.push({
+          id: String(run.id || run.timestamp || items.length),
+          timestamp: String(run.timestamp || ''),
+          ...preview,
+        });
+      }
+
+      if (items.length >= 5) {
+        break;
+      }
+    }
+
+    return items;
+  }, [recentRuns]);
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -2163,6 +2212,7 @@ function QuinnConversationSurface({
 
   const [literalKeyboardHeight, setLiteralKeyboardHeight] = useState(0);
   const [showLiteralTools, setShowLiteralTools] = useState(false);
+  const [showOutcomeHistory, setShowOutcomeHistory] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
 
   useEffect(() => {
@@ -2471,6 +2521,17 @@ function QuinnConversationSurface({
                   <Pressable
                     style={[
                       styles.literalToolChip,
+                      showOutcomeHistory && styles.literalToolChipActive,
+                    ]}
+                    onPress={() => setShowOutcomeHistory((prev) => !prev)}
+                  >
+                    <Feather name="list" size={14} color="rgba(245, 248, 255, 0.76)" />
+                    <Text style={styles.literalToolChipText}>Outcomes</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.literalToolChip,
                       !latestVisibleOutcomeSource && styles.literalToolChipDisabled,
                     ]}
                     disabled={!latestVisibleOutcomeSource}
@@ -2500,6 +2561,44 @@ function QuinnConversationSurface({
                   </Pressable>
                 </View>
               </View>
+            </View>
+          ) : null}
+
+          {showOutcomeHistory ? (
+            <View style={styles.literalOutcomeHistoryPanel}>
+              <View style={styles.literalOutcomeHistoryHeader}>
+                <Text style={styles.literalOutcomeHistoryTitle}>Outcome history</Text>
+                <Text style={styles.literalOutcomeHistoryCount}>
+                  {outcomeHistoryItems.length ? `${outcomeHistoryItems.length} recent` : 'Local'}
+                </Text>
+              </View>
+
+              {outcomeHistoryItems.length ? (
+                outcomeHistoryItems.map((item) => (
+                  <View key={item.id} style={styles.literalOutcomeHistoryRow}>
+                    <View style={styles.literalOutcomeHistoryRowHeader}>
+                      <Text style={styles.literalOutcomeHistoryHelp}>
+                        {item.didItHelp || 'Unknown'}
+                      </Text>
+                      {item.timestamp ? (
+                        <Text style={styles.literalOutcomeHistoryTime}>
+                          {formatOutcomeHistoryTimestamp(item.timestamp)}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.literalOutcomeHistoryLabel}>Did</Text>
+                    <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                      {item.actuallyDid || 'No action captured.'}
+                    </Text>
+                    <Text style={styles.literalOutcomeHistoryLabel}>Caused</Text>
+                    <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                      {item.itCaused || 'No effect captured.'}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.literalOutcomeHistoryEmpty}>No logged outcomes yet.</Text>
+              )}
             </View>
           ) : null}
 
@@ -6859,6 +6958,11 @@ responseReplayButton: {
     marginBottom: 6,
   },
 
+  literalToolChipActive: {
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+  },
+
   literalToolChipDisabled: {
     opacity: 0.36,
   },
@@ -6878,6 +6982,90 @@ responseReplayButton: {
     fontWeight: '700',
     textTransform: 'uppercase',
     marginBottom: 5,
+  },
+
+  literalOutcomeHistoryPanel: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: 'rgba(14, 14, 19, 0.86)',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    marginBottom: 8,
+  },
+
+  literalOutcomeHistoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+
+  literalOutcomeHistoryTitle: {
+    color: 'rgba(245, 248, 255, 0.78)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+  },
+
+  literalOutcomeHistoryCount: {
+    color: 'rgba(245, 248, 255, 0.44)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+
+  literalOutcomeHistoryRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    paddingTop: 8,
+    marginTop: 8,
+  },
+
+  literalOutcomeHistoryRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+
+  literalOutcomeHistoryHelp: {
+    color: 'rgba(255, 214, 153, 0.86)',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+
+  literalOutcomeHistoryTime: {
+    color: 'rgba(245, 248, 255, 0.38)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '600',
+  },
+
+  literalOutcomeHistoryLabel: {
+    color: 'rgba(245, 248, 255, 0.42)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginTop: 4,
+  },
+
+  literalOutcomeHistoryText: {
+    color: 'rgba(245, 248, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+
+  literalOutcomeHistoryEmpty: {
+    color: 'rgba(245, 248, 255, 0.50)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    marginTop: 5,
   },
 
   literalComposerBox: {

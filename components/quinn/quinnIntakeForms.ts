@@ -88,6 +88,12 @@ export type QuinnOutcomeLogMinimumCaptureStatus = {
   missingRequiredFields: QuinnOutcomeLogMinimumCaptureField[];
 };
 
+export type QuinnOutcomeLogHistoryPreview = {
+  actuallyDid: string;
+  itCaused: string;
+  didItHelp: string;
+};
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
@@ -130,6 +136,16 @@ function getQuinnPacketSectionValue(lines: string[], heading: string) {
     .trim();
 }
 
+function cleanQuinnOutcomeHistoryValue(value: string) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+
+  if (!clean || /^\[[\s\S]*\]$/.test(clean)) {
+    return '';
+  }
+
+  return clean.length > 180 ? `${clean.slice(0, 177).trim()}...` : clean;
+}
+
 export function getQuinnOutcomeLogMinimumCaptureStatus(
   packetText: string
 ): QuinnOutcomeLogMinimumCaptureStatus {
@@ -156,6 +172,26 @@ export function getQuinnOutcomeLogMinimumCaptureStatus(
     isOutcomeLog: true,
     hasMinimumData: missingRequiredFields.length === 0,
     missingRequiredFields,
+  };
+}
+
+export function getQuinnOutcomeLogHistoryPreview(
+  packetText: string
+): QuinnOutcomeLogHistoryPreview | null {
+  const text = String(packetText || '');
+
+  if (!text.includes(QUINN_OUTCOME_LOG_MARKER)) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+
+  return {
+    actuallyDid: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'WHAT I ACTUALLY DID:')
+    ),
+    itCaused: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'IT CAUSED:')),
+    didItHelp: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'DID IT HELP?')),
   };
 }
 
