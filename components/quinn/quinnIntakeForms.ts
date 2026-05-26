@@ -25,6 +25,14 @@ export type QuinnIntakeFormDefinition = {
   template: string[];
 };
 
+export type QuinnIntakeFormPacketKind = {
+  id: QuinnIntakeFormId;
+  label: string;
+  icon: QuinnIntakeFormIconName;
+  marker: string;
+  isOutcomeLog: boolean;
+};
+
 export const QUINNOS_RESPONSE_PROTOCOL = [
   '',
   'QUINNOS RESPONSE PROTOCOL',
@@ -672,6 +680,28 @@ export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
     ],
   },
 ];
+
+export function getQuinnIntakeFormKindFromPacketText(
+  packetText: string
+): QuinnIntakeFormPacketKind | null {
+  const text = String(packetText || '');
+
+  for (const form of QUINNOS_INTAKE_FORMS) {
+    const marker = form.template[0];
+
+    if (marker && text.includes(marker)) {
+      return {
+        id: form.id,
+        label: form.label,
+        icon: form.icon,
+        marker,
+        isOutcomeLog: form.id === 'outcome-log',
+      };
+    }
+  }
+
+  return null;
+}
 
 export function buildQuinnOutcomeLogPacketFromRun(source: QuinnOutcomeLogPrefillSource) {
   const outcomeForm = QUINNOS_INTAKE_FORMS.find((form) => form.id === 'outcome-log');

@@ -105,6 +105,7 @@ import {
   QUINNOS_INTAKE_FORMS,
   buildQuinnIntakeFormPacket,
   buildQuinnOutcomeLogPacketFromRun,
+  getQuinnIntakeFormKindFromPacketText,
   getQuinnOutcomeLogMinimumCaptureStatus,
   type QuinnIntakeFormDefinition,
 } from '../../components/quinn/quinnIntakeForms';
@@ -2289,6 +2290,7 @@ function QuinnConversationSurface({
           {visibleThreadMessages.map((run, index) => {
             const userText = String(run.packetText || '').trim();
             const assistantText = sanitizeQuinnVisibleReplyText(run.writtenResult || '');
+            const packetKind = getQuinnIntakeFormKindFromPacketText(userText);
 
             return (
               <View
@@ -2297,6 +2299,16 @@ function QuinnConversationSurface({
               >
                 {userText ? (
                   <View style={styles.literalUserBubble}>
+                    {packetKind ? (
+                      <View style={styles.literalPacketKindBadge}>
+                        <Feather
+                          name={packetKind.icon}
+                          size={11}
+                          color="rgba(245, 248, 255, 0.66)"
+                        />
+                        <Text style={styles.literalPacketKindBadgeText}>{packetKind.label}</Text>
+                      </View>
+                    ) : null}
                     <Text style={styles.literalMessageText}>{userText}</Text>
                   </View>
                 ) : null}
@@ -3009,6 +3021,7 @@ function QuinnConversationSurface({
                 {visibleThreadMessages.map((run, index) => {
                   const userText = String(run.packetText || '').trim();
                   const assistantText = sanitizeQuinnVisibleReplyText(run.writtenResult || '');
+                  const packetKind = getQuinnIntakeFormKindFromPacketText(userText);
 
                   return (
                     <View
@@ -3018,6 +3031,16 @@ function QuinnConversationSurface({
                       {userText ? (
                         <View style={styles.userMessageBubble}>
                           <Text style={styles.userMessageLabel}>You</Text>
+                          {packetKind ? (
+                            <View style={styles.packetKindBadge}>
+                              <Feather
+                                name={packetKind.icon}
+                                size={11}
+                                color="rgba(245, 248, 255, 0.66)"
+                              />
+                              <Text style={styles.packetKindBadgeText}>{packetKind.label}</Text>
+                            </View>
+                          ) : null}
                           <Text style={styles.userMessageText}>{userText}</Text>
                         </View>
                       ) : null}
@@ -6231,6 +6254,27 @@ cardOrbGlowWarm: {
     letterSpacing: -0.05,
   },
 
+  packetKindBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    marginBottom: 7,
+  },
+
+  packetKindBadgeText: {
+    color: 'rgba(245, 248, 255, 0.68)',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+
   assistantMessageBubble: {
     alignSelf: 'flex-start',
     maxWidth: '96%',
@@ -6645,6 +6689,27 @@ responseReplayButton: {
     lineHeight: 23,
     fontWeight: '500',
     letterSpacing: -0.05,
+  },
+
+  literalPacketKindBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    marginBottom: 7,
+  },
+
+  literalPacketKindBadgeText: {
+    color: 'rgba(245, 248, 255, 0.68)',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '700',
+    marginLeft: 4,
   },
 
   literalTypingText: {
