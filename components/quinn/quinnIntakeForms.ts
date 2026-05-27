@@ -18,6 +18,8 @@ export type QuinnIntakeFormId =
   | 'default-map'
   | 'outcome-log';
 
+export type QuinnPacketKindId = QuinnIntakeFormId | 'draft-pattern-card';
+
 export type QuinnIntakeFormDefinition = {
   id: QuinnIntakeFormId;
   label: string;
@@ -26,7 +28,7 @@ export type QuinnIntakeFormDefinition = {
 };
 
 export type QuinnIntakeFormPacketKind = {
-  id: QuinnIntakeFormId;
+  id: QuinnPacketKindId;
   label: string;
   icon: QuinnIntakeFormIconName;
   marker: string;
@@ -108,6 +110,7 @@ export type QuinnPatternCandidatePreview = {
 export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
 
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
+const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -857,6 +860,16 @@ export function getQuinnIntakeFormKindFromPacketText(
   packetText: string
 ): QuinnIntakeFormPacketKind | null {
   const text = String(packetText || '');
+
+  if (text.includes(QUINN_DRAFT_PATTERN_CARD_MARKER)) {
+    return {
+      id: 'draft-pattern-card',
+      label: 'Draft Pattern',
+      icon: 'edit-3',
+      marker: QUINN_DRAFT_PATTERN_CARD_MARKER,
+      isOutcomeLog: false,
+    };
+  }
 
   for (const form of QUINNOS_INTAKE_FORMS) {
     const marker = form.template[0];
