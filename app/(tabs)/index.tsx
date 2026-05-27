@@ -103,6 +103,7 @@ import { TOKENS } from '../../components/quinn/quinnSystem';
 import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
 import {
   QUINNOS_INTAKE_FORMS,
+  buildQuinnDraftPatternCardPacket,
   buildQuinnIntakeFormPacket,
   buildQuinnOutcomeLogPacketFromRun,
   getQuinnIntakeFormKindFromPacketText,
@@ -2333,6 +2334,14 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function loadDraftPatternCardFromCandidate(candidate: QuinnPatternCandidateItem) {
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(buildQuinnDraftPatternCardPacket(candidate));
+    setShowPatternCandidates(false);
+    setShowLiteralTools(false);
+    focusLiteralComposerSoon();
+  }
+
   const useLiteralChatShellPreview = true;
 
   if (useLiteralChatShellPreview) {
@@ -2728,6 +2737,15 @@ function QuinnConversationSurface({
                     <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
                       {item.evidenceLine || 'No evidence captured.'}
                     </Text>
+                    <View style={styles.literalPatternCandidateActionRow}>
+                      <Pressable
+                        style={styles.literalPatternCandidateAction}
+                        onPress={() => loadDraftPatternCardFromCandidate(item)}
+                      >
+                        <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
+                        <Text style={styles.literalPatternCandidateActionText}>Draft card</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 ))
               ) : (
@@ -7251,6 +7269,32 @@ responseReplayButton: {
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '500',
+  },
+
+  literalPatternCandidateActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+
+  literalPatternCandidateAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+
+  literalPatternCandidateActionText: {
+    color: 'rgba(245, 248, 255, 0.62)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginLeft: 5,
   },
 
   literalOutcomeHistoryEmpty: {

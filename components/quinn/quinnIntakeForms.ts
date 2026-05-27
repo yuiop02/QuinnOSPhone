@@ -105,6 +105,8 @@ export type QuinnPatternCandidatePreview = {
   evidenceLine: string;
 };
 
+export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
@@ -261,6 +263,72 @@ export function getQuinnPatternCandidatePreview(
     candidateLine: whatQuinnosShouldRemember || actuallyDid,
     evidenceLine: whatMissed || itCaused || whatWorked,
   };
+}
+
+function formatQuinnDraftPatternCardValue(value: string, fallback: string) {
+  const clean = String(value || '').trim();
+
+  return clean || fallback;
+}
+
+export function buildQuinnDraftPatternCardPacket(candidate: QuinnDraftPatternCardSource) {
+  return [
+    'QUINNOS DRAFT PATTERN CARD',
+    '',
+    'PURPOSE:',
+    'Turn this local pattern candidate into a reviewable draft. Do not store it as truth yet.',
+    '',
+    'CANDIDATE:',
+    formatQuinnDraftPatternCardValue(candidate.candidateLine, '[No candidate line captured.]'),
+    '',
+    'EVIDENCE:',
+    formatQuinnDraftPatternCardValue(candidate.evidenceLine, '[No evidence captured.]'),
+    '',
+    'SOURCE OUTCOME:',
+    'What I actually did:',
+    formatQuinnDraftPatternCardValue(candidate.actuallyDid, '[No action captured.]'),
+    '',
+    'It caused:',
+    formatQuinnDraftPatternCardValue(candidate.itCaused, '[No effect captured.]'),
+    '',
+    'Did it help?',
+    formatQuinnDraftPatternCardValue(candidate.didItHelp, '[unknown]'),
+    '',
+    'WHAT WORKED:',
+    formatQuinnDraftPatternCardValue(candidate.whatWorked, '[No useful part captured.]'),
+    '',
+    'WHAT MISSED:',
+    formatQuinnDraftPatternCardValue(candidate.whatMissed, '[No miss captured.]'),
+    '',
+    'WHAT QUINNOS MIGHT REMEMBER:',
+    formatQuinnDraftPatternCardValue(
+      candidate.whatQuinnosShouldRemember,
+      '[No memory candidate captured.]'
+    ),
+    '',
+    'CONFIDENCE:',
+    '[draft / low / medium / high — Quinn chooses]',
+    '',
+    'WHEN THIS PATTERN SHOULD MATTER:',
+    '[When should Future Quinn use this?]',
+    '',
+    'WHEN THIS PATTERN SHOULD NOT MATTER:',
+    '[What would make this misleading, too broad, old-wound-driven, or not applicable?]',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response. If the evidence is thin, still return the compact draft shape below.',
+    '',
+    'DRAFT OUTPUT SHAPE:',
+    'Return exactly these sections:',
+    'POSSIBLE PATTERN:',
+    'EVIDENCE:',
+    'OVERGENERALIZATION RISK:',
+    'BEFORE STORING, QUINN SHOULD DECIDE:',
+    '',
+    'OUTPUT I NEED FROM REN:',
+    'Turn this into a draft pattern card only. Use the DRAFT OUTPUT SHAPE. Name the possible pattern, the evidence, the risk of overgeneralizing, and what Quinn should decide before storing it. Do not treat this as permanent memory yet. Return visible text even if the evidence is thin.',
+    ...QUINNOS_RESPONSE_PROTOCOL,
+  ].join('\n');
 }
 
 export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
