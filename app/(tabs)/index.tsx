@@ -106,10 +106,12 @@ import {
   buildQuinnDraftPatternCardPacket,
   buildQuinnIntakeFormPacket,
   buildQuinnOutcomeLogPacketFromRun,
+  getQuinnDraftPatternCardHistoryPreview,
   getQuinnIntakeFormKindFromPacketText,
   getQuinnOutcomeLogHistoryPreview,
   getQuinnOutcomeLogMinimumCaptureStatus,
   getQuinnPatternCandidatePreview,
+  type QuinnDraftPatternCardHistoryPreview,
   type QuinnIntakeFormDefinition,
   type QuinnOutcomeLogHistoryPreview,
   type QuinnPatternCandidatePreview,
@@ -150,6 +152,11 @@ type QuinnOutcomeHistoryItem = QuinnOutcomeLogHistoryPreview & {
 };
 
 type QuinnPatternCandidateItem = QuinnPatternCandidatePreview & {
+  id: string;
+  timestamp: string;
+};
+
+type QuinnDraftPatternCardHistoryItem = QuinnDraftPatternCardHistoryPreview & {
   id: string;
   timestamp: string;
 };
@@ -1517,6 +1524,27 @@ function QuinnConversationSurface({
 
     return items;
   }, [recentRuns]);
+  const draftPatternCardHistoryItems = React.useMemo<QuinnDraftPatternCardHistoryItem[]>(() => {
+    const items: QuinnDraftPatternCardHistoryItem[] = [];
+
+    for (const run of recentRuns) {
+      const preview = getQuinnDraftPatternCardHistoryPreview(run.packetText || '');
+
+      if (preview) {
+        items.push({
+          id: String(run.id || run.timestamp || items.length),
+          timestamp: String(run.timestamp || ''),
+          ...preview,
+        });
+      }
+
+      if (items.length >= 5) {
+        break;
+      }
+    }
+
+    return items;
+  }, [recentRuns]);
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -2251,6 +2279,7 @@ function QuinnConversationSurface({
   const [showLiteralTools, setShowLiteralTools] = useState(false);
   const [showOutcomeHistory, setShowOutcomeHistory] = useState(false);
   const [showPatternCandidates, setShowPatternCandidates] = useState(false);
+  const [showDraftPatternCards, setShowDraftPatternCards] = useState(false);
   const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
@@ -2310,6 +2339,7 @@ function QuinnConversationSurface({
   function closeLiteralPanelsForDraftLoad() {
     setShowOutcomeHistory(false);
     setShowPatternCandidates(false);
+    setShowDraftPatternCards(false);
     setShowLiteralTools(false);
   }
 
@@ -2323,6 +2353,7 @@ function QuinnConversationSurface({
     collapseLongFormComposerForPanelAccess();
     setShowLiteralTools(false);
     setShowPatternCandidates(false);
+    setShowDraftPatternCards(false);
     setShowOutcomeHistory((prev) => !prev);
   }
 
@@ -2330,7 +2361,16 @@ function QuinnConversationSurface({
     collapseLongFormComposerForPanelAccess();
     setShowLiteralTools(false);
     setShowOutcomeHistory(false);
+    setShowDraftPatternCards(false);
     setShowPatternCandidates((prev) => !prev);
+  }
+
+  function handleToggleDraftPatternCards() {
+    collapseLongFormComposerForPanelAccess();
+    setShowLiteralTools(false);
+    setShowOutcomeHistory(false);
+    setShowPatternCandidates(false);
+    setShowDraftPatternCards((prev) => !prev);
   }
 
   function handleStartFreshLiteralArc() {
@@ -2663,6 +2703,17 @@ function QuinnConversationSurface({
                   <Pressable
                     style={[
                       styles.literalToolChip,
+                      showDraftPatternCards && styles.literalToolChipActive,
+                    ]}
+                    onPress={handleToggleDraftPatternCards}
+                  >
+                    <Feather name="edit-3" size={14} color="rgba(245, 248, 255, 0.76)" />
+                    <Text style={styles.literalToolChipText}>Drafts</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.literalToolChip,
                       !latestVisibleOutcomeSource && styles.literalToolChipDisabled,
                     ]}
                     disabled={!latestVisibleOutcomeSource}
@@ -2808,6 +2859,65 @@ function QuinnConversationSurface({
                   ))
                 ) : (
                   <Text style={styles.literalOutcomeHistoryEmpty}>No pattern candidates yet.</Text>
+                )}
+              </ScrollView>
+            </View>
+          ) : null}
+
+          {showDraftPatternCards ? (
+            <View style={styles.literalOutcomeHistoryPanel}>
+              <View style={styles.literalOutcomeHistoryHeader}>
+                <Text style={styles.literalOutcomeHistoryTitle}>Draft pattern cards</Text>
+                <View style={styles.literalOutcomeHistoryHeaderActions}>
+                  <Text style={styles.literalOutcomeHistoryCount}>
+                    {draftPatternCardHistoryItems.length
+                      ? `${draftPatternCardHistoryItems.length} local`
+                      : 'Local'}
+                  </Text>
+                  <Pressable
+                    style={styles.literalOutcomeHistoryCloseButton}
+                    onPress={() => setShowDraftPatternCards(false)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Feather name="x" size={13} color="rgba(245, 248, 255, 0.62)" />
+                    <Text style={styles.literalOutcomeHistoryCloseText}>Close</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={draftPatternCardHistoryItems.length > 2}
+                style={styles.literalOutcomeHistoryPanelBody}
+              >
+                {draftPatternCardHistoryItems.length ? (
+                  draftPatternCardHistoryItems.map((item) => (
+                    <View key={item.id} style={styles.literalOutcomeHistoryRow}>
+                      <View style={styles.literalOutcomeHistoryRowHeader}>
+                        <Text style={styles.literalPatternCandidateStatus}>
+                          {item.confidence || 'Draft'}
+                        </Text>
+                        {item.timestamp ? (
+                          <Text style={styles.literalOutcomeHistoryTime}>
+                            {formatOutcomeHistoryTimestamp(item.timestamp)}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Candidate</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {item.candidate || item.mightRemember || 'No candidate captured.'}
+                      </Text>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {item.evidence ||
+                          item.shouldMatter ||
+                          item.shouldNotMatter ||
+                          'No evidence captured.'}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.literalOutcomeHistoryEmpty}>No draft pattern cards yet.</Text>
                 )}
               </ScrollView>
             </View>

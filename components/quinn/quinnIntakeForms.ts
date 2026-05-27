@@ -107,6 +107,15 @@ export type QuinnPatternCandidatePreview = {
   evidenceLine: string;
 };
 
+export type QuinnDraftPatternCardHistoryPreview = {
+  candidate: string;
+  evidence: string;
+  confidence: string;
+  shouldMatter: string;
+  shouldNotMatter: string;
+  mightRemember: string;
+};
+
 export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
 
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
@@ -332,6 +341,33 @@ export function buildQuinnDraftPatternCardPacket(candidate: QuinnDraftPatternCar
     'Turn this into a draft pattern card only. Use the DRAFT OUTPUT SHAPE. Name the possible pattern, the evidence, the risk of overgeneralizing, and what Quinn should decide before storing it. Do not treat this as permanent memory yet. Return visible text even if the evidence is thin.',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
+}
+
+export function getQuinnDraftPatternCardHistoryPreview(
+  packetText: string
+): QuinnDraftPatternCardHistoryPreview | null {
+  const text = String(packetText || '');
+
+  if (!text.includes(QUINN_DRAFT_PATTERN_CARD_MARKER)) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+
+  return {
+    candidate: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'CANDIDATE:')),
+    evidence: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'EVIDENCE:')),
+    confidence: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'CONFIDENCE:')),
+    shouldMatter: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'WHEN THIS PATTERN SHOULD MATTER:')
+    ),
+    shouldNotMatter: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'WHEN THIS PATTERN SHOULD NOT MATTER:')
+    ),
+    mightRemember: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'WHAT QUINNOS MIGHT REMEMBER:')
+    ),
+  };
 }
 
 export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [
