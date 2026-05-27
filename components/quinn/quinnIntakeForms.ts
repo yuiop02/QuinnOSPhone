@@ -116,6 +116,13 @@ export type QuinnDraftPatternCardHistoryPreview = {
   mightRemember: string;
 };
 
+export type QuinnDraftPatternCardResultPreview = {
+  possiblePattern: string;
+  evidence: string;
+  overgeneralizationRisk: string;
+  beforeStoringDecision: string;
+};
+
 export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
 
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
@@ -141,7 +148,7 @@ const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
 
 function isQuinnPacketSectionHeading(line: string) {
   const clean = line.trim();
-  return Boolean(clean && clean === clean.toUpperCase() && /^[A-Z0-9 /?'-]+:?$/.test(clean));
+  return Boolean(clean && clean === clean.toUpperCase() && /^[A-Z0-9 /?,'-]+:?$/.test(clean));
 }
 
 function getQuinnPacketSectionValue(lines: string[], heading: string) {
@@ -368,6 +375,41 @@ export function getQuinnDraftPatternCardHistoryPreview(
       getQuinnPacketSectionValue(lines, 'WHAT QUINNOS MIGHT REMEMBER:')
     ),
   };
+}
+
+export function getQuinnDraftPatternCardResultPreview(
+  responseText: string
+): QuinnDraftPatternCardResultPreview | null {
+  const text = String(responseText || '').trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const preview = {
+    possiblePattern: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'POSSIBLE PATTERN:')
+    ),
+    evidence: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'EVIDENCE:')),
+    overgeneralizationRisk: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'OVERGENERALIZATION RISK:')
+    ),
+    beforeStoringDecision: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'BEFORE STORING, QUINN SHOULD DECIDE:')
+    ),
+  };
+
+  if (
+    !preview.possiblePattern &&
+    !preview.evidence &&
+    !preview.overgeneralizationRisk &&
+    !preview.beforeStoringDecision
+  ) {
+    return null;
+  }
+
+  return preview;
 }
 
 export const QUINNOS_INTAKE_FORMS: QuinnIntakeFormDefinition[] = [

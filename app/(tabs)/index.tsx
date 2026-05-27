@@ -107,11 +107,13 @@ import {
   buildQuinnIntakeFormPacket,
   buildQuinnOutcomeLogPacketFromRun,
   getQuinnDraftPatternCardHistoryPreview,
+  getQuinnDraftPatternCardResultPreview,
   getQuinnIntakeFormKindFromPacketText,
   getQuinnOutcomeLogHistoryPreview,
   getQuinnOutcomeLogMinimumCaptureStatus,
   getQuinnPatternCandidatePreview,
   type QuinnDraftPatternCardHistoryPreview,
+  type QuinnDraftPatternCardResultPreview,
   type QuinnIntakeFormDefinition,
   type QuinnOutcomeLogHistoryPreview,
   type QuinnPatternCandidatePreview,
@@ -160,6 +162,7 @@ type QuinnDraftPatternCardHistoryItem = QuinnDraftPatternCardHistoryPreview & {
   id: string;
   timestamp: string;
   packetText: string;
+  resultPreview: QuinnDraftPatternCardResultPreview | null;
 };
 
 type NumberedOption = {
@@ -1531,12 +1534,16 @@ function QuinnConversationSurface({
     for (const run of recentRuns) {
       const originalPacketText = String(run.packetText || '');
       const preview = getQuinnDraftPatternCardHistoryPreview(originalPacketText);
+      const resultPreview = getQuinnDraftPatternCardResultPreview(
+        sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+      );
 
       if (preview) {
         items.push({
           id: String(run.id || run.timestamp || items.length),
           timestamp: String(run.timestamp || ''),
           packetText: originalPacketText,
+          resultPreview,
           ...preview,
         });
       }
@@ -2919,13 +2926,23 @@ function QuinnConversationSurface({
                           </Text>
                         ) : null}
                       </View>
-                      <Text style={styles.literalOutcomeHistoryLabel}>Candidate</Text>
-                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                        {item.candidate || item.mightRemember || 'No candidate captured.'}
+                      <Text style={styles.literalOutcomeHistoryLabel}>
+                        {item.resultPreview ? 'Possible pattern' : 'Candidate'}
                       </Text>
-                      <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
                       <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                        {item.evidence ||
+                        {item.resultPreview?.possiblePattern ||
+                          item.candidate ||
+                          item.mightRemember ||
+                          'No candidate captured.'}
+                      </Text>
+                      <Text style={styles.literalOutcomeHistoryLabel}>
+                        {item.resultPreview ? 'Risk' : 'Evidence'}
+                      </Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {item.resultPreview?.overgeneralizationRisk ||
+                          item.resultPreview?.beforeStoringDecision ||
+                          item.resultPreview?.evidence ||
+                          item.evidence ||
                           item.shouldMatter ||
                           item.shouldNotMatter ||
                           'No evidence captured.'}
