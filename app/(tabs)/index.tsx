@@ -174,6 +174,8 @@ const LONG_FORM_LITERAL_COMPOSER_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.45);
 const LONG_FORM_LITERAL_COMPOSER_MIN_HEIGHT = Math.round(
   Math.min(LONG_FORM_LITERAL_COMPOSER_MAX_HEIGHT, Math.max(240, WINDOW_HEIGHT * 0.34))
 );
+const LITERAL_PANEL_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.34);
+const LITERAL_PANEL_BODY_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.27);
 const QUINN_LENSES = getQuinnLenses();
 const SNAPSHOT_PERSIST_DEBOUNCE_MS = 250;
 const AMBIENT_STARS = [
@@ -2305,6 +2307,32 @@ function QuinnConversationSurface({
     setLiteralComposerContentHeight(38);
   }
 
+  function closeLiteralPanelsForDraftLoad() {
+    setShowOutcomeHistory(false);
+    setShowPatternCandidates(false);
+    setShowLiteralTools(false);
+  }
+
+  function collapseLongFormComposerForPanelAccess() {
+    if (isLongFormComposerDraft) {
+      setLongFormComposerCollapsed(true);
+    }
+  }
+
+  function handleToggleOutcomeHistory() {
+    collapseLongFormComposerForPanelAccess();
+    setShowLiteralTools(false);
+    setShowPatternCandidates(false);
+    setShowOutcomeHistory((prev) => !prev);
+  }
+
+  function handleTogglePatternCandidates() {
+    collapseLongFormComposerForPanelAccess();
+    setShowLiteralTools(false);
+    setShowOutcomeHistory(false);
+    setShowPatternCandidates((prev) => !prev);
+  }
+
   function handleStartFreshLiteralArc() {
     resetLiteralComposerExpansion();
     onStartFreshArc();
@@ -2319,7 +2347,7 @@ function QuinnConversationSurface({
   function loadLiteralIntakeForm(form: QuinnIntakeFormDefinition) {
     setLongFormComposerCollapsed(false);
     onChangePacketText(buildQuinnIntakeFormPacket(form));
-    setShowLiteralTools(false);
+    closeLiteralPanelsForDraftLoad();
     focusLiteralComposerSoon();
   }
 
@@ -2330,15 +2358,14 @@ function QuinnConversationSurface({
 
     setLongFormComposerCollapsed(false);
     onChangePacketText(buildQuinnOutcomeLogPacketFromRun(latestVisibleOutcomeSource));
-    setShowLiteralTools(false);
+    closeLiteralPanelsForDraftLoad();
     focusLiteralComposerSoon();
   }
 
   function loadDraftPatternCardFromCandidate(candidate: QuinnPatternCandidateItem) {
     setLongFormComposerCollapsed(false);
     onChangePacketText(buildQuinnDraftPatternCardPacket(candidate));
-    setShowPatternCandidates(false);
-    setShowLiteralTools(false);
+    closeLiteralPanelsForDraftLoad();
     focusLiteralComposerSoon();
   }
 
@@ -2616,7 +2643,7 @@ function QuinnConversationSurface({
                       styles.literalToolChip,
                       showOutcomeHistory && styles.literalToolChipActive,
                     ]}
-                    onPress={() => setShowOutcomeHistory((prev) => !prev)}
+                    onPress={handleToggleOutcomeHistory}
                   >
                     <Feather name="list" size={14} color="rgba(245, 248, 255, 0.76)" />
                     <Text style={styles.literalToolChipText}>Outcomes</Text>
@@ -2627,7 +2654,7 @@ function QuinnConversationSurface({
                       styles.literalToolChip,
                       showPatternCandidates && styles.literalToolChipActive,
                     ]}
-                    onPress={() => setShowPatternCandidates((prev) => !prev)}
+                    onPress={handleTogglePatternCandidates}
                   >
                     <Feather name="trending-up" size={14} color="rgba(245, 248, 255, 0.76)" />
                     <Text style={styles.literalToolChipText}>Patterns</Text>
@@ -2673,37 +2700,53 @@ function QuinnConversationSurface({
             <View style={styles.literalOutcomeHistoryPanel}>
               <View style={styles.literalOutcomeHistoryHeader}>
                 <Text style={styles.literalOutcomeHistoryTitle}>Outcome history</Text>
-                <Text style={styles.literalOutcomeHistoryCount}>
-                  {outcomeHistoryItems.length ? `${outcomeHistoryItems.length} recent` : 'Local'}
-                </Text>
+                <View style={styles.literalOutcomeHistoryHeaderActions}>
+                  <Text style={styles.literalOutcomeHistoryCount}>
+                    {outcomeHistoryItems.length ? `${outcomeHistoryItems.length} recent` : 'Local'}
+                  </Text>
+                  <Pressable
+                    style={styles.literalOutcomeHistoryCloseButton}
+                    onPress={() => setShowOutcomeHistory(false)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Feather name="x" size={13} color="rgba(245, 248, 255, 0.62)" />
+                    <Text style={styles.literalOutcomeHistoryCloseText}>Close</Text>
+                  </Pressable>
+                </View>
               </View>
 
-              {outcomeHistoryItems.length ? (
-                outcomeHistoryItems.map((item) => (
-                  <View key={item.id} style={styles.literalOutcomeHistoryRow}>
-                    <View style={styles.literalOutcomeHistoryRowHeader}>
-                      <Text style={styles.literalOutcomeHistoryHelp}>
-                        {item.didItHelp || 'Unknown'}
-                      </Text>
-                      {item.timestamp ? (
-                        <Text style={styles.literalOutcomeHistoryTime}>
-                          {formatOutcomeHistoryTimestamp(item.timestamp)}
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={outcomeHistoryItems.length > 2}
+                style={styles.literalOutcomeHistoryPanelBody}
+              >
+                {outcomeHistoryItems.length ? (
+                  outcomeHistoryItems.map((item) => (
+                    <View key={item.id} style={styles.literalOutcomeHistoryRow}>
+                      <View style={styles.literalOutcomeHistoryRowHeader}>
+                        <Text style={styles.literalOutcomeHistoryHelp}>
+                          {item.didItHelp || 'Unknown'}
                         </Text>
-                      ) : null}
+                        {item.timestamp ? (
+                          <Text style={styles.literalOutcomeHistoryTime}>
+                            {formatOutcomeHistoryTimestamp(item.timestamp)}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Did</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {item.actuallyDid || 'No action captured.'}
+                      </Text>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Caused</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {item.itCaused || 'No effect captured.'}
+                      </Text>
                     </View>
-                    <Text style={styles.literalOutcomeHistoryLabel}>Did</Text>
-                    <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                      {item.actuallyDid || 'No action captured.'}
-                    </Text>
-                    <Text style={styles.literalOutcomeHistoryLabel}>Caused</Text>
-                    <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                      {item.itCaused || 'No effect captured.'}
-                    </Text>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.literalOutcomeHistoryEmpty}>No logged outcomes yet.</Text>
-              )}
+                  ))
+                ) : (
+                  <Text style={styles.literalOutcomeHistoryEmpty}>No logged outcomes yet.</Text>
+                )}
+              </ScrollView>
             </View>
           ) : null}
 
@@ -2711,46 +2754,85 @@ function QuinnConversationSurface({
             <View style={styles.literalOutcomeHistoryPanel}>
               <View style={styles.literalOutcomeHistoryHeader}>
                 <Text style={styles.literalOutcomeHistoryTitle}>Pattern candidates</Text>
-                <Text style={styles.literalOutcomeHistoryCount}>
-                  {patternCandidateItems.length ? `${patternCandidateItems.length} local` : 'Local'}
-                </Text>
+                <View style={styles.literalOutcomeHistoryHeaderActions}>
+                  <Text style={styles.literalOutcomeHistoryCount}>
+                    {patternCandidateItems.length ? `${patternCandidateItems.length} local` : 'Local'}
+                  </Text>
+                  <Pressable
+                    style={styles.literalOutcomeHistoryCloseButton}
+                    onPress={() => setShowPatternCandidates(false)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Feather name="x" size={13} color="rgba(245, 248, 255, 0.62)" />
+                    <Text style={styles.literalOutcomeHistoryCloseText}>Close</Text>
+                  </Pressable>
+                </View>
               </View>
 
-              {patternCandidateItems.length ? (
-                patternCandidateItems.map((item) => (
-                  <View key={item.id} style={styles.literalOutcomeHistoryRow}>
-                    <View style={styles.literalOutcomeHistoryRowHeader}>
-                      <Text style={styles.literalPatternCandidateStatus}>
-                        {item.didItHelp || 'Unknown'}
-                      </Text>
-                      {item.timestamp ? (
-                        <Text style={styles.literalOutcomeHistoryTime}>
-                          {formatOutcomeHistoryTimestamp(item.timestamp)}
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={patternCandidateItems.length > 2}
+                style={styles.literalOutcomeHistoryPanelBody}
+              >
+                {patternCandidateItems.length ? (
+                  patternCandidateItems.map((item) => (
+                    <View key={item.id} style={styles.literalOutcomeHistoryRow}>
+                      <View style={styles.literalOutcomeHistoryRowHeader}>
+                        <Text style={styles.literalPatternCandidateStatus}>
+                          {item.didItHelp || 'Unknown'}
                         </Text>
-                      ) : null}
+                        {item.timestamp ? (
+                          <Text style={styles.literalOutcomeHistoryTime}>
+                            {formatOutcomeHistoryTimestamp(item.timestamp)}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Candidate</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {item.candidateLine || 'No candidate line captured.'}
+                      </Text>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {item.evidenceLine || 'No evidence captured.'}
+                      </Text>
+                      <View style={styles.literalPatternCandidateActionRow}>
+                        <Pressable
+                          style={styles.literalPatternCandidateAction}
+                          onPress={() => loadDraftPatternCardFromCandidate(item)}
+                        >
+                          <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
+                          <Text style={styles.literalPatternCandidateActionText}>Draft card</Text>
+                        </Pressable>
+                      </View>
                     </View>
-                    <Text style={styles.literalOutcomeHistoryLabel}>Candidate</Text>
-                    <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                      {item.candidateLine || 'No candidate line captured.'}
-                    </Text>
-                    <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
-                    <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                      {item.evidenceLine || 'No evidence captured.'}
-                    </Text>
-                    <View style={styles.literalPatternCandidateActionRow}>
-                      <Pressable
-                        style={styles.literalPatternCandidateAction}
-                        onPress={() => loadDraftPatternCardFromCandidate(item)}
-                      >
-                        <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
-                        <Text style={styles.literalPatternCandidateActionText}>Draft card</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.literalOutcomeHistoryEmpty}>No pattern candidates yet.</Text>
-              )}
+                  ))
+                ) : (
+                  <Text style={styles.literalOutcomeHistoryEmpty}>No pattern candidates yet.</Text>
+                )}
+              </ScrollView>
+            </View>
+          ) : null}
+
+          {isLongFormComposerDraft ? (
+            <View style={styles.literalLongFormControlRow}>
+              <View style={styles.literalLongFormLabelWrap}>
+                <Feather name="file-text" size={12} color="rgba(245, 248, 255, 0.52)" />
+                <Text style={styles.literalLongFormLabel}>Long form</Text>
+              </View>
+              <Pressable
+                style={styles.literalLongFormToggle}
+                onPress={() => setLongFormComposerCollapsed((previous) => !previous)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather
+                  name={longFormComposerCollapsed ? 'maximize-2' : 'minimize-2'}
+                  size={12}
+                  color="rgba(245, 248, 255, 0.72)"
+                />
+                <Text style={styles.literalLongFormToggleText}>
+                  {longFormComposerCollapsed ? 'Expand' : 'Collapse'}
+                </Text>
+              </Pressable>
             </View>
           ) : null}
 
@@ -2762,7 +2844,10 @@ function QuinnConversationSurface({
           >
             <Pressable
               style={[styles.literalComposerToolButton, showLiteralTools && styles.literalComposerToolButtonActive]}
-              onPress={() => setShowLiteralTools((prev) => !prev)}
+              onPress={() => {
+                collapseLongFormComposerForPanelAccess();
+                setShowLiteralTools((prev) => !prev);
+              }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 8 }}
             >
               <Feather
@@ -7196,6 +7281,7 @@ responseReplayButton: {
     paddingHorizontal: 10,
     paddingVertical: 9,
     marginBottom: 8,
+    maxHeight: LITERAL_PANEL_MAX_HEIGHT,
   },
 
   literalOutcomeHistoryHeader: {
@@ -7218,6 +7304,34 @@ responseReplayButton: {
     lineHeight: 14,
     fontWeight: '700',
     textTransform: 'uppercase',
+  },
+
+  literalOutcomeHistoryHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+
+  literalOutcomeHistoryCloseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    marginLeft: 6,
+  },
+
+  literalOutcomeHistoryCloseText: {
+    color: 'rgba(245, 248, 255, 0.62)',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '700',
+    marginLeft: 3,
+  },
+
+  literalOutcomeHistoryPanelBody: {
+    maxHeight: LITERAL_PANEL_BODY_MAX_HEIGHT,
   },
 
   literalOutcomeHistoryRow: {
@@ -7303,6 +7417,50 @@ responseReplayButton: {
     lineHeight: 16,
     fontWeight: '600',
     marginTop: 5,
+  },
+
+  literalLongFormControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingLeft: 9,
+    paddingRight: 5,
+    marginBottom: 6,
+  },
+
+  literalLongFormLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  literalLongFormLabel: {
+    color: 'rgba(245, 248, 255, 0.54)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginLeft: 5,
+  },
+
+  literalLongFormToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+  },
+
+  literalLongFormToggleText: {
+    color: 'rgba(245, 248, 255, 0.72)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginLeft: 5,
   },
 
   literalComposerBox: {
