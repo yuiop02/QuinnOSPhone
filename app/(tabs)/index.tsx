@@ -167,6 +167,12 @@ type VisibleReplySource = {
 
 const FADE_WALL_HEIGHT = 324;
 const WINDOW_WIDTH = Dimensions.get('window').width;
+const WINDOW_HEIGHT = Dimensions.get('window').height;
+const COMPACT_LITERAL_COMPOSER_MAX_HEIGHT = 124;
+const LONG_FORM_LITERAL_COMPOSER_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.45);
+const LONG_FORM_LITERAL_COMPOSER_MIN_HEIGHT = Math.round(
+  Math.min(LONG_FORM_LITERAL_COMPOSER_MAX_HEIGHT, Math.max(240, WINDOW_HEIGHT * 0.34))
+);
 const QUINN_LENSES = getQuinnLenses();
 const SNAPSHOT_PERSIST_DEBOUNCE_MS = 250;
 const AMBIENT_STARS = [
@@ -2242,7 +2248,29 @@ function QuinnConversationSurface({
   const [showLiteralTools, setShowLiteralTools] = useState(false);
   const [showOutcomeHistory, setShowOutcomeHistory] = useState(false);
   const [showPatternCandidates, setShowPatternCandidates] = useState(false);
+  const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
+  const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
+  const literalComposerLineCount = packetText ? packetText.split(/\r?\n/).length : 0;
+  const isLongFormComposerDraft = Boolean(packetText.trim()) && (
+    packetText.includes('QUINNOS ') ||
+    literalComposerLineCount >= 8 ||
+    packetText.length > 480
+  );
+  const shouldUseLongFormComposer = isLongFormComposerDraft && !longFormComposerCollapsed;
+  const maxLongFormComposerHeight = LONG_FORM_LITERAL_COMPOSER_MAX_HEIGHT;
+  const literalComposerInputHeight = shouldUseLongFormComposer
+    ? Math.min(
+        Math.max(literalComposerContentHeight, LONG_FORM_LITERAL_COMPOSER_MIN_HEIGHT),
+        maxLongFormComposerHeight
+      )
+    : Math.min(
+        Math.max(literalComposerContentHeight, 38),
+        COMPACT_LITERAL_COMPOSER_MAX_HEIGHT
+      );
+  const literalComposerInputScrollable = shouldUseLongFormComposer
+    ? literalComposerContentHeight > maxLongFormComposerHeight
+    : literalComposerContentHeight > COMPACT_LITERAL_COMPOSER_MAX_HEIGHT;
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
@@ -2258,6 +2286,29 @@ function QuinnConversationSurface({
       hideSubscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (!packetText.trim()) {
+      setLongFormComposerCollapsed(false);
+      setLiteralComposerContentHeight(38);
+      return;
+    }
+
+    if (!isLongFormComposerDraft) {
+      setLongFormComposerCollapsed(false);
+    }
+  }, [isLongFormComposerDraft, packetText]);
+
+  function resetLiteralComposerExpansion() {
+    setLongFormComposerCollapsed(false);
+    setLiteralComposerContentHeight(38);
+  }
+
+  function handleStartFreshLiteralArc() {
+    resetLiteralComposerExpansion();
+    onStartFreshArc();
+  }
+
   function focusLiteralComposerSoon(delay = 80) {
     setTimeout(() => {
       literalComposerInputRef.current?.focus();
@@ -2265,6 +2316,7 @@ function QuinnConversationSurface({
   }
 
   function loadLiteralIntakeForm(form: QuinnIntakeFormDefinition) {
+    setLongFormComposerCollapsed(false);
     onChangePacketText(buildQuinnIntakeFormPacket(form));
     setShowLiteralTools(false);
     focusLiteralComposerSoon();
@@ -2275,6 +2327,7 @@ function QuinnConversationSurface({
       return;
     }
 
+    setLongFormComposerCollapsed(false);
     onChangePacketText(buildQuinnOutcomeLogPacketFromRun(latestVisibleOutcomeSource));
     setShowLiteralTools(false);
     focusLiteralComposerSoon();
@@ -2303,7 +2356,7 @@ function QuinnConversationSurface({
             </View>
           </Pressable>
 
-          <Pressable style={styles.literalChatNewButton} onPress={onStartFreshArc}>
+          <Pressable style={styles.literalChatNewButton} onPress={handleStartFreshLiteralArc}>
             <Feather name="edit-3" size={16} color="rgba(245, 248, 255, 0.82)" />
           </Pressable>
         </View>
@@ -2315,6 +2368,7 @@ function QuinnConversationSurface({
           contentContainerStyle={[
             styles.literalChatScrollContent,
             literalKeyboardHeight > 0 && styles.literalChatScrollContentKeyboardOpen,
+            shouldUseLongFormComposer && styles.literalChatScrollContentLongForm,
           ]}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
@@ -2465,6 +2519,7 @@ function QuinnConversationSurface({
           style={[
             styles.literalComposerDock,
             literalKeyboardHeight > 0 && styles.literalComposerDockKeyboardOpen,
+            shouldUseLongFormComposer && styles.literalComposerDockLongForm,
             literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight + 56, 236) },
           ]}
         >
@@ -2538,10 +2593,10 @@ function QuinnConversationSurface({
 
                   <Pressable
                     style={styles.literalToolChip}
-                    onPress={() => {
-                      setShowLiteralTools(false);
-                      onStartFreshArc();
-                    }}
+                      onPress={() => {
+                        setShowLiteralTools(false);
+                        handleStartFreshLiteralArc();
+                      }}
                   >
                     <Feather name="edit-3" size={14} color="rgba(245, 248, 255, 0.76)" />
                     <Text style={styles.literalToolChipText}>New chat</Text>
@@ -2588,6 +2643,7 @@ function QuinnConversationSurface({
                     ]}
                     disabled={!packetText.trim()}
                     onPress={() => {
+                      resetLiteralComposerExpansion();
                       onChangePacketText('');
                       setShowLiteralTools(false);
 
@@ -2680,7 +2736,12 @@ function QuinnConversationSurface({
             </View>
           ) : null}
 
-          <View style={styles.literalComposerBox}>
+          <View
+            style={[
+              styles.literalComposerBox,
+              shouldUseLongFormComposer && styles.literalComposerBoxLongForm,
+            ]}
+          >
             <Pressable
               style={[styles.literalComposerToolButton, showLiteralTools && styles.literalComposerToolButtonActive]}
               onPress={() => setShowLiteralTools((prev) => !prev)}
@@ -2700,17 +2761,56 @@ function QuinnConversationSurface({
               onChangeText={onChangePacketText}
               onFocus={() => setInputFocused(true)}
               onBlur={() => setInputFocused(false)}
+              onContentSizeChange={(event) => {
+                const nextHeight = Math.ceil(event.nativeEvent.contentSize.height);
+                if (!Number.isFinite(nextHeight)) {
+                  return;
+                }
+                setLiteralComposerContentHeight((currentHeight) =>
+                  Math.abs(currentHeight - nextHeight) > 1 ? nextHeight : currentHeight
+                );
+              }}
               placeholder="Message Quinn..."
               placeholderTextColor="rgba(245, 245, 247, 0.42)"
-              style={styles.literalComposerInput}
+              scrollEnabled={literalComposerInputScrollable}
+              style={[
+                styles.literalComposerInput,
+                shouldUseLongFormComposer && styles.literalComposerInputLongForm,
+                {
+                  height: literalComposerInputHeight,
+                  maxHeight: shouldUseLongFormComposer
+                    ? maxLongFormComposerHeight
+                    : COMPACT_LITERAL_COMPOSER_MAX_HEIGHT,
+                },
+              ]}
               textAlignVertical="top"
             />
 
             <View style={styles.literalComposerButtons}>
+              {isLongFormComposerDraft ? (
+                <Pressable
+                  style={[
+                    styles.literalComposerGhostButton,
+                    shouldUseLongFormComposer && styles.literalComposerGhostButtonActive,
+                  ]}
+                  onPress={() => setLongFormComposerCollapsed((previous) => !previous)}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                >
+                  <Feather
+                    name={shouldUseLongFormComposer ? 'minimize-2' : 'maximize-2'}
+                    size={15}
+                    color="rgba(250, 250, 252, 0.68)"
+                  />
+                </Pressable>
+              ) : null}
+
               {packetText.trim() ? (
                 <Pressable
                   style={styles.literalComposerGhostButton}
-                  onPress={() => onChangePacketText('')}
+                  onPress={() => {
+                    resetLiteralComposerExpansion();
+                    onChangePacketText('');
+                  }}
                   hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
                 >
                   <Feather name="x" size={15} color="rgba(250, 250, 252, 0.66)" />
@@ -6753,6 +6853,10 @@ responseReplayButton: {
     paddingBottom: 300,
   },
 
+  literalChatScrollContentLongForm: {
+    paddingBottom: 500,
+  },
+
   literalChatEmptyState: {
     minHeight: 300,
     alignItems: 'center',
@@ -6937,6 +7041,10 @@ responseReplayButton: {
 
   literalComposerDockKeyboardOpen: {
     backgroundColor: 'rgba(7, 7, 10, 0.88)',
+  },
+
+  literalComposerDockLongForm: {
+    backgroundColor: 'rgba(7, 7, 10, 0.92)',
   },
 
   literalLensRow: {
@@ -7172,6 +7280,12 @@ responseReplayButton: {
     elevation: 7,
   },
 
+  literalComposerBoxLongForm: {
+    borderRadius: 24,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(25, 25, 30, 0.98)',
+  },
+
   literalComposerToolButtonActive: {
     borderColor: 'rgba(255, 255, 255, 0.18)',
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
@@ -7180,7 +7294,7 @@ responseReplayButton: {
   literalComposerInput: {
     flex: 1,
     minHeight: 38,
-    maxHeight: 124,
+    maxHeight: COMPACT_LITERAL_COMPOSER_MAX_HEIGHT,
     color: 'rgba(250, 250, 252, 0.94)',
     fontSize: 16,
     lineHeight: 22,
@@ -7189,6 +7303,14 @@ responseReplayButton: {
     paddingTop: 8,
     paddingBottom: 7,
     paddingHorizontal: 0,
+  },
+
+  literalComposerInputLongForm: {
+    fontSize: 15,
+    lineHeight: 21,
+    letterSpacing: 0,
+    paddingTop: 10,
+    paddingBottom: 9,
   },
 
   literalComposerButtons: {
@@ -7216,6 +7338,10 @@ responseReplayButton: {
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
+  },
+
+  literalComposerGhostButtonActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
   },
 
   literalComposerIconButton: {
