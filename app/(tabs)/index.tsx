@@ -159,6 +159,7 @@ type QuinnPatternCandidateItem = QuinnPatternCandidatePreview & {
 type QuinnDraftPatternCardHistoryItem = QuinnDraftPatternCardHistoryPreview & {
   id: string;
   timestamp: string;
+  packetText: string;
 };
 
 type NumberedOption = {
@@ -1528,12 +1529,14 @@ function QuinnConversationSurface({
     const items: QuinnDraftPatternCardHistoryItem[] = [];
 
     for (const run of recentRuns) {
-      const preview = getQuinnDraftPatternCardHistoryPreview(run.packetText || '');
+      const originalPacketText = String(run.packetText || '');
+      const preview = getQuinnDraftPatternCardHistoryPreview(originalPacketText);
 
       if (preview) {
         items.push({
           id: String(run.id || run.timestamp || items.length),
           timestamp: String(run.timestamp || ''),
+          packetText: originalPacketText,
           ...preview,
         });
       }
@@ -2409,6 +2412,19 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function reopenDraftPatternCardFromHistory(item: QuinnDraftPatternCardHistoryItem) {
+    const originalPacketText = String(item.packetText || '');
+
+    if (!originalPacketText.trim()) {
+      return;
+    }
+
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(originalPacketText);
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
   const useLiteralChatShellPreview = true;
 
   if (useLiteralChatShellPreview) {
@@ -2914,6 +2930,19 @@ function QuinnConversationSurface({
                           item.shouldNotMatter ||
                           'No evidence captured.'}
                       </Text>
+                      {item.packetText.trim() ? (
+                        <View style={styles.literalPatternCandidateActionRow}>
+                          <Pressable
+                            style={styles.literalPatternCandidateAction}
+                            onPress={() => reopenDraftPatternCardFromHistory(item)}
+                          >
+                            <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
+                            <Text style={styles.literalPatternCandidateActionText}>
+                              Reopen draft
+                            </Text>
+                          </Pressable>
+                        </View>
+                      ) : null}
                     </View>
                   ))
                 ) : (
