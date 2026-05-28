@@ -123,6 +123,20 @@ export type QuinnDraftPatternCardResultPreview = {
   beforeStoringDecision: string;
 };
 
+export type QuinnPatternCardSaveIntentPacketPreview = {
+  possiblePattern: string;
+  evidence: string;
+  sourceRunId: string;
+};
+
+export type QuinnPatternCardSaveIntentResultPreview = {
+  saveReadiness: string;
+  shouldPreserveLater: string;
+  clarifyBeforeStorage: string;
+  storageRisk: string;
+  nextBestMove: string;
+};
+
 export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
 
 export type QuinnSessionPatternCardDraftSource = {
@@ -178,6 +192,17 @@ function getQuinnPacketSectionValue(lines: string[], heading: string) {
     .slice(headingIndex + 1, nextHeadingIndex < 0 ? undefined : nextHeadingIndex)
     .join('\n')
     .trim();
+}
+
+function getQuinnPacketLabeledLineValue(lines: string[], label: string) {
+  const cleanLabel = label.trim().toLowerCase();
+  const line = lines.find((item) => item.trim().toLowerCase().startsWith(cleanLabel));
+
+  if (!line) {
+    return '';
+  }
+
+  return line.trim().slice(label.length).trim();
 }
 
 function cleanQuinnOutcomeHistoryValue(value: string) {
@@ -467,10 +492,86 @@ export function buildQuinnPatternCardSaveIntentPacket(
     'VISIBLE OUTPUT REQUIREMENT:',
     'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
     '',
+    'SAVE INTENT OUTPUT SHAPE:',
+    'Return exactly these sections:',
+    'SAVE READINESS:',
+    'SHOULD PRESERVE LATER:',
+    'CLARIFY BEFORE STORAGE:',
+    'STORAGE RISK:',
+    'NEXT BEST MOVE:',
+    '',
     'OUTPUT I NEED FROM REN:',
-    'Evaluate this as a save-intent review only. Do not treat it as stored memory. Say whether this card seems specific enough, useful enough, and safe enough to preserve later. Name what should be clarified before storage.',
+    'Use the SAVE INTENT OUTPUT SHAPE. Evaluate this as a save-intent review only. Do not treat it as stored memory. Say whether this card seems specific enough, useful enough, and safe enough to preserve later. Name what should be clarified before storage. Return visible text.',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
+}
+
+export function getQuinnPatternCardSaveIntentPacketPreview(
+  packetText: string
+): QuinnPatternCardSaveIntentPacketPreview | null {
+  const text = String(packetText || '');
+
+  if (!text.includes(QUINN_PATTERN_CARD_SAVE_INTENT_MARKER)) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const preview = {
+    possiblePattern: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'POSSIBLE PATTERN:')
+    ),
+    evidence: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'EVIDENCE:')),
+    sourceRunId: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketLabeledLineValue(lines, 'Source run:')
+    ),
+  };
+
+  if (!preview.possiblePattern && !preview.evidence && !preview.sourceRunId) {
+    return null;
+  }
+
+  return preview;
+}
+
+export function getQuinnPatternCardSaveIntentResultPreview(
+  responseText: string
+): QuinnPatternCardSaveIntentResultPreview | null {
+  const text = String(responseText || '').trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const preview = {
+    saveReadiness: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'SAVE READINESS:')
+    ),
+    shouldPreserveLater: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'SHOULD PRESERVE LATER:')
+    ),
+    clarifyBeforeStorage: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'CLARIFY BEFORE STORAGE:')
+    ),
+    storageRisk: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'STORAGE RISK:')
+    ),
+    nextBestMove: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'NEXT BEST MOVE:')
+    ),
+  };
+
+  if (
+    !preview.saveReadiness &&
+    !preview.shouldPreserveLater &&
+    !preview.clarifyBeforeStorage &&
+    !preview.storageRisk &&
+    !preview.nextBestMove
+  ) {
+    return null;
+  }
+
+  return preview;
 }
 
 export function getQuinnDraftPatternCardHistoryPreview(
