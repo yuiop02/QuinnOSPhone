@@ -61,6 +61,15 @@ function formatRunTimestamp(value: string | null | undefined) {
   return clean || '(none yet)';
 }
 
+type SessionPatternCardExportInput = {
+  createdAt: string;
+  possiblePattern: string;
+  evidence: string;
+  overgeneralizationRisk: string;
+  beforeStoringDecision: string;
+  sourceRunId: string;
+};
+
 function buildActiveThreadState({
   packetTitle,
   writtenResult,
@@ -113,6 +122,7 @@ export function buildExportBundle({
   currentSessionArc,
   lastRunAt,
   recentRuns,
+  sessionPatternCards = [],
   memories,
   notifications,
   settings,
@@ -127,6 +137,7 @@ export function buildExportBundle({
   currentSessionArc: SessionArc | null;
   lastRunAt: string | null;
   recentRuns: RunHistoryItem[];
+  sessionPatternCards?: SessionPatternCardExportInput[];
   memories: MemoryItem[];
   notifications: NotificationItem[];
   settings: QuinnSettings;
@@ -135,6 +146,14 @@ export function buildExportBundle({
 }): ExportBundle {
   const generatedAt = new Date().toISOString();
   const latestCompletedRun = recentRuns[0] || null;
+  const exportedSessionPatternCards = sessionPatternCards.map((card) => ({
+    createdAt: String(card.createdAt || '').trim(),
+    possiblePattern: String(card.possiblePattern || '').trim(),
+    evidence: String(card.evidence || '').trim(),
+    overgeneralizationRisk: String(card.overgeneralizationRisk || '').trim(),
+    beforeStoringDecision: String(card.beforeStoringDecision || '').trim(),
+    sourceRunId: String(card.sourceRunId || '').trim(),
+  }));
   const currentComposer = {
     title: packetTitle,
     text: packetText,
@@ -174,6 +193,7 @@ export function buildExportBundle({
     },
     currentComposer,
     activeThread,
+    sessionPatternCards: exportedSessionPatternCards,
     latestCompletedRun,
     settings,
     voiceSettings,
@@ -237,6 +257,22 @@ export function buildExportBundle({
           ]),
         ]
       : ['(none yet)']),
+    '',
+    '## Session Pattern Cards',
+    '',
+    ...(
+      exportedSessionPatternCards.length
+        ? exportedSessionPatternCards.flatMap((card, index) => [
+            `### ${index + 1}. ${formatOptionalText(card.possiblePattern, 'Untitled pattern card')}`,
+            `- Created: ${formatRunTimestamp(card.createdAt)}`,
+            `- Evidence: ${formatOptionalText(card.evidence)}`,
+            `- Overgeneralization risk: ${formatOptionalText(card.overgeneralizationRisk)}`,
+            `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
+            `- Source run: ${formatOptionalText(card.sourceRunId, '(none)')}`,
+            '',
+          ])
+        : ['(none yet)']
+    ),
     '',
     '## Latest Completed Run',
     '',
@@ -371,6 +407,19 @@ export function buildExportBundle({
             (beat) => `- ${beat.lensLabel}: ${beat.summary}`
           ),
         ]
+      : ['(none yet)']),
+    '',
+    'Session pattern cards:',
+    ...(exportedSessionPatternCards.length
+      ? exportedSessionPatternCards.flatMap((card, index) => [
+          `${index + 1}. ${formatOptionalText(card.possiblePattern, 'Untitled pattern card')}`,
+          `- Created: ${formatRunTimestamp(card.createdAt)}`,
+          `- Evidence: ${formatOptionalText(card.evidence)}`,
+          `- Overgeneralization risk: ${formatOptionalText(card.overgeneralizationRisk)}`,
+          `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
+          `- Source run: ${formatOptionalText(card.sourceRunId, '(none)')}`,
+          '',
+        ])
       : ['(none yet)']),
     '',
     'Latest completed run:',

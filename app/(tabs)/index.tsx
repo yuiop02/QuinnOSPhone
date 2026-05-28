@@ -1322,8 +1322,10 @@ type QuinnConversationSurfaceProps = {
   activeLensId: QuinnLensId;
   isStagingNextMove: boolean;
   runError: string;
+  sessionPatternCards: QuinnSessionPatternCard[];
   onTriggerWave: () => void;
   onChangePacketText: (value: string) => void;
+  onChangeSessionPatternCards: React.Dispatch<React.SetStateAction<QuinnSessionPatternCard[]>>;
   onSelectLens: (lensId: QuinnLensId) => void;
   onStageNextMove: () => Promise<void>;
   onStartFreshArc: () => void;
@@ -1353,8 +1355,10 @@ function QuinnConversationSurface({
   activeLensId,
   isStagingNextMove,
   runError,
+  sessionPatternCards,
   onTriggerWave,
   onChangePacketText,
+  onChangeSessionPatternCards,
   onSelectLens,
   onStageNextMove,
   onStartFreshArc,
@@ -2302,7 +2306,6 @@ function QuinnConversationSurface({
   const [showPatternCandidates, setShowPatternCandidates] = useState(false);
   const [showDraftPatternCards, setShowDraftPatternCards] = useState(false);
   const [showSessionPatternCards, setShowSessionPatternCards] = useState(false);
-  const [sessionPatternCards, setSessionPatternCards] = useState<QuinnSessionPatternCard[]>([]);
   const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
@@ -2470,7 +2473,7 @@ function QuinnConversationSurface({
     const overgeneralizationRisk = String(item.resultPreview.overgeneralizationRisk || '').trim();
     const beforeStoringDecision = String(item.resultPreview.beforeStoringDecision || '').trim();
 
-    setSessionPatternCards((currentCards) => {
+    onChangeSessionPatternCards((currentCards) => {
       const duplicateKey = `${possiblePattern.toLowerCase()}|${evidence.toLowerCase()}`;
       const alreadyExists = currentCards.some(
         (card) =>
@@ -2501,7 +2504,9 @@ function QuinnConversationSurface({
   }
 
   function removeSessionPatternCard(cardId: string) {
-    setSessionPatternCards((currentCards) => currentCards.filter((card) => card.id !== cardId));
+    onChangeSessionPatternCards((currentCards) =>
+      currentCards.filter((card) => card.id !== cardId)
+    );
   }
 
   const useLiteralChatShellPreview = true;
@@ -3919,6 +3924,7 @@ export default function App() {
   const [isStagingNextMove, setIsStagingNextMove] = useState(false);
   const [runError, setRunError] = useState('');
   const [recentRuns, setRecentRuns] = useState<RunHistoryItem[]>([]);
+  const [sessionPatternCards, setSessionPatternCards] = useState<QuinnSessionPatternCard[]>([]);
   const [memories, setMemories] = useState<MemoryItem[]>(INITIAL_MEMORIES);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState<QuinnSettings>(INITIAL_SETTINGS);
@@ -4109,6 +4115,7 @@ export default function App() {
         currentSessionArc,
         lastRunAt,
         recentRuns,
+        sessionPatternCards,
         memories,
         notifications,
         settings,
@@ -4124,6 +4131,7 @@ export default function App() {
       currentSessionArc,
       lastRunAt,
       recentRuns,
+      sessionPatternCards,
       memories,
       notifications,
       settings,
@@ -4658,8 +4666,10 @@ export default function App() {
         activeLensId={activeLensId}
         isStagingNextMove={isStagingNextMove}
         runError={runError}
+        sessionPatternCards={sessionPatternCards}
         onTriggerWave={triggerWave}
         onChangePacketText={setPacketText}
+        onChangeSessionPatternCards={setSessionPatternCards}
         onSelectLens={setActiveLensId}
         onStageNextMove={handleStageNextMove}
         onStartFreshArc={handleStartFreshArc}
