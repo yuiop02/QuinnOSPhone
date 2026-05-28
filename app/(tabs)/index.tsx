@@ -104,6 +104,7 @@ import { SURFACE_THEME } from '../../components/quinn/quinnSurfaceTheme';
 import {
   QUINNOS_INTAKE_FORMS,
   buildQuinnDraftPatternCardPacket,
+  buildQuinnDraftPatternCardPacketFromSessionCard,
   buildQuinnIntakeFormPacket,
   buildQuinnOutcomeLogPacketFromRun,
   getQuinnDraftPatternCardHistoryPreview,
@@ -2503,6 +2504,13 @@ function QuinnConversationSurface({
     setShowLiteralTools(false);
   }
 
+  function reopenSessionPatternCardAsDraft(card: QuinnSessionPatternCard) {
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(buildQuinnDraftPatternCardPacketFromSessionCard(card));
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
   function removeSessionPatternCard(cardId: string) {
     onChangeSessionPatternCards((currentCards) =>
       currentCards.filter((card) => card.id !== cardId)
@@ -3125,6 +3133,18 @@ function QuinnConversationSurface({
                           'No risk captured.'}
                       </Text>
                       <View style={styles.literalPatternCandidateActionRow}>
+                        <Pressable
+                          style={[
+                            styles.literalPatternCandidateAction,
+                            styles.literalPatternCandidateActionInline,
+                          ]}
+                          onPress={() => reopenSessionPatternCardAsDraft(card)}
+                        >
+                          <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
+                          <Text style={styles.literalPatternCandidateActionText}>
+                            Reopen as draft
+                          </Text>
+                        </Pressable>
                         <Pressable
                           style={styles.literalPatternCandidateAction}
                           onPress={() => removeSessionPatternCard(card.id)}

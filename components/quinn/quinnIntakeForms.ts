@@ -125,6 +125,15 @@ export type QuinnDraftPatternCardResultPreview = {
 
 export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
 
+export type QuinnSessionPatternCardDraftSource = {
+  possiblePattern: string;
+  evidence: string;
+  overgeneralizationRisk: string;
+  beforeStoringDecision: string;
+  createdAt?: string;
+  sourceRunId?: string;
+};
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 
@@ -346,6 +355,65 @@ export function buildQuinnDraftPatternCardPacket(candidate: QuinnDraftPatternCar
     '',
     'OUTPUT I NEED FROM REN:',
     'Turn this into a draft pattern card only. Use the DRAFT OUTPUT SHAPE. Name the possible pattern, the evidence, the risk of overgeneralizing, and what Quinn should decide before storing it. Do not treat this as permanent memory yet. Return visible text even if the evidence is thin.',
+    ...QUINNOS_RESPONSE_PROTOCOL,
+  ].join('\n');
+}
+
+export function buildQuinnDraftPatternCardPacketFromSessionCard(
+  card: QuinnSessionPatternCardDraftSource
+) {
+  return [
+    'QUINNOS DRAFT PATTERN CARD',
+    '',
+    'PURPOSE:',
+    'Revise this approved-for-now session Pattern Card without treating it as permanent memory yet.',
+    '',
+    'CANDIDATE:',
+    formatQuinnDraftPatternCardValue(card.possiblePattern, '[No possible pattern captured.]'),
+    '',
+    'EVIDENCE:',
+    formatQuinnDraftPatternCardValue(card.evidence, '[No evidence captured.]'),
+    '',
+    'SOURCE CARD:',
+    'Source run:',
+    formatQuinnDraftPatternCardValue(card.sourceRunId || '', '[No source run captured.]'),
+    '',
+    'Approved:',
+    formatQuinnDraftPatternCardValue(card.createdAt || '', '[No approval time captured.]'),
+    '',
+    'OVERGENERALIZATION RISK:',
+    formatQuinnDraftPatternCardValue(
+      card.overgeneralizationRisk,
+      '[No overgeneralization risk captured.]'
+    ),
+    '',
+    'BEFORE STORING, QUINN SHOULD DECIDE:',
+    formatQuinnDraftPatternCardValue(
+      card.beforeStoringDecision,
+      '[No before-storing decision captured.]'
+    ),
+    '',
+    'CONFIDENCE:',
+    '[draft / low / medium / high — Quinn chooses]',
+    '',
+    'WHEN THIS PATTERN SHOULD MATTER:',
+    '[When should Future Quinn use this?]',
+    '',
+    'WHEN THIS PATTERN SHOULD NOT MATTER:',
+    '[What would make this misleading, too broad, old-wound-driven, or not applicable?]',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response. If the evidence is thin, still return the compact draft shape below.',
+    '',
+    'DRAFT OUTPUT SHAPE:',
+    'Return exactly these sections:',
+    'POSSIBLE PATTERN:',
+    'EVIDENCE:',
+    'OVERGENERALIZATION RISK:',
+    'BEFORE STORING, QUINN SHOULD DECIDE:',
+    '',
+    'OUTPUT I NEED FROM REN:',
+    'Turn this into a revised draft pattern card only. Use the DRAFT OUTPUT SHAPE. Name the possible pattern, the evidence, the risk of overgeneralizing, and what Quinn should decide before storing it. Do not treat this as permanent memory yet. Return visible text even if the evidence is thin.',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
