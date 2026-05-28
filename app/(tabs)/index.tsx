@@ -2322,6 +2322,9 @@ function QuinnConversationSurface({
   const [showPatternCandidates, setShowPatternCandidates] = useState(false);
   const [showDraftPatternCards, setShowDraftPatternCards] = useState(false);
   const [showSessionPatternCards, setShowSessionPatternCards] = useState(false);
+  const [selectedSessionPatternCardId, setSelectedSessionPatternCardId] = useState<string | null>(
+    null
+  );
   const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
@@ -2380,6 +2383,15 @@ function QuinnConversationSurface({
     }
   }, [isSessionPatternCardImportDraft, sessionPatternCardImportMessage]);
 
+  useEffect(() => {
+    if (
+      selectedSessionPatternCardId &&
+      !sessionPatternCards.some((card) => card.id === selectedSessionPatternCardId)
+    ) {
+      setSelectedSessionPatternCardId(null);
+    }
+  }, [selectedSessionPatternCardId, sessionPatternCards]);
+
   function resetLiteralComposerExpansion() {
     setLongFormComposerCollapsed(false);
     setLiteralComposerContentHeight(38);
@@ -2391,6 +2403,7 @@ function QuinnConversationSurface({
     setShowDraftPatternCards(false);
     setShowSessionPatternCards(false);
     setShowLiteralTools(false);
+    setSelectedSessionPatternCardId(null);
   }
 
   function collapseLongFormComposerForPanelAccess() {
@@ -2405,6 +2418,7 @@ function QuinnConversationSurface({
     setShowPatternCandidates(false);
     setShowDraftPatternCards(false);
     setShowSessionPatternCards(false);
+    setSelectedSessionPatternCardId(null);
     setShowOutcomeHistory((prev) => !prev);
   }
 
@@ -2414,6 +2428,7 @@ function QuinnConversationSurface({
     setShowOutcomeHistory(false);
     setShowDraftPatternCards(false);
     setShowSessionPatternCards(false);
+    setSelectedSessionPatternCardId(null);
     setShowPatternCandidates((prev) => !prev);
   }
 
@@ -2423,6 +2438,7 @@ function QuinnConversationSurface({
     setShowOutcomeHistory(false);
     setShowPatternCandidates(false);
     setShowSessionPatternCards(false);
+    setSelectedSessionPatternCardId(null);
     setShowDraftPatternCards((prev) => !prev);
   }
 
@@ -2432,6 +2448,9 @@ function QuinnConversationSurface({
     setShowOutcomeHistory(false);
     setShowPatternCandidates(false);
     setShowDraftPatternCards(false);
+    if (showSessionPatternCards) {
+      setSelectedSessionPatternCardId(null);
+    }
     setShowSessionPatternCards((prev) => !prev);
   }
 
@@ -2524,6 +2543,7 @@ function QuinnConversationSurface({
     setShowDraftPatternCards(false);
     setShowSessionPatternCards(true);
     setShowLiteralTools(false);
+    setSelectedSessionPatternCardId(null);
   }
 
   function reopenSessionPatternCardAsDraft(card: QuinnSessionPatternCard) {
@@ -2595,6 +2615,7 @@ function QuinnConversationSurface({
       setShowSessionPatternCards(true);
       setShowLiteralTools(false);
       setLongFormComposerCollapsed(true);
+      setSelectedSessionPatternCardId(null);
       return;
     }
 
@@ -2622,9 +2643,14 @@ function QuinnConversationSurface({
     setShowSessionPatternCards(true);
     setShowLiteralTools(false);
     setLongFormComposerCollapsed(true);
+    setSelectedSessionPatternCardId(null);
   }
 
   function removeSessionPatternCard(cardId: string) {
+    if (selectedSessionPatternCardId === cardId) {
+      setSelectedSessionPatternCardId(null);
+    }
+
     onChangeSessionPatternCards((currentCards) =>
       currentCards.filter((card) => card.id !== cardId)
     );
@@ -3211,7 +3237,10 @@ function QuinnConversationSurface({
                   </Text>
                   <Pressable
                     style={styles.literalOutcomeHistoryCloseButton}
-                    onPress={() => setShowSessionPatternCards(false)}
+                    onPress={() => {
+                      setShowSessionPatternCards(false);
+                      setSelectedSessionPatternCardId(null);
+                    }}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <Feather name="x" size={13} color="rgba(245, 248, 255, 0.62)" />
@@ -3238,53 +3267,115 @@ function QuinnConversationSurface({
                 style={styles.literalOutcomeHistoryPanelBody}
               >
                 {sessionPatternCards.length ? (
-                  sessionPatternCards.map((card) => (
-                    <View key={card.id} style={styles.literalOutcomeHistoryRow}>
-                      <View style={styles.literalOutcomeHistoryRowHeader}>
-                        <Text style={styles.literalPatternCandidateStatus}>Approved</Text>
-                        {card.createdAt ? (
-                          <Text style={styles.literalOutcomeHistoryTime}>
-                            {formatOutcomeHistoryTimestamp(card.createdAt)}
-                          </Text>
+                  sessionPatternCards.map((card) => {
+                    const isDetailOpen = selectedSessionPatternCardId === card.id;
+
+                    return (
+                      <View key={card.id} style={styles.literalOutcomeHistoryRow}>
+                        <View style={styles.literalOutcomeHistoryRowHeader}>
+                          <Text style={styles.literalPatternCandidateStatus}>Approved</Text>
+                          {card.createdAt ? (
+                            <Text style={styles.literalOutcomeHistoryTime}>
+                              {formatOutcomeHistoryTimestamp(card.createdAt)}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Text style={styles.literalOutcomeHistoryLabel}>Possible pattern</Text>
+                        <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                          {card.possiblePattern || 'No pattern captured.'}
+                        </Text>
+                        <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
+                        <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                          {card.evidence || 'No evidence captured.'}
+                        </Text>
+                        <Text style={styles.literalOutcomeHistoryLabel}>Risk</Text>
+                        <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                          {card.overgeneralizationRisk ||
+                            card.beforeStoringDecision ||
+                            'No risk captured.'}
+                        </Text>
+                        <View style={styles.literalPatternCandidateActionRow}>
+                          <Pressable
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              styles.literalPatternCandidateActionInline,
+                            ]}
+                            onPress={() => reopenSessionPatternCardAsDraft(card)}
+                          >
+                            <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
+                            <Text style={styles.literalPatternCandidateActionText}>
+                              Reopen as draft
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              styles.literalPatternCandidateActionInline,
+                            ]}
+                            onPress={() => setSelectedSessionPatternCardId(card.id)}
+                          >
+                            <Feather name="eye" size={12} color="rgba(245, 248, 255, 0.62)" />
+                            <Text style={styles.literalPatternCandidateActionText}>View</Text>
+                          </Pressable>
+                          <Pressable
+                            style={styles.literalPatternCandidateAction}
+                            onPress={() => removeSessionPatternCard(card.id)}
+                          >
+                            <Feather name="trash-2" size={12} color="rgba(245, 248, 255, 0.62)" />
+                            <Text style={styles.literalPatternCandidateActionText}>Remove</Text>
+                          </Pressable>
+                        </View>
+
+                        {isDetailOpen ? (
+                          <View style={styles.literalSessionPatternCardDetail}>
+                            <View style={styles.literalSessionPatternCardDetailHeader}>
+                              <Text style={styles.literalSessionPatternCardDetailTitle}>
+                                Card detail
+                              </Text>
+                              <Pressable
+                                style={styles.literalOutcomeHistoryCloseButton}
+                                onPress={() => setSelectedSessionPatternCardId(null)}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Feather name="x" size={13} color="rgba(245, 248, 255, 0.62)" />
+                                <Text style={styles.literalOutcomeHistoryCloseText}>Close</Text>
+                              </Pressable>
+                            </View>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Possible pattern</Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.possiblePattern || 'No pattern captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.evidence || 'No evidence captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>
+                              Overgeneralization risk
+                            </Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.overgeneralizationRisk || 'No risk captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>
+                              Before storing decision
+                            </Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.beforeStoringDecision || 'No decision captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Created</Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.createdAt
+                                ? formatOutcomeHistoryTimestamp(card.createdAt)
+                                : 'No created time captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Source run</Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.sourceRunId || 'No source run captured.'}
+                            </Text>
+                          </View>
                         ) : null}
                       </View>
-                      <Text style={styles.literalOutcomeHistoryLabel}>Possible pattern</Text>
-                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                        {card.possiblePattern || 'No pattern captured.'}
-                      </Text>
-                      <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
-                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                        {card.evidence || 'No evidence captured.'}
-                      </Text>
-                      <Text style={styles.literalOutcomeHistoryLabel}>Risk</Text>
-                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
-                        {card.overgeneralizationRisk ||
-                          card.beforeStoringDecision ||
-                          'No risk captured.'}
-                      </Text>
-                      <View style={styles.literalPatternCandidateActionRow}>
-                        <Pressable
-                          style={[
-                            styles.literalPatternCandidateAction,
-                            styles.literalPatternCandidateActionInline,
-                          ]}
-                          onPress={() => reopenSessionPatternCardAsDraft(card)}
-                        >
-                          <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
-                          <Text style={styles.literalPatternCandidateActionText}>
-                            Reopen as draft
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          style={styles.literalPatternCandidateAction}
-                          onPress={() => removeSessionPatternCard(card.id)}
-                        >
-                          <Feather name="trash-2" size={12} color="rgba(245, 248, 255, 0.62)" />
-                          <Text style={styles.literalPatternCandidateActionText}>Remove</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))
+                    );
+                  })
                 ) : (
                   <Text style={styles.literalOutcomeHistoryEmpty}>
                     No approved pattern cards yet.
@@ -7892,6 +7983,7 @@ responseReplayButton: {
   literalPatternCandidateActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     marginTop: 8,
   },
 
@@ -7924,6 +8016,38 @@ responseReplayButton: {
     alignItems: 'center',
     marginTop: 4,
     marginBottom: 2,
+  },
+
+  literalSessionPatternCardDetail: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingHorizontal: 9,
+    paddingTop: 8,
+    paddingBottom: 9,
+    marginTop: 9,
+  },
+
+  literalSessionPatternCardDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+
+  literalSessionPatternCardDetailTitle: {
+    color: 'rgba(245, 248, 255, 0.74)',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+
+  literalSessionPatternCardDetailText: {
+    color: 'rgba(245, 248, 255, 0.76)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
   },
 
   literalOutcomeHistoryEmpty: {
