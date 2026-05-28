@@ -18,7 +18,7 @@ export type QuinnIntakeFormId =
   | 'default-map'
   | 'outcome-log';
 
-export type QuinnPacketKindId = QuinnIntakeFormId | 'draft-pattern-card';
+export type QuinnPacketKindId = QuinnIntakeFormId | 'draft-pattern-card' | 'pattern-card-save-intent';
 
 export type QuinnIntakeFormDefinition = {
   id: QuinnIntakeFormId;
@@ -134,8 +134,11 @@ export type QuinnSessionPatternCardDraftSource = {
   sourceRunId?: string;
 };
 
+export type QuinnPatternCardSaveIntentSource = QuinnSessionPatternCardDraftSource;
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
+const QUINN_PATTERN_CARD_SAVE_INTENT_MARKER = 'QUINNOS PATTERN CARD SAVE INTENT';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -414,6 +417,58 @@ export function buildQuinnDraftPatternCardPacketFromSessionCard(
     '',
     'OUTPUT I NEED FROM REN:',
     'Turn this into a revised draft pattern card only. Use the DRAFT OUTPUT SHAPE. Name the possible pattern, the evidence, the risk of overgeneralizing, and what Quinn should decide before storing it. Do not treat this as permanent memory yet. Return visible text even if the evidence is thin.',
+    ...QUINNOS_RESPONSE_PROTOCOL,
+  ].join('\n');
+}
+
+export function buildQuinnPatternCardSaveIntentPacket(
+  card: QuinnPatternCardSaveIntentSource
+) {
+  return [
+    'QUINNOS PATTERN CARD SAVE INTENT',
+    '',
+    'PURPOSE:',
+    'Review whether this approved-for-now session Pattern Card is specific, safe, useful, and consent-worthy enough to become durable later. Do not store it yet.',
+    '',
+    'POSSIBLE PATTERN:',
+    formatQuinnDraftPatternCardValue(card.possiblePattern, '[No possible pattern captured.]'),
+    '',
+    'EVIDENCE:',
+    formatQuinnDraftPatternCardValue(card.evidence, '[No evidence captured.]'),
+    '',
+    'OVERGENERALIZATION RISK:',
+    formatQuinnDraftPatternCardValue(
+      card.overgeneralizationRisk,
+      '[No overgeneralization risk captured.]'
+    ),
+    '',
+    'BEFORE STORING DECISION:',
+    formatQuinnDraftPatternCardValue(
+      card.beforeStoringDecision,
+      '[No before-storing decision captured.]'
+    ),
+    '',
+    'SOURCE:',
+    'Created:',
+    formatQuinnDraftPatternCardValue(card.createdAt || '', '[No created time captured.]'),
+    '',
+    'Source run:',
+    formatQuinnDraftPatternCardValue(card.sourceRunId || '', '[No source run captured.]'),
+    '',
+    'WHY THIS MIGHT DESERVE DURABILITY:',
+    '[Quinn fills this in.]',
+    '',
+    'WHY THIS MIGHT NOT DESERVE DURABILITY:',
+    '[Quinn fills this in.]',
+    '',
+    'WHAT FUTURE QUINN WOULD NEED FROM THIS CARD:',
+    '[Quinn fills this in.]',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
+    '',
+    'OUTPUT I NEED FROM REN:',
+    'Evaluate this as a save-intent review only. Do not treat it as stored memory. Say whether this card seems specific enough, useful enough, and safe enough to preserve later. Name what should be clarified before storage.',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
@@ -1006,6 +1061,16 @@ export function getQuinnIntakeFormKindFromPacketText(
   packetText: string
 ): QuinnIntakeFormPacketKind | null {
   const text = String(packetText || '');
+
+  if (text.includes(QUINN_PATTERN_CARD_SAVE_INTENT_MARKER)) {
+    return {
+      id: 'pattern-card-save-intent',
+      label: 'Save Intent',
+      icon: 'bookmark',
+      marker: QUINN_PATTERN_CARD_SAVE_INTENT_MARKER,
+      isOutcomeLog: false,
+    };
+  }
 
   if (text.includes(QUINN_DRAFT_PATTERN_CARD_MARKER)) {
     return {
