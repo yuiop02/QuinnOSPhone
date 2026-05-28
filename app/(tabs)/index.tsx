@@ -165,6 +165,17 @@ type QuinnDraftPatternCardHistoryItem = QuinnDraftPatternCardHistoryPreview & {
   resultPreview: QuinnDraftPatternCardResultPreview | null;
 };
 
+type QuinnSessionPatternCard = {
+  id: string;
+  createdAt: string;
+  possiblePattern: string;
+  evidence: string;
+  overgeneralizationRisk: string;
+  beforeStoringDecision: string;
+  sourcePacketText: string;
+  sourceRunId: string;
+};
+
 type NumberedOption = {
   index: number;
   text: string;
@@ -2290,6 +2301,8 @@ function QuinnConversationSurface({
   const [showOutcomeHistory, setShowOutcomeHistory] = useState(false);
   const [showPatternCandidates, setShowPatternCandidates] = useState(false);
   const [showDraftPatternCards, setShowDraftPatternCards] = useState(false);
+  const [showSessionPatternCards, setShowSessionPatternCards] = useState(false);
+  const [sessionPatternCards, setSessionPatternCards] = useState<QuinnSessionPatternCard[]>([]);
   const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
@@ -2350,6 +2363,7 @@ function QuinnConversationSurface({
     setShowOutcomeHistory(false);
     setShowPatternCandidates(false);
     setShowDraftPatternCards(false);
+    setShowSessionPatternCards(false);
     setShowLiteralTools(false);
   }
 
@@ -2364,6 +2378,7 @@ function QuinnConversationSurface({
     setShowLiteralTools(false);
     setShowPatternCandidates(false);
     setShowDraftPatternCards(false);
+    setShowSessionPatternCards(false);
     setShowOutcomeHistory((prev) => !prev);
   }
 
@@ -2372,6 +2387,7 @@ function QuinnConversationSurface({
     setShowLiteralTools(false);
     setShowOutcomeHistory(false);
     setShowDraftPatternCards(false);
+    setShowSessionPatternCards(false);
     setShowPatternCandidates((prev) => !prev);
   }
 
@@ -2380,7 +2396,17 @@ function QuinnConversationSurface({
     setShowLiteralTools(false);
     setShowOutcomeHistory(false);
     setShowPatternCandidates(false);
+    setShowSessionPatternCards(false);
     setShowDraftPatternCards((prev) => !prev);
+  }
+
+  function handleToggleSessionPatternCards() {
+    collapseLongFormComposerForPanelAccess();
+    setShowLiteralTools(false);
+    setShowOutcomeHistory(false);
+    setShowPatternCandidates(false);
+    setShowDraftPatternCards(false);
+    setShowSessionPatternCards((prev) => !prev);
   }
 
   function handleStartFreshLiteralArc() {
@@ -2430,6 +2456,52 @@ function QuinnConversationSurface({
     onChangePacketText(originalPacketText);
     closeLiteralPanelsForDraftLoad();
     focusLiteralComposerSoon();
+  }
+
+  function approveSessionPatternCardFromDraft(item: QuinnDraftPatternCardHistoryItem) {
+    if (!item.resultPreview) {
+      return;
+    }
+
+    const possiblePattern = String(
+      item.resultPreview.possiblePattern || item.candidate || item.mightRemember || ''
+    ).trim();
+    const evidence = String(item.resultPreview.evidence || item.evidence || '').trim();
+    const overgeneralizationRisk = String(item.resultPreview.overgeneralizationRisk || '').trim();
+    const beforeStoringDecision = String(item.resultPreview.beforeStoringDecision || '').trim();
+
+    setSessionPatternCards((currentCards) => {
+      const duplicateKey = `${possiblePattern.toLowerCase()}|${evidence.toLowerCase()}`;
+      const alreadyExists = currentCards.some(
+        (card) =>
+          `${card.possiblePattern.toLowerCase()}|${card.evidence.toLowerCase()}` === duplicateKey
+      );
+
+      if (alreadyExists) {
+        return currentCards;
+      }
+
+      return [
+        {
+          id: `session-pattern-card-${Date.now()}-${currentCards.length}`,
+          createdAt: new Date().toISOString(),
+          possiblePattern,
+          evidence,
+          overgeneralizationRisk,
+          beforeStoringDecision,
+          sourcePacketText: item.packetText,
+          sourceRunId: item.id || item.timestamp,
+        },
+        ...currentCards,
+      ];
+    });
+    setShowDraftPatternCards(false);
+    setShowSessionPatternCards(true);
+    setShowLiteralTools(false);
+  }
+
+  function removeSessionPatternCard(cardId: string) {
+    setSessionPatternCards((currentCards) => currentCards.filter((card) => card.id !== cardId));
   }
 
   const useLiteralChatShellPreview = true;
@@ -2737,6 +2809,17 @@ function QuinnConversationSurface({
                   <Pressable
                     style={[
                       styles.literalToolChip,
+                      showSessionPatternCards && styles.literalToolChipActive,
+                    ]}
+                    onPress={handleToggleSessionPatternCards}
+                  >
+                    <Feather name="layers" size={14} color="rgba(245, 248, 255, 0.76)" />
+                    <Text style={styles.literalToolChipText}>Cards</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.literalToolChip,
                       !latestVisibleOutcomeSource && styles.literalToolChipDisabled,
                     ]}
                     disabled={!latestVisibleOutcomeSource}
@@ -2950,7 +3033,10 @@ function QuinnConversationSurface({
                       {item.packetText.trim() ? (
                         <View style={styles.literalPatternCandidateActionRow}>
                           <Pressable
-                            style={styles.literalPatternCandidateAction}
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              item.resultPreview && styles.literalPatternCandidateActionInline,
+                            ]}
                             onPress={() => reopenDraftPatternCardFromHistory(item)}
                           >
                             <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
@@ -2958,12 +3044,96 @@ function QuinnConversationSurface({
                               Reopen draft
                             </Text>
                           </Pressable>
+                          {item.resultPreview ? (
+                            <Pressable
+                              style={styles.literalPatternCandidateAction}
+                              onPress={() => approveSessionPatternCardFromDraft(item)}
+                            >
+                              <Feather
+                                name="check-circle"
+                                size={12}
+                                color="rgba(245, 248, 255, 0.62)"
+                              />
+                              <Text style={styles.literalPatternCandidateActionText}>
+                                Approve card
+                              </Text>
+                            </Pressable>
+                          ) : null}
                         </View>
                       ) : null}
                     </View>
                   ))
                 ) : (
                   <Text style={styles.literalOutcomeHistoryEmpty}>No draft pattern cards yet.</Text>
+                )}
+              </ScrollView>
+            </View>
+          ) : null}
+
+          {showSessionPatternCards ? (
+            <View style={styles.literalOutcomeHistoryPanel}>
+              <View style={styles.literalOutcomeHistoryHeader}>
+                <Text style={styles.literalOutcomeHistoryTitle}>Pattern cards</Text>
+                <View style={styles.literalOutcomeHistoryHeaderActions}>
+                  <Text style={styles.literalOutcomeHistoryCount}>
+                    {sessionPatternCards.length ? `${sessionPatternCards.length} approved` : 'Local'}
+                  </Text>
+                  <Pressable
+                    style={styles.literalOutcomeHistoryCloseButton}
+                    onPress={() => setShowSessionPatternCards(false)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Feather name="x" size={13} color="rgba(245, 248, 255, 0.62)" />
+                    <Text style={styles.literalOutcomeHistoryCloseText}>Close</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={sessionPatternCards.length > 2}
+                style={styles.literalOutcomeHistoryPanelBody}
+              >
+                {sessionPatternCards.length ? (
+                  sessionPatternCards.map((card) => (
+                    <View key={card.id} style={styles.literalOutcomeHistoryRow}>
+                      <View style={styles.literalOutcomeHistoryRowHeader}>
+                        <Text style={styles.literalPatternCandidateStatus}>Approved</Text>
+                        {card.createdAt ? (
+                          <Text style={styles.literalOutcomeHistoryTime}>
+                            {formatOutcomeHistoryTimestamp(card.createdAt)}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Possible pattern</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {card.possiblePattern || 'No pattern captured.'}
+                      </Text>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {card.evidence || 'No evidence captured.'}
+                      </Text>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Risk</Text>
+                      <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                        {card.overgeneralizationRisk ||
+                          card.beforeStoringDecision ||
+                          'No risk captured.'}
+                      </Text>
+                      <View style={styles.literalPatternCandidateActionRow}>
+                        <Pressable
+                          style={styles.literalPatternCandidateAction}
+                          onPress={() => removeSessionPatternCard(card.id)}
+                        >
+                          <Feather name="trash-2" size={12} color="rgba(245, 248, 255, 0.62)" />
+                          <Text style={styles.literalPatternCandidateActionText}>Remove</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.literalOutcomeHistoryEmpty}>
+                    No approved pattern cards yet.
+                  </Text>
                 )}
               </ScrollView>
             </View>
@@ -7557,6 +7727,10 @@ responseReplayButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
     paddingHorizontal: 8,
     paddingVertical: 5,
+  },
+
+  literalPatternCandidateActionInline: {
+    marginRight: 6,
   },
 
   literalPatternCandidateActionText: {
