@@ -61,7 +61,7 @@ function formatRunTimestamp(value: string | null | undefined) {
   return clean || '(none yet)';
 }
 
-type SessionPatternCardExportInput = {
+export type QuinnExportSessionPatternCard = {
   createdAt: string;
   possiblePattern: string;
   evidence: string;
@@ -69,6 +69,116 @@ type SessionPatternCardExportInput = {
   beforeStoringDecision: string;
   sourceRunId: string;
 };
+
+type SessionPatternCardExportInput = QuinnExportSessionPatternCard;
+
+function cleanImportedSessionPatternCardValue(value: string) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  const normalized = clean.toLowerCase();
+
+  if (
+    !clean ||
+    normalized === '(none)' ||
+    normalized === '(none yet)' ||
+    normalized === 'untitled pattern card'
+  ) {
+    return '';
+  }
+
+  return clean;
+}
+
+function getImportedSessionPatternCardField(lines: string[], label: string) {
+  const prefix = `- ${label}:`;
+  const line = lines.find((item) =>
+    item.trim().toLowerCase().startsWith(prefix.toLowerCase())
+  );
+
+  if (!line) {
+    return '';
+  }
+
+  return cleanImportedSessionPatternCardValue(line.trim().slice(prefix.length));
+}
+
+export function parseSessionPatternCardsFromExport(
+  exportText: string
+): QuinnExportSessionPatternCard[] {
+  const text = String(exportText || '').replace(/\r\n/g, '\n');
+  const headingMatch = text.match(/^## Session Pattern Cards\s*$/m);
+
+  if (!headingMatch || headingMatch.index === undefined) {
+    return [];
+  }
+
+  const sectionStart = headingMatch.index + headingMatch[0].length;
+  const remainingText = text.slice(sectionStart);
+  const nextSectionIndex = remainingText.search(/\n##\s+/);
+  const sectionText = (
+    nextSectionIndex >= 0 ? remainingText.slice(0, nextSectionIndex) : remainingText
+  ).trim();
+
+  if (!sectionText || sectionText === '(none yet)') {
+    return [];
+  }
+
+  const cardBlocks: string[][] = [];
+  let currentBlock: string[] = [];
+
+  for (const line of sectionText.split('\n')) {
+    if (/^###\s+\d+\.\s+/.test(line.trim())) {
+      if (currentBlock.length) {
+        cardBlocks.push(currentBlock);
+      }
+
+      currentBlock = [line];
+      continue;
+    }
+
+    if (currentBlock.length) {
+      currentBlock.push(line);
+    }
+  }
+
+  if (currentBlock.length) {
+    cardBlocks.push(currentBlock);
+  }
+
+  return cardBlocks
+    .map((lines) => {
+      const titleLine = lines[0] || '';
+      const possiblePattern = cleanImportedSessionPatternCardValue(
+        titleLine.replace(/^###\s+\d+\.\s+/, '')
+      );
+      const card = {
+        createdAt: getImportedSessionPatternCardField(lines, 'Created'),
+        possiblePattern,
+        evidence: getImportedSessionPatternCardField(lines, 'Evidence'),
+        overgeneralizationRisk: getImportedSessionPatternCardField(
+          lines,
+          'Overgeneralization risk'
+        ),
+        beforeStoringDecision: getImportedSessionPatternCardField(
+          lines,
+          'Before storing decision'
+        ),
+        sourceRunId: getImportedSessionPatternCardField(lines, 'Source run'),
+      };
+
+      if (
+        !card.possiblePattern &&
+        !card.evidence &&
+        !card.overgeneralizationRisk &&
+        !card.beforeStoringDecision &&
+        !card.sourceRunId
+      ) {
+        return null;
+      }
+
+      return card;
+    })
+    .filter((card): card is QuinnExportSessionPatternCard => Boolean(card));
+}
 
 function buildActiveThreadState({
   packetTitle,

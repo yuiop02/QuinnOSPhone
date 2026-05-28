@@ -57,7 +57,8 @@ import {
   INITIAL_MEMORIES,
   INITIAL_PACKET_TITLE,
   INITIAL_SETTINGS,
-  INITIAL_VOICE_SETTINGS
+  INITIAL_VOICE_SETTINGS,
+  parseSessionPatternCardsFromExport,
 } from '../../components/quinn/quinnAppState';
 import {
   getQuinnLocalVoiceBaseUrl,
@@ -201,6 +202,19 @@ const LITERAL_PANEL_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.34);
 const LITERAL_PANEL_BODY_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.27);
 const QUINN_LENSES = getQuinnLenses();
 const SNAPSHOT_PERSIST_DEBOUNCE_MS = 250;
+const SESSION_PATTERN_CARD_IMPORT_MARKER = 'QUINNOS SESSION PATTERN CARD IMPORT';
+const SESSION_PATTERN_CARD_IMPORT_TEMPLATE = [
+  SESSION_PATTERN_CARD_IMPORT_MARKER,
+  '',
+  'PURPOSE:',
+  'Restore session-local Pattern Cards from a QuinnOS export. This does not call backend, write memory, or send anything to Ren.',
+  '',
+  'INSTRUCTIONS:',
+  'Paste a QuinnOS export below, then use the local Import cards action. Do not send this packet.',
+  '',
+  'PASTE EXPORT BELOW:',
+  '[Paste QuinnOS export here]',
+].join('\n');
 const AMBIENT_STARS = [
   { x: 18, y: 82, size: 2.2, color: '#FFF7F0' },
   { x: 56, y: 58, size: 1.8, color: '#E6EEFF' },
@@ -1430,6 +1444,7 @@ function QuinnConversationSurface({
   const [voiceStatus, setVoiceStatus] = useState('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [outcomeCaptureGuardMessage, setOutcomeCaptureGuardMessage] = useState('');
+  const [sessionPatternCardImportMessage, setSessionPatternCardImportMessage] = useState('');
   const [, setQuinnVoiceReachable] = useState<boolean | null>(null);
   const [, setIsCheckingQuinnVoice] = useState(false);
   const [isPreparingQuinnVoice, setIsPreparingQuinnVoice] = useState(false);
@@ -2311,6 +2326,7 @@ function QuinnConversationSurface({
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
   const literalComposerLineCount = packetText ? packetText.split(/\r?\n/).length : 0;
+  const isSessionPatternCardImportDraft = packetText.includes(SESSION_PATTERN_CARD_IMPORT_MARKER);
   const isLongFormComposerDraft = Boolean(packetText.trim()) && (
     packetText.includes('QUINNOS ') ||
     literalComposerLineCount >= 8 ||
@@ -2357,6 +2373,12 @@ function QuinnConversationSurface({
       setLongFormComposerCollapsed(false);
     }
   }, [isLongFormComposerDraft, packetText]);
+
+  useEffect(() => {
+    if (!isSessionPatternCardImportDraft && sessionPatternCardImportMessage) {
+      setSessionPatternCardImportMessage('');
+    }
+  }, [isSessionPatternCardImportDraft, sessionPatternCardImportMessage]);
 
   function resetLiteralComposerExpansion() {
     setLongFormComposerCollapsed(false);
@@ -2509,6 +2531,97 @@ function QuinnConversationSurface({
     onChangePacketText(buildQuinnDraftPatternCardPacketFromSessionCard(card));
     closeLiteralPanelsForDraftLoad();
     focusLiteralComposerSoon();
+  }
+
+  function getSessionPatternCardDuplicateKey(card: {
+    possiblePattern: string;
+    evidence: string;
+  }) {
+    return `${String(card.possiblePattern || '').trim().toLowerCase()}|${String(
+      card.evidence || ''
+    )
+      .trim()
+      .toLowerCase()}`;
+  }
+
+  function stageSessionPatternCardImport() {
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(SESSION_PATTERN_CARD_IMPORT_TEMPLATE);
+    setSessionPatternCardImportMessage('Paste a QuinnOS export below, then tap Import cards.');
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
+  function importSessionPatternCardsFromComposer() {
+    const parsedCards = parseSessionPatternCardsFromExport(packetText);
+
+    if (!parsedCards.length) {
+      setSessionPatternCardImportMessage('No Session Pattern Cards found in this export.');
+      focusLiteralComposerSoon();
+      return;
+    }
+
+    const existingKeys = new Set(sessionPatternCards.map(getSessionPatternCardDuplicateKey));
+    const importedAt = Date.now();
+    const cardsToRestore = parsedCards.reduce<QuinnSessionPatternCard[]>(
+      (restoredCards, card, index) => {
+        const possiblePattern = String(card.possiblePattern || '').trim();
+        const evidence = String(card.evidence || '').trim();
+        const duplicateKey = getSessionPatternCardDuplicateKey({ possiblePattern, evidence });
+
+        if ((!possiblePattern && !evidence) || existingKeys.has(duplicateKey)) {
+          return restoredCards;
+        }
+
+        existingKeys.add(duplicateKey);
+        restoredCards.push({
+          id: `session-pattern-card-import-${importedAt}-${index}`,
+          createdAt: String(card.createdAt || '').trim() || new Date(importedAt).toISOString(),
+          possiblePattern: possiblePattern || 'Untitled pattern card',
+          evidence,
+          overgeneralizationRisk: String(card.overgeneralizationRisk || '').trim(),
+          beforeStoringDecision: String(card.beforeStoringDecision || '').trim(),
+          sourcePacketText: '',
+          sourceRunId: String(card.sourceRunId || '').trim() || 'Imported QuinnOS export',
+        });
+
+        return restoredCards;
+      },
+      []
+    );
+
+    if (!cardsToRestore.length) {
+      setSessionPatternCardImportMessage('No new cards restored; matching cards are already here.');
+      setShowSessionPatternCards(true);
+      setShowLiteralTools(false);
+      setLongFormComposerCollapsed(true);
+      return;
+    }
+
+    onChangeSessionPatternCards((currentCards) => {
+      const currentKeys = new Set(currentCards.map(getSessionPatternCardDuplicateKey));
+      const newCards = cardsToRestore.filter((card) => {
+        const duplicateKey = getSessionPatternCardDuplicateKey(card);
+
+        if (currentKeys.has(duplicateKey)) {
+          return false;
+        }
+
+        currentKeys.add(duplicateKey);
+        return true;
+      });
+
+      return newCards.length ? [...newCards, ...currentCards] : currentCards;
+    });
+    setSessionPatternCardImportMessage(
+      `Restored ${cardsToRestore.length} pattern card${cardsToRestore.length === 1 ? '' : 's'}.`
+    );
+    setShowOutcomeHistory(false);
+    setShowPatternCandidates(false);
+    setShowDraftPatternCards(false);
+    setShowSessionPatternCards(true);
+    setShowLiteralTools(false);
+    setLongFormComposerCollapsed(true);
   }
 
   function removeSessionPatternCard(cardId: string) {
@@ -2739,6 +2852,11 @@ function QuinnConversationSurface({
           {outcomeCaptureGuardMessage ? (
             <Text style={[styles.literalStatusText, styles.literalGuardText]}>
               {outcomeCaptureGuardMessage}
+            </Text>
+          ) : null}
+          {sessionPatternCardImportMessage ? (
+            <Text style={[styles.literalStatusText, styles.literalImportStatusText]}>
+              {sessionPatternCardImportMessage}
             </Text>
           ) : null}
           {voiceStatus ? <Text style={styles.literalStatusText}>{voiceStatus}</Text> : null}
@@ -3102,6 +3220,18 @@ function QuinnConversationSurface({
                 </View>
               </View>
 
+              <View style={styles.literalPatternCardImportRow}>
+                <Pressable
+                  style={styles.literalPatternCandidateAction}
+                  onPress={stageSessionPatternCardImport}
+                >
+                  <Feather name="download" size={12} color="rgba(245, 248, 255, 0.62)" />
+                  <Text style={styles.literalPatternCandidateActionText}>
+                    Import from export
+                  </Text>
+                </Pressable>
+              </View>
+
               <ScrollView
                 nestedScrollEnabled
                 showsVerticalScrollIndicator={sessionPatternCards.length > 2}
@@ -3161,6 +3291,24 @@ function QuinnConversationSurface({
                   </Text>
                 )}
               </ScrollView>
+            </View>
+          ) : null}
+
+          {isSessionPatternCardImportDraft ? (
+            <View style={styles.literalSessionPatternImportControl}>
+              <View style={styles.literalSessionPatternImportTextWrap}>
+                <Text style={styles.literalSessionPatternImportTitle}>Session card import</Text>
+                <Text style={styles.literalSessionPatternImportHint}>
+                  Paste export text below, then restore locally.
+                </Text>
+              </View>
+              <Pressable
+                style={styles.literalSessionPatternImportButton}
+                onPress={importSessionPatternCardsFromComposer}
+              >
+                <Feather name="download" size={13} color="rgba(245, 248, 255, 0.74)" />
+                <Text style={styles.literalSessionPatternImportButtonText}>Import cards</Text>
+              </Pressable>
             </View>
           ) : null}
 
@@ -7771,12 +7919,69 @@ responseReplayButton: {
     marginLeft: 5,
   },
 
+  literalPatternCardImportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+
   literalOutcomeHistoryEmpty: {
     color: 'rgba(245, 248, 255, 0.50)',
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '600',
     marginTop: 5,
+  },
+
+  literalSessionPatternImportControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+
+  literalSessionPatternImportTextWrap: {
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  literalSessionPatternImportTitle: {
+    color: 'rgba(245, 248, 255, 0.70)',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+
+  literalSessionPatternImportHint: {
+    color: 'rgba(245, 248, 255, 0.46)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+
+  literalSessionPatternImportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+
+  literalSessionPatternImportButtonText: {
+    color: 'rgba(245, 248, 255, 0.72)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+    marginLeft: 5,
   },
 
   literalLongFormControlRow: {
@@ -7955,6 +8160,10 @@ responseReplayButton: {
 
   literalGuardText: {
     color: 'rgba(255, 214, 153, 0.86)',
+  },
+
+  literalImportStatusText: {
+    color: 'rgba(190, 225, 255, 0.86)',
   },
 
 });
