@@ -187,6 +187,7 @@ type QuinnSessionPatternCard = {
   beforeStoringDecision: string;
   sourcePacketText: string;
   sourceRunId: string;
+  saveIntentReview?: QuinnPatternCardSaveIntentResultPreview | null;
 };
 
 type NumberedOption = {
@@ -462,6 +463,59 @@ function formatOutcomeHistoryTimestamp(value: string) {
 
 function normalizeSessionPatternCardReviewValue(value: string) {
   return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function buildSaveIntentReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) {
+  const items: QuinnPatternCardSaveIntentReviewItem[] = [];
+
+  for (const run of recentRuns) {
+    const preview = getQuinnPatternCardSaveIntentPacketPreview(run.packetText || '');
+    const resultPreview = getQuinnPatternCardSaveIntentResultPreview(
+      sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+    );
+
+    if (preview && resultPreview) {
+      items.push({
+        id: String(run.id || run.timestamp || items.length),
+        timestamp: String(run.timestamp || ''),
+        resultPreview,
+        ...preview,
+      });
+    }
+
+    if (items.length >= 10) {
+      break;
+    }
+  }
+
+  return items;
+}
+
+function getSaveIntentReviewForSessionPatternCard(
+  card: QuinnSessionPatternCard,
+  saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[]
+) {
+  const cardPattern = normalizeSessionPatternCardReviewValue(card.possiblePattern);
+  const cardEvidence = normalizeSessionPatternCardReviewValue(card.evidence);
+  const cardSourceRunId = normalizeSessionPatternCardReviewValue(card.sourceRunId);
+  const recentReview = saveIntentReviewItems.find((item) => {
+    const itemPattern = normalizeSessionPatternCardReviewValue(item.possiblePattern);
+    const itemEvidence = normalizeSessionPatternCardReviewValue(item.evidence);
+    const itemSourceRunId = normalizeSessionPatternCardReviewValue(item.sourceRunId);
+    const coreMatch = Boolean(
+      cardPattern &&
+        cardEvidence &&
+        itemPattern === cardPattern &&
+        itemEvidence === cardEvidence
+    );
+    const sourceMatch = Boolean(
+      cardSourceRunId && itemSourceRunId && itemSourceRunId === cardSourceRunId
+    );
+
+    return coreMatch || sourceMatch;
+  });
+
+  return recentReview?.resultPreview || card.saveIntentReview || null;
 }
 
 const TopFadeWall = React.memo(function TopFadeWall() {
@@ -1602,29 +1656,7 @@ function QuinnConversationSurface({
     return items;
   }, [recentRuns]);
   const saveIntentReviewItems = React.useMemo<QuinnPatternCardSaveIntentReviewItem[]>(() => {
-    const items: QuinnPatternCardSaveIntentReviewItem[] = [];
-
-    for (const run of recentRuns) {
-      const preview = getQuinnPatternCardSaveIntentPacketPreview(run.packetText || '');
-      const resultPreview = getQuinnPatternCardSaveIntentResultPreview(
-        sanitizeQuinnVisibleReplyText(run.writtenResult || '')
-      );
-
-      if (preview && resultPreview) {
-        items.push({
-          id: String(run.id || run.timestamp || items.length),
-          timestamp: String(run.timestamp || ''),
-          resultPreview,
-          ...preview,
-        });
-      }
-
-      if (items.length >= 10) {
-        break;
-      }
-    }
-
-    return items;
+    return buildSaveIntentReviewItemsFromRecentRuns(recentRuns);
   }, [recentRuns]);
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
@@ -2600,31 +2632,6 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
-  function getSaveIntentReviewForCard(card: QuinnSessionPatternCard) {
-    const cardPattern = normalizeSessionPatternCardReviewValue(card.possiblePattern);
-    const cardEvidence = normalizeSessionPatternCardReviewValue(card.evidence);
-    const cardSourceRunId = normalizeSessionPatternCardReviewValue(card.sourceRunId);
-
-    return (
-      saveIntentReviewItems.find((item) => {
-        const itemPattern = normalizeSessionPatternCardReviewValue(item.possiblePattern);
-        const itemEvidence = normalizeSessionPatternCardReviewValue(item.evidence);
-        const itemSourceRunId = normalizeSessionPatternCardReviewValue(item.sourceRunId);
-        const coreMatch = Boolean(
-          cardPattern &&
-            cardEvidence &&
-            itemPattern === cardPattern &&
-            itemEvidence === cardEvidence
-        );
-        const sourceMatch = Boolean(
-          cardSourceRunId && itemSourceRunId && itemSourceRunId === cardSourceRunId
-        );
-
-        return coreMatch || sourceMatch;
-      }) || null
-    );
-  }
-
   function getSessionPatternCardDuplicateKey(card: {
     possiblePattern: string;
     evidence: string;
@@ -2675,6 +2682,7 @@ function QuinnConversationSurface({
           beforeStoringDecision: String(card.beforeStoringDecision || '').trim(),
           sourcePacketText: '',
           sourceRunId: String(card.sourceRunId || '').trim() || 'Imported QuinnOS export',
+          saveIntentReview: card.saveIntentReview || null,
         });
 
         return restoredCards;
@@ -3341,8 +3349,10 @@ function QuinnConversationSurface({
                 {sessionPatternCards.length ? (
                   sessionPatternCards.map((card) => {
                     const isDetailOpen = selectedSessionPatternCardId === card.id;
-                    const saveIntentReview = getSaveIntentReviewForCard(card);
-                    const saveIntentResult = saveIntentReview?.resultPreview || null;
+                    const saveIntentResult = getSaveIntentReviewForSessionPatternCard(
+                      card,
+                      saveIntentReviewItems
+                    );
                     const saveIntentStatus =
                       saveIntentResult?.saveReadiness || saveIntentResult?.shouldPreserveLater || '';
 
@@ -4500,24 +4510,33 @@ export default function App() {
     voiceSettings,
   ]);
 
-  const exportBundle = useMemo(
-    () =>
-      buildExportBundle({
-        packetTitle,
-        packetText,
-        writtenResult,
-        compressedSummary,
-        currentMemoryResonance,
-        currentSessionArc,
-        lastRunAt,
-        recentRuns,
-        sessionPatternCards,
-        memories,
-        notifications,
-        settings,
-        voiceSessions,
-        voiceSettings,
-      }),
+  const exportBundle = useMemo(() => {
+    const exportSaveIntentReviewItems = buildSaveIntentReviewItemsFromRecentRuns(recentRuns);
+    const sessionPatternCardsForExport = sessionPatternCards.map((card) => ({
+      ...card,
+      saveIntentReview: getSaveIntentReviewForSessionPatternCard(
+        card,
+        exportSaveIntentReviewItems
+      ),
+    }));
+
+    return buildExportBundle({
+      packetTitle,
+      packetText,
+      writtenResult,
+      compressedSummary,
+      currentMemoryResonance,
+      currentSessionArc,
+      lastRunAt,
+      recentRuns,
+      sessionPatternCards: sessionPatternCardsForExport,
+      memories,
+      notifications,
+      settings,
+      voiceSessions,
+      voiceSettings,
+    });
+  },
     [
       packetTitle,
       packetText,
