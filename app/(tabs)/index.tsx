@@ -191,6 +191,18 @@ type QuinnSessionPatternCard = {
   saveIntentReview?: QuinnPatternCardSaveIntentResultPreview | null;
 };
 
+type QuinnRestorableFailedDraft = {
+  packetTitle: string;
+  packetText: string;
+};
+
+type QuinnPendingUserBubble = {
+  id: string;
+  packetText: string;
+  submittedAt: string;
+  status: 'pending' | 'failed';
+};
+
 type NumberedOption = {
   index: number;
   text: string;
@@ -1424,6 +1436,7 @@ type QuinnConversationSurfaceProps = {
     stayOnScreen?: boolean;
     syncVisibleInput?: boolean;
     sessionArc?: SessionArc | null;
+    onRunStart?: () => void;
   }) => Promise<QuinnRunResult | null>;
 };
 
@@ -1519,6 +1532,10 @@ function QuinnConversationSurface({
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [outcomeCaptureGuardMessage, setOutcomeCaptureGuardMessage] = useState('');
   const [sessionPatternCardImportMessage, setSessionPatternCardImportMessage] = useState('');
+  const [restorableFailedDraft, setRestorableFailedDraft] =
+    useState<QuinnRestorableFailedDraft | null>(null);
+  const [failedDraftRestoreMessage, setFailedDraftRestoreMessage] = useState('');
+  const [pendingUserBubble, setPendingUserBubble] = useState<QuinnPendingUserBubble | null>(null);
   const [, setQuinnVoiceReachable] = useState<boolean | null>(null);
   const [, setIsCheckingQuinnVoice] = useState(false);
   const [isPreparingQuinnVoice, setIsPreparingQuinnVoice] = useState(false);
@@ -2320,7 +2337,10 @@ function QuinnConversationSurface({
       return;
     }
 
-    const outcomeMinimumCaptureStatus = getQuinnOutcomeLogMinimumCaptureStatus(packetText);
+    const submittedPacketText = packetText;
+    const submittedPacketTitle = packetTitle || 'Quinn Chat';
+    const outcomeMinimumCaptureStatus =
+      getQuinnOutcomeLogMinimumCaptureStatus(submittedPacketText);
 
     if (outcomeMinimumCaptureStatus.isOutcomeLog && !outcomeMinimumCaptureStatus.hasMinimumData) {
       setOutcomeCaptureGuardMessage(
@@ -2335,15 +2355,43 @@ function QuinnConversationSurface({
     await interruptQuinnPlayback();
     onTriggerWave();
 
+    let composerClearedForRun = false;
+
     const runResult = await onRunPacket({
-      packetTitle: packetTitle || 'Quinn Chat',
-      packetText,
+      packetTitle: submittedPacketTitle,
+      packetText: submittedPacketText,
       stayOnScreen: true,
-      syncVisibleInput: true,
+      syncVisibleInput: false,
+      onRunStart: () => {
+        setPendingUserBubble({
+          id: `pending-user-bubble-${Date.now()}`,
+          packetText: submittedPacketText,
+          submittedAt: new Date().toISOString(),
+          status: 'pending',
+        });
+        composerClearedForRun = true;
+        resetLiteralComposerExpansion();
+        onChangePacketText('');
+        setRestorableFailedDraft(null);
+        setFailedDraftRestoreMessage('');
+      },
     });
 
     if (runResult) {
-      onChangePacketText('');
+      setPendingUserBubble(null);
+    } else if (composerClearedForRun) {
+      setPendingUserBubble((currentBubble) =>
+        currentBubble && currentBubble.packetText === submittedPacketText
+          ? {
+              ...currentBubble,
+              status: 'failed',
+            }
+          : currentBubble
+      );
+      setRestorableFailedDraft({
+        packetTitle: submittedPacketTitle,
+        packetText: submittedPacketText,
+      });
     }
 
     const speakText = String(runResult?.written || '').trim();
@@ -2394,8 +2442,8 @@ function QuinnConversationSurface({
   }
 
   const [literalKeyboardHeight, setLiteralKeyboardHeight] = useState(0);
-  const [showLiteralTools, setShowLiteralTools] = useState(false);
-  const [showOutcomeHistory, setShowOutcomeHistory] = useState(false);
+    const [showLiteralTools, setShowLiteralTools] = useState(false);
+    const [showOutcomeHistory, setShowOutcomeHistory] = useState(false);
   const [showPatternCandidates, setShowPatternCandidates] = useState(false);
   const [showDraftPatternCards, setShowDraftPatternCards] = useState(false);
   const [showSessionPatternCards, setShowSessionPatternCards] = useState(false);
@@ -2462,6 +2510,14 @@ function QuinnConversationSurface({
   }, [isSessionPatternCardImportDraft, sessionPatternCardImportMessage]);
 
   useEffect(() => {
+    if (!restorableFailedDraft && failedDraftRestoreMessage) {
+      setFailedDraftRestoreMessage('');
+    } else if (restorableFailedDraft && !packetText.trim() && failedDraftRestoreMessage) {
+      setFailedDraftRestoreMessage('');
+    }
+  }, [failedDraftRestoreMessage, packetText, restorableFailedDraft]);
+
+  useEffect(() => {
     if (
       selectedSessionPatternCardId &&
       !sessionPatternCards.some((card) => card.id === selectedSessionPatternCardId)
@@ -2482,6 +2538,24 @@ function QuinnConversationSurface({
   function resetLiteralComposerExpansion() {
     setLongFormComposerCollapsed(false);
     setLiteralComposerContentHeight(38);
+  }
+
+  function restoreFailedSubmittedDraft() {
+    if (!restorableFailedDraft) {
+      return;
+    }
+
+    if (packetText.trim()) {
+      setFailedDraftRestoreMessage('Clear composer first to restore the failed draft.');
+      focusLiteralComposerSoon();
+      return;
+    }
+
+    resetLiteralComposerExpansion();
+    onChangePacketText(restorableFailedDraft.packetText);
+    setRestorableFailedDraft(null);
+    setFailedDraftRestoreMessage('');
+    focusLiteralComposerSoon();
   }
 
   function closeLiteralPanelsForDraftLoad() {
@@ -2548,6 +2622,9 @@ function QuinnConversationSurface({
 
   function handleStartFreshLiteralArc() {
     resetLiteralComposerExpansion();
+    setPendingUserBubble(null);
+    setRestorableFailedDraft(null);
+    setFailedDraftRestoreMessage('');
     onStartFreshArc();
   }
 
@@ -2878,7 +2955,7 @@ function QuinnConversationSurface({
             scheduleConversationAutoScroll(false);
           }}
         >
-          {!visibleThreadMessages.length && !writtenResult ? (
+          {!visibleThreadMessages.length && !writtenResult && !pendingUserBubble ? (
             <View style={styles.literalChatEmptyState}>
               <Text
                 style={styles.literalChatEmptyTitle}
@@ -2992,6 +3069,36 @@ function QuinnConversationSurface({
             );
           })}
 
+          {pendingUserBubble ? (() => {
+            const packetKind = getQuinnIntakeFormKindFromPacketText(pendingUserBubble.packetText);
+
+            return (
+              <View style={styles.literalMessagePair}>
+                <View
+                  style={[
+                    styles.literalUserBubble,
+                    pendingUserBubble.status === 'failed' && styles.literalUserBubbleFailed,
+                  ]}
+                >
+                  {packetKind ? (
+                    <View style={styles.literalPacketKindBadge}>
+                      <Feather
+                        name={packetKind.icon}
+                        size={11}
+                        color="rgba(245, 248, 255, 0.66)"
+                      />
+                      <Text style={styles.literalPacketKindBadgeText}>{packetKind.label}</Text>
+                    </View>
+                  ) : null}
+                  <Text style={styles.literalMessageText}>{pendingUserBubble.packetText}</Text>
+                  <Text style={styles.literalOptimisticBubbleMeta}>
+                    {pendingUserBubble.status === 'failed' ? 'Send failed' : 'Sending...'}
+                  </Text>
+                </View>
+              </View>
+            );
+          })() : null}
+
           {isRunning ? (
             <View style={styles.literalAssistantBlock}>
               <View style={styles.literalAssistantAvatar}>
@@ -3048,6 +3155,22 @@ function QuinnConversationSurface({
           </ScrollView>
 
           {runError ? <Text style={styles.literalStatusText}>{runError}</Text> : null}
+          {restorableFailedDraft ? (
+            <View style={styles.literalRestoreDraftRow}>
+              <Pressable
+                style={styles.literalRestoreDraftButton}
+                onPress={restoreFailedSubmittedDraft}
+              >
+                <Feather name="rotate-ccw" size={12} color="rgba(245, 248, 255, 0.70)" />
+                <Text style={styles.literalRestoreDraftButtonText}>Restore failed draft</Text>
+              </Pressable>
+              <Text style={styles.literalRestoreDraftHint}>
+                {packetText.trim()
+                  ? failedDraftRestoreMessage || 'Clear composer to restore without overwriting.'
+                  : 'Last failed send is available.'}
+              </Text>
+            </View>
+          ) : null}
           {voiceError ? <Text style={styles.literalStatusText}>{voiceError}</Text> : null}
           {outcomeCaptureGuardMessage ? (
             <Text style={[styles.literalStatusText, styles.literalGuardText]}>
@@ -4901,6 +5024,7 @@ export default function App() {
       stayOnScreen?: boolean;
       syncVisibleInput?: boolean;
       sessionArc?: SessionArc | null;
+      onRunStart?: () => void;
     }
   ): Promise<QuinnRunResult | null> {
     if (runInFlightRef.current) {
@@ -4920,6 +5044,7 @@ export default function App() {
     const effectiveLensId = override?.lensId ?? activeLensId;
     const stayOnScreen = override?.stayOnScreen ?? true;
     const syncVisibleInput = override?.syncVisibleInput ?? true;
+    const onRunStart = override?.onRunStart;
     const sessionArcForRun = override?.sessionArc ?? currentSessionArc;
     const runThreadId =
       String(sessionArcForRun?.id || '').trim() || activeThreadIdRef.current;
@@ -4978,6 +5103,7 @@ export default function App() {
     runInFlightRef.current = true;
     setIsRunning(true);
     setRunError('');
+    onRunStart?.();
 
     try {
       const result = await runQuinnPacket({
@@ -8103,6 +8229,12 @@ responseReplayButton: {
     backgroundColor: 'rgba(87, 48, 108, 0.74)',
   },
 
+  literalUserBubbleFailed: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 214, 153, 0.22)',
+    backgroundColor: 'rgba(108, 61, 64, 0.70)',
+  },
+
   literalAssistantBlock: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -8148,6 +8280,14 @@ responseReplayButton: {
     lineHeight: 23,
     fontWeight: '500',
     letterSpacing: -0.05,
+  },
+
+  literalOptimisticBubbleMeta: {
+    color: 'rgba(245, 248, 255, 0.50)',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '700',
+    marginTop: 8,
   },
 
   literalPacketKindBadge: {
@@ -8785,6 +8925,42 @@ responseReplayButton: {
 
   literalImportStatusText: {
     color: 'rgba(190, 225, 255, 0.86)',
+  },
+
+  literalRestoreDraftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingHorizontal: 8,
+    marginBottom: 6,
+  },
+
+  literalRestoreDraftButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginRight: 7,
+  },
+
+  literalRestoreDraftButtonText: {
+    color: 'rgba(245, 248, 255, 0.68)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginLeft: 5,
+  },
+
+  literalRestoreDraftHint: {
+    color: 'rgba(220, 226, 244, 0.54)',
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '500',
+    flexShrink: 1,
   },
 
 });
