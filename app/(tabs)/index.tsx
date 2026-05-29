@@ -59,6 +59,7 @@ import {
   INITIAL_SETTINGS,
   INITIAL_VOICE_SETTINGS,
   parseSessionPatternCardsFromExport,
+  type QuinnSavedPatternCard,
 } from '../../components/quinn/quinnAppState';
 import {
   getQuinnLocalVoiceBaseUrl,
@@ -1407,9 +1408,11 @@ type QuinnConversationSurfaceProps = {
   isStagingNextMove: boolean;
   runError: string;
   sessionPatternCards: QuinnSessionPatternCard[];
+  savedPatternCards: QuinnSavedPatternCard[];
   onTriggerWave: () => void;
   onChangePacketText: (value: string) => void;
   onChangeSessionPatternCards: React.Dispatch<React.SetStateAction<QuinnSessionPatternCard[]>>;
+  onChangeSavedPatternCards: React.Dispatch<React.SetStateAction<QuinnSavedPatternCard[]>>;
   onSelectLens: (lensId: QuinnLensId) => void;
   onStageNextMove: () => Promise<void>;
   onStartFreshArc: () => void;
@@ -1440,9 +1443,11 @@ function QuinnConversationSurface({
   isStagingNextMove,
   runError,
   sessionPatternCards,
+  savedPatternCards,
   onTriggerWave,
   onChangePacketText,
   onChangeSessionPatternCards,
+  onChangeSavedPatternCards,
   onSelectLens,
   onStageNextMove,
   onStartFreshArc,
@@ -2397,6 +2402,7 @@ function QuinnConversationSurface({
   const [selectedSessionPatternCardId, setSelectedSessionPatternCardId] = useState<string | null>(
     null
   );
+  const [selectedSavedPatternCardId, setSelectedSavedPatternCardId] = useState<string | null>(null);
   const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
@@ -2464,6 +2470,15 @@ function QuinnConversationSurface({
     }
   }, [selectedSessionPatternCardId, sessionPatternCards]);
 
+  useEffect(() => {
+    if (
+      selectedSavedPatternCardId &&
+      !savedPatternCards.some((card) => card.id === selectedSavedPatternCardId)
+    ) {
+      setSelectedSavedPatternCardId(null);
+    }
+  }, [selectedSavedPatternCardId, savedPatternCards]);
+
   function resetLiteralComposerExpansion() {
     setLongFormComposerCollapsed(false);
     setLiteralComposerContentHeight(38);
@@ -2476,6 +2491,7 @@ function QuinnConversationSurface({
     setShowSessionPatternCards(false);
     setShowLiteralTools(false);
     setSelectedSessionPatternCardId(null);
+    setSelectedSavedPatternCardId(null);
   }
 
   function collapseLongFormComposerForPanelAccess() {
@@ -2491,6 +2507,7 @@ function QuinnConversationSurface({
     setShowDraftPatternCards(false);
     setShowSessionPatternCards(false);
     setSelectedSessionPatternCardId(null);
+    setSelectedSavedPatternCardId(null);
     setShowOutcomeHistory((prev) => !prev);
   }
 
@@ -2501,6 +2518,7 @@ function QuinnConversationSurface({
     setShowDraftPatternCards(false);
     setShowSessionPatternCards(false);
     setSelectedSessionPatternCardId(null);
+    setSelectedSavedPatternCardId(null);
     setShowPatternCandidates((prev) => !prev);
   }
 
@@ -2511,6 +2529,7 @@ function QuinnConversationSurface({
     setShowPatternCandidates(false);
     setShowSessionPatternCards(false);
     setSelectedSessionPatternCardId(null);
+    setSelectedSavedPatternCardId(null);
     setShowDraftPatternCards((prev) => !prev);
   }
 
@@ -2522,6 +2541,7 @@ function QuinnConversationSurface({
     setShowDraftPatternCards(false);
     if (showSessionPatternCards) {
       setSelectedSessionPatternCardId(null);
+      setSelectedSavedPatternCardId(null);
     }
     setShowSessionPatternCards((prev) => !prev);
   }
@@ -2632,6 +2652,70 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function saveSessionPatternCardLocally(card: QuinnSessionPatternCard) {
+    const saveIntentReview = getSaveIntentReviewForSessionPatternCard(card, saveIntentReviewItems);
+
+    if (!saveIntentReview) {
+      return;
+    }
+
+    const duplicateKey = getSessionPatternCardDuplicateKey(card);
+
+    if (
+      savedPatternCards.some(
+        (savedCard) => getSessionPatternCardDuplicateKey(savedCard) === duplicateKey
+      )
+    ) {
+      return;
+    }
+
+    const savedAt = new Date().toISOString();
+    const savedCardId = `saved-pattern-card-${Date.now()}-${savedPatternCards.length}`;
+
+    onChangeSavedPatternCards((currentCards) => {
+      const alreadySaved = currentCards.some(
+        (savedCard) => getSessionPatternCardDuplicateKey(savedCard) === duplicateKey
+      );
+
+      if (alreadySaved) {
+        return currentCards;
+      }
+
+      return [
+        {
+          id: savedCardId,
+          savedAt,
+          possiblePattern: card.possiblePattern,
+          evidence: card.evidence,
+          overgeneralizationRisk: card.overgeneralizationRisk,
+          beforeStoringDecision: card.beforeStoringDecision,
+          sourceRunId: card.sourceRunId,
+          saveIntentReview,
+        },
+        ...currentCards,
+      ];
+    });
+    setSelectedSavedPatternCardId(savedCardId);
+    setSelectedSessionPatternCardId(null);
+    setShowSessionPatternCards(true);
+  }
+
+  function reopenSavedPatternCardAsDraft(card: QuinnSavedPatternCard) {
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(
+      buildQuinnDraftPatternCardPacketFromSessionCard({
+        possiblePattern: card.possiblePattern,
+        evidence: card.evidence,
+        overgeneralizationRisk: card.overgeneralizationRisk,
+        beforeStoringDecision: card.beforeStoringDecision,
+        createdAt: card.savedAt,
+        sourceRunId: card.sourceRunId,
+      })
+    );
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
   function getSessionPatternCardDuplicateKey(card: {
     possiblePattern: string;
     evidence: string;
@@ -2732,6 +2816,16 @@ function QuinnConversationSurface({
     }
 
     onChangeSessionPatternCards((currentCards) =>
+      currentCards.filter((card) => card.id !== cardId)
+    );
+  }
+
+  function removeSavedPatternCard(cardId: string) {
+    if (selectedSavedPatternCardId === cardId) {
+      setSelectedSavedPatternCardId(null);
+    }
+
+    onChangeSavedPatternCards((currentCards) =>
       currentCards.filter((card) => card.id !== cardId)
     );
   }
@@ -3313,13 +3407,16 @@ function QuinnConversationSurface({
                 <Text style={styles.literalOutcomeHistoryTitle}>Pattern cards</Text>
                 <View style={styles.literalOutcomeHistoryHeaderActions}>
                   <Text style={styles.literalOutcomeHistoryCount}>
-                    {sessionPatternCards.length ? `${sessionPatternCards.length} approved` : 'Local'}
+                    {savedPatternCards.length || sessionPatternCards.length
+                      ? `${savedPatternCards.length} saved / ${sessionPatternCards.length} session`
+                      : 'Local'}
                   </Text>
                   <Pressable
                     style={styles.literalOutcomeHistoryCloseButton}
                     onPress={() => {
                       setShowSessionPatternCards(false);
                       setSelectedSessionPatternCardId(null);
+                      setSelectedSavedPatternCardId(null);
                     }}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
@@ -3343,9 +3440,184 @@ function QuinnConversationSurface({
 
               <ScrollView
                 nestedScrollEnabled
-                showsVerticalScrollIndicator={sessionPatternCards.length > 2}
+                showsVerticalScrollIndicator={savedPatternCards.length + sessionPatternCards.length > 2}
                 style={styles.literalOutcomeHistoryPanelBody}
               >
+                <Text style={styles.literalPatternCardSectionTitle}>Saved locally</Text>
+                {savedPatternCards.length ? (
+                  savedPatternCards.map((card) => {
+                    const isDetailOpen = selectedSavedPatternCardId === card.id;
+                    const saveIntentResult = card.saveIntentReview;
+                    const saveIntentStatus =
+                      saveIntentResult?.saveReadiness || saveIntentResult?.shouldPreserveLater || '';
+
+                    return (
+                      <View key={card.id} style={styles.literalOutcomeHistoryRow}>
+                        <View style={styles.literalOutcomeHistoryRowHeader}>
+                          <Text style={styles.literalPatternCandidateStatus}>Saved locally</Text>
+                          {card.savedAt ? (
+                            <Text style={styles.literalOutcomeHistoryTime}>
+                              {formatOutcomeHistoryTimestamp(card.savedAt)}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Text style={styles.literalOutcomeHistoryLabel}>Possible pattern</Text>
+                        <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                          {card.possiblePattern || 'No pattern captured.'}
+                        </Text>
+                        <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
+                        <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                          {card.evidence || 'No evidence captured.'}
+                        </Text>
+                        <Text style={styles.literalOutcomeHistoryLabel}>Risk</Text>
+                        <Text style={styles.literalOutcomeHistoryText} numberOfLines={2}>
+                          {card.overgeneralizationRisk ||
+                            card.beforeStoringDecision ||
+                            'No risk captured.'}
+                        </Text>
+                        {saveIntentStatus ? (
+                          <>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Save review</Text>
+                            <Text style={styles.literalOutcomeHistoryText} numberOfLines={1}>
+                              {saveIntentStatus}
+                            </Text>
+                          </>
+                        ) : null}
+                        <View style={styles.literalPatternCandidateActionRow}>
+                          <Pressable
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              styles.literalPatternCandidateActionInline,
+                            ]}
+                            onPress={() => reopenSavedPatternCardAsDraft(card)}
+                          >
+                            <Feather name="edit-3" size={12} color="rgba(245, 248, 255, 0.62)" />
+                            <Text style={styles.literalPatternCandidateActionText}>
+                              Reopen as draft
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              styles.literalPatternCandidateActionInline,
+                            ]}
+                            onPress={() => {
+                              setSelectedSavedPatternCardId(card.id);
+                              setSelectedSessionPatternCardId(null);
+                            }}
+                          >
+                            <Feather name="eye" size={12} color="rgba(245, 248, 255, 0.62)" />
+                            <Text style={styles.literalPatternCandidateActionText}>View</Text>
+                          </Pressable>
+                          <Pressable
+                            style={styles.literalPatternCandidateAction}
+                            onPress={() => removeSavedPatternCard(card.id)}
+                          >
+                            <Feather name="trash-2" size={12} color="rgba(245, 248, 255, 0.62)" />
+                            <Text style={styles.literalPatternCandidateActionText}>
+                              Remove saved
+                            </Text>
+                          </Pressable>
+                        </View>
+
+                        {isDetailOpen ? (
+                          <View style={styles.literalSessionPatternCardDetail}>
+                            <View style={styles.literalSessionPatternCardDetailHeader}>
+                              <Text style={styles.literalSessionPatternCardDetailTitle}>
+                                Saved card detail
+                              </Text>
+                              <Pressable
+                                style={styles.literalOutcomeHistoryCloseButton}
+                                onPress={() => setSelectedSavedPatternCardId(null)}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Feather name="x" size={13} color="rgba(245, 248, 255, 0.62)" />
+                                <Text style={styles.literalOutcomeHistoryCloseText}>Close</Text>
+                              </Pressable>
+                            </View>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Possible pattern</Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.possiblePattern || 'No pattern captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Evidence</Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.evidence || 'No evidence captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>
+                              Overgeneralization risk
+                            </Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.overgeneralizationRisk || 'No risk captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>
+                              Before storing decision
+                            </Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.beforeStoringDecision || 'No decision captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Saved at</Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.savedAt
+                                ? formatOutcomeHistoryTimestamp(card.savedAt)
+                                : 'No saved time captured.'}
+                            </Text>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Source run</Text>
+                            <Text style={styles.literalSessionPatternCardDetailText}>
+                              {card.sourceRunId || 'No source run captured.'}
+                            </Text>
+                            <Text style={styles.literalSessionPatternCardDetailSectionTitle}>
+                              Save intent review
+                            </Text>
+                            {saveIntentResult ? (
+                              <>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Save readiness
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {saveIntentResult.saveReadiness || 'No readiness captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Should preserve later
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {saveIntentResult.shouldPreserveLater ||
+                                    'No preserve-later read captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Clarify before storage
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {saveIntentResult.clarifyBeforeStorage ||
+                                    'No clarification captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>Storage risk</Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {saveIntentResult.storageRisk || 'No storage risk captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Next best move
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {saveIntentResult.nextBestMove || 'No next move captured.'}
+                                </Text>
+                              </>
+                            ) : (
+                              <Text style={styles.literalSessionPatternCardDetailText}>
+                                No save-intent review captured on this saved card.
+                              </Text>
+                            )}
+                          </View>
+                        ) : null}
+                      </View>
+                    );
+                  })
+                ) : (
+                  <Text style={styles.literalOutcomeHistoryEmpty}>
+                    No saved pattern cards yet.
+                  </Text>
+                )}
+
+                <Text style={styles.literalPatternCardSectionTitle}>Session cards</Text>
                 {sessionPatternCards.length ? (
                   sessionPatternCards.map((card) => {
                     const isDetailOpen = selectedSessionPatternCardId === card.id;
@@ -3355,11 +3627,16 @@ function QuinnConversationSurface({
                     );
                     const saveIntentStatus =
                       saveIntentResult?.saveReadiness || saveIntentResult?.shouldPreserveLater || '';
+                    const isSavedLocally = savedPatternCards.some(
+                      (savedCard) =>
+                        getSessionPatternCardDuplicateKey(savedCard) ===
+                        getSessionPatternCardDuplicateKey(card)
+                    );
 
                     return (
                       <View key={card.id} style={styles.literalOutcomeHistoryRow}>
                         <View style={styles.literalOutcomeHistoryRowHeader}>
-                          <Text style={styles.literalPatternCandidateStatus}>Approved</Text>
+                          <Text style={styles.literalPatternCandidateStatus}>Approved session</Text>
                           {card.createdAt ? (
                             <Text style={styles.literalOutcomeHistoryTime}>
                               {formatOutcomeHistoryTimestamp(card.createdAt)}
@@ -3406,7 +3683,10 @@ function QuinnConversationSurface({
                               styles.literalPatternCandidateAction,
                               styles.literalPatternCandidateActionInline,
                             ]}
-                            onPress={() => setSelectedSessionPatternCardId(card.id)}
+                            onPress={() => {
+                              setSelectedSessionPatternCardId(card.id);
+                              setSelectedSavedPatternCardId(null);
+                            }}
                           >
                             <Feather name="eye" size={12} color="rgba(245, 248, 255, 0.62)" />
                             <Text style={styles.literalPatternCandidateActionText}>View</Text>
@@ -3423,6 +3703,42 @@ function QuinnConversationSurface({
                               Save intent
                             </Text>
                           </Pressable>
+                          {saveIntentResult ? (
+                            isSavedLocally ? (
+                              <View
+                                style={[
+                                  styles.literalPatternCandidateAction,
+                                  styles.literalPatternCandidateActionInline,
+                                ]}
+                              >
+                                <Feather
+                                  name="check"
+                                  size={12}
+                                  color="rgba(245, 248, 255, 0.62)"
+                                />
+                                <Text style={styles.literalPatternCandidateActionText}>
+                                  Saved locally
+                                </Text>
+                              </View>
+                            ) : (
+                              <Pressable
+                                style={[
+                                  styles.literalPatternCandidateAction,
+                                  styles.literalPatternCandidateActionInline,
+                                ]}
+                                onPress={() => saveSessionPatternCardLocally(card)}
+                              >
+                                <Feather
+                                  name="save"
+                                  size={12}
+                                  color="rgba(245, 248, 255, 0.62)"
+                                />
+                                <Text style={styles.literalPatternCandidateActionText}>
+                                  Save locally
+                                </Text>
+                              </Pressable>
+                            )
+                          ) : null}
                           <Pressable
                             style={styles.literalPatternCandidateAction}
                             onPress={() => removeSessionPatternCard(card.id)}
@@ -4331,6 +4647,7 @@ export default function App() {
   const [runError, setRunError] = useState('');
   const [recentRuns, setRecentRuns] = useState<RunHistoryItem[]>([]);
   const [sessionPatternCards, setSessionPatternCards] = useState<QuinnSessionPatternCard[]>([]);
+  const [savedPatternCards, setSavedPatternCards] = useState<QuinnSavedPatternCard[]>([]);
   const [memories, setMemories] = useState<MemoryItem[]>(INITIAL_MEMORIES);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [settings, setSettings] = useState<QuinnSettings>(INITIAL_SETTINGS);
@@ -4434,6 +4751,9 @@ export default function App() {
         setCurrentSessionArc(snapshot.currentSessionArc || null);
         setLastRunAt(snapshot.lastRunAt || null);
         setRecentRuns(hydratedRecentRuns);
+        setSavedPatternCards(
+          Array.isArray(snapshot.savedPatternCards) ? snapshot.savedPatternCards : []
+        );
         setMemories(
           Array.isArray(snapshot.memories) && snapshot.memories.length
             ? snapshot.memories
@@ -4473,6 +4793,7 @@ export default function App() {
         currentSessionArc,
         lastRunAt,
         recentRuns,
+        savedPatternCards,
         memories,
         notifications,
         settings,
@@ -4503,6 +4824,7 @@ export default function App() {
     currentSessionArc,
     lastRunAt,
     recentRuns,
+    savedPatternCards,
     memories,
     notifications,
     settings,
@@ -5082,9 +5404,11 @@ export default function App() {
         isStagingNextMove={isStagingNextMove}
         runError={runError}
         sessionPatternCards={sessionPatternCards}
+        savedPatternCards={savedPatternCards}
         onTriggerWave={triggerWave}
         onChangePacketText={setPacketText}
         onChangeSessionPatternCards={setSessionPatternCards}
+        onChangeSavedPatternCards={setSavedPatternCards}
         onSelectLens={setActiveLensId}
         onStageNextMove={handleStageNextMove}
         onStartFreshArc={handleStartFreshArc}
@@ -8111,6 +8435,15 @@ responseReplayButton: {
     fontSize: 11.5,
     lineHeight: 15,
     fontWeight: '800',
+  },
+
+  literalPatternCardSectionTitle: {
+    color: 'rgba(245, 248, 255, 0.54)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginTop: 8,
   },
 
   literalOutcomeHistoryTime: {

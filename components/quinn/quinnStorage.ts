@@ -1,5 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { INITIAL_SETTINGS, INITIAL_VOICE_SETTINGS } from './quinnAppState';
+import {
+    INITIAL_SETTINGS,
+    INITIAL_VOICE_SETTINGS,
+    type QuinnPatternCardSaveIntentReview,
+    type QuinnSavedPatternCard,
+} from './quinnAppState';
 import {
     MemoryItem,
     MemoryResonanceItem,
@@ -28,6 +33,7 @@ export type QuinnSnapshot = {
   recentRuns: RunHistoryItem[];
   memories: MemoryItem[];
   notifications: NotificationItem[];
+  savedPatternCards: QuinnSavedPatternCard[];
   settings: QuinnSettings;
   voiceSessions: VoiceSession[];
   voiceSettings: VoiceSettings;
@@ -172,6 +178,58 @@ function normalizeRunHistoryItem(item: any): RunHistoryItem | null {
   };
 }
 
+function normalizeSavedPatternCardSaveIntentReview(
+  item: any
+): QuinnPatternCardSaveIntentReview | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const review = {
+    saveReadiness: String(item.saveReadiness || '').trim(),
+    shouldPreserveLater: String(item.shouldPreserveLater || '').trim(),
+    clarifyBeforeStorage: String(item.clarifyBeforeStorage || '').trim(),
+    storageRisk: String(item.storageRisk || '').trim(),
+    nextBestMove: String(item.nextBestMove || '').trim(),
+  };
+
+  if (
+    !review.saveReadiness &&
+    !review.shouldPreserveLater &&
+    !review.clarifyBeforeStorage &&
+    !review.storageRisk &&
+    !review.nextBestMove
+  ) {
+    return null;
+  }
+
+  return review;
+}
+
+function normalizeSavedPatternCard(item: any): QuinnSavedPatternCard | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const possiblePattern = String(item.possiblePattern || '').trim();
+  const evidence = String(item.evidence || '').trim();
+
+  if (!possiblePattern && !evidence) {
+    return null;
+  }
+
+  return {
+    id: String(item.id || `saved-pattern-card-${String(item.savedAt || Date.now())}`),
+    savedAt: String(item.savedAt || new Date().toISOString()),
+    possiblePattern: possiblePattern || 'Untitled pattern card',
+    evidence,
+    overgeneralizationRisk: String(item.overgeneralizationRisk || '').trim(),
+    beforeStoringDecision: String(item.beforeStoringDecision || '').trim(),
+    sourceRunId: String(item.sourceRunId || '').trim(),
+    saveIntentReview: normalizeSavedPatternCardSaveIntentReview(item.saveIntentReview),
+  };
+}
+
 function normalizeMemoryItem(item: any): MemoryItem | null {
   if (!item || typeof item !== 'object') {
     return null;
@@ -311,6 +369,14 @@ function normalizeSnapshot(data: any): QuinnSnapshot {
         .filter((item: NotificationItem | null): item is NotificationItem => Boolean(item))
     : [];
 
+  const savedPatternCards = Array.isArray(data?.savedPatternCards)
+    ? data.savedPatternCards
+        .map(normalizeSavedPatternCard)
+        .filter(
+          (item: QuinnSavedPatternCard | null): item is QuinnSavedPatternCard => Boolean(item)
+        )
+    : [];
+
   const voiceSessions = Array.isArray(data?.voiceSessions)
     ? data.voiceSessions
         .map(normalizeVoiceSession)
@@ -328,6 +394,7 @@ function normalizeSnapshot(data: any): QuinnSnapshot {
     recentRuns,
     memories,
     notifications,
+    savedPatternCards,
     settings: data?.settings ? normalizeSettings(data.settings) : INITIAL_SETTINGS,
     voiceSessions,
     voiceSettings: data?.voiceSettings

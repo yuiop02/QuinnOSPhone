@@ -61,6 +61,14 @@ function formatRunTimestamp(value: string | null | undefined) {
   return clean || '(none yet)';
 }
 
+export type QuinnPatternCardSaveIntentReview = {
+  saveReadiness: string;
+  shouldPreserveLater: string;
+  clarifyBeforeStorage: string;
+  storageRisk: string;
+  nextBestMove: string;
+};
+
 export type QuinnExportSessionPatternCard = {
   createdAt: string;
   possiblePattern: string;
@@ -68,13 +76,18 @@ export type QuinnExportSessionPatternCard = {
   overgeneralizationRisk: string;
   beforeStoringDecision: string;
   sourceRunId: string;
-  saveIntentReview?: {
-    saveReadiness: string;
-    shouldPreserveLater: string;
-    clarifyBeforeStorage: string;
-    storageRisk: string;
-    nextBestMove: string;
-  } | null;
+  saveIntentReview?: QuinnPatternCardSaveIntentReview | null;
+};
+
+export type QuinnSavedPatternCard = {
+  id: string;
+  savedAt: string;
+  possiblePattern: string;
+  evidence: string;
+  overgeneralizationRisk: string;
+  beforeStoringDecision: string;
+  sourceRunId: string;
+  saveIntentReview: QuinnPatternCardSaveIntentReview | null;
 };
 
 type SessionPatternCardExportInput = QuinnExportSessionPatternCard;
