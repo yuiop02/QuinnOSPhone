@@ -18,7 +18,11 @@ export type QuinnIntakeFormId =
   | 'default-map'
   | 'outcome-log';
 
-export type QuinnPacketKindId = QuinnIntakeFormId | 'draft-pattern-card' | 'pattern-card-save-intent';
+export type QuinnPacketKindId =
+  | QuinnIntakeFormId
+  | 'draft-pattern-card'
+  | 'pattern-card-save-intent'
+  | 'pattern-card-application';
 
 export type QuinnIntakeFormDefinition = {
   id: QuinnIntakeFormId;
@@ -150,9 +154,15 @@ export type QuinnSessionPatternCardDraftSource = {
 
 export type QuinnPatternCardSaveIntentSource = QuinnSessionPatternCardDraftSource;
 
+export type QuinnPatternCardApplicationSource = QuinnSessionPatternCardDraftSource & {
+  savedAt?: string;
+  saveIntentReview?: QuinnPatternCardSaveIntentResultPreview | null;
+};
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 const QUINN_PATTERN_CARD_SAVE_INTENT_MARKER = 'QUINNOS PATTERN CARD SAVE INTENT';
+const QUINN_PATTERN_CARD_APPLICATION_MARKER = 'QUINNOS PATTERN CARD APPLICATION';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -502,6 +512,89 @@ export function buildQuinnPatternCardSaveIntentPacket(
     '',
     'OUTPUT I NEED FROM REN:',
     'Use the SAVE INTENT OUTPUT SHAPE. Evaluate this as a save-intent review only. Do not treat it as stored memory. Say whether this card seems specific enough, useful enough, and safe enough to preserve later. Name what should be clarified before storage. Return visible text.',
+    ...QUINNOS_RESPONSE_PROTOCOL,
+  ].join('\n');
+}
+
+export function buildQuinnPatternCardApplicationPacket(
+  card: QuinnPatternCardApplicationSource
+) {
+  const saveIntentReview = card.saveIntentReview;
+
+  return [
+    'QUINNOS PATTERN CARD APPLICATION',
+    '',
+    'PURPOSE:',
+    'Test whether this saved Pattern Card applies to a current situation without treating it as automatic truth.',
+    '',
+    'SAVED PATTERN:',
+    formatQuinnDraftPatternCardValue(card.possiblePattern, '[No saved pattern captured.]'),
+    '',
+    'EVIDENCE:',
+    formatQuinnDraftPatternCardValue(card.evidence, '[No evidence captured.]'),
+    '',
+    'OVERGENERALIZATION RISK:',
+    formatQuinnDraftPatternCardValue(
+      card.overgeneralizationRisk,
+      '[No overgeneralization risk captured.]'
+    ),
+    '',
+    'BEFORE USING THIS PATTERN, REMEMBER:',
+    formatQuinnDraftPatternCardValue(
+      card.beforeStoringDecision,
+      '[No before-using note captured.]'
+    ),
+    '',
+    'SAVE INTENT REVIEW:',
+    'Save readiness:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.saveReadiness || '',
+      '[No save readiness captured.]'
+    ),
+    '',
+    'Should preserve later:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.shouldPreserveLater || '',
+      '[No preserve-later read captured.]'
+    ),
+    '',
+    'Clarify before storage:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.clarifyBeforeStorage || '',
+      '[No clarification captured.]'
+    ),
+    '',
+    'Storage risk:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.storageRisk || '',
+      '[No storage risk captured.]'
+    ),
+    '',
+    'Next best move:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.nextBestMove || '',
+      '[No next move captured.]'
+    ),
+    '',
+    'CURRENT SITUATION:',
+    '[Quinn describes what is happening now.]',
+    '',
+    'WHAT I AM TEMPTED TO ASSUME:',
+    '[Quinn fills this in.]',
+    '',
+    'WHAT I NEED FROM REN:',
+    'Use this saved card as a possible lens, not as automatic truth. Tell me whether it applies, where it does not apply, what evidence supports or weakens it, and the most useful next move.',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
+    '',
+    'APPLICATION OUTPUT SHAPE:',
+    'Return exactly these sections:',
+    'APPLIES?',
+    'SUPPORTING EVIDENCE:',
+    'LIMITS / MISFIT:',
+    'RISK OF OVERUSING THIS PATTERN:',
+    'NEXT BEST MOVE:',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
@@ -1162,6 +1255,16 @@ export function getQuinnIntakeFormKindFromPacketText(
   packetText: string
 ): QuinnIntakeFormPacketKind | null {
   const text = String(packetText || '');
+
+  if (text.includes(QUINN_PATTERN_CARD_APPLICATION_MARKER)) {
+    return {
+      id: 'pattern-card-application',
+      label: 'Card Check',
+      icon: 'target',
+      marker: QUINN_PATTERN_CARD_APPLICATION_MARKER,
+      isOutcomeLog: false,
+    };
+  }
 
   if (text.includes(QUINN_PATTERN_CARD_SAVE_INTENT_MARKER)) {
     return {

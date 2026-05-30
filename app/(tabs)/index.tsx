@@ -110,6 +110,7 @@ import {
   buildQuinnDraftPatternCardPacketFromSessionCard,
   buildQuinnIntakeFormPacket,
   buildQuinnOutcomeLogPacketFromRun,
+  buildQuinnPatternCardApplicationPacket,
   buildQuinnPatternCardSaveIntentPacket,
   getQuinnDraftPatternCardHistoryPreview,
   getQuinnDraftPatternCardResultPreview,
@@ -2794,6 +2795,13 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function stageSavedPatternCardApplication(card: QuinnSavedPatternCard) {
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(buildQuinnPatternCardApplicationPacket(card));
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
   function getSessionPatternCardDuplicateKey(card: {
     possiblePattern: string;
     evidence: string;
@@ -3663,6 +3671,18 @@ function QuinnConversationSurface({
                           </>
                         ) : null}
                         <View style={styles.literalPatternCandidateActionRow}>
+                          <Pressable
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              styles.literalPatternCandidateActionInline,
+                            ]}
+                            onPress={() => stageSavedPatternCardApplication(card)}
+                          >
+                            <Feather name="target" size={12} color="rgba(245, 248, 255, 0.62)" />
+                            <Text style={styles.literalPatternCandidateActionText}>
+                              Apply card
+                            </Text>
+                          </Pressable>
                           <Pressable
                             style={[
                               styles.literalPatternCandidateAction,
