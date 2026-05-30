@@ -58,6 +58,7 @@ import {
   INITIAL_PACKET_TITLE,
   INITIAL_SETTINGS,
   INITIAL_VOICE_SETTINGS,
+  parseSavedPatternCardsFromExport,
   parseSessionPatternCardsFromExport,
   type QuinnSavedPatternCard,
 } from '../../components/quinn/quinnAppState';
@@ -232,10 +233,10 @@ const SESSION_PATTERN_CARD_IMPORT_TEMPLATE = [
   SESSION_PATTERN_CARD_IMPORT_MARKER,
   '',
   'PURPOSE:',
-  'Restore session-local Pattern Cards from a QuinnOS export. This does not call backend, write memory, or send anything to Ren.',
+  'Restore Pattern Cards from a QuinnOS export. This does not call backend, write memory, or send anything to Ren.',
   '',
   'INSTRUCTIONS:',
-  'Paste a QuinnOS export below, then use the local Import cards action. Do not send this packet.',
+  'Paste a QuinnOS export below, then use the local Import cards action. Session cards and saved cards will be restored into their local shelves. Do not send this packet.',
   '',
   'PASTE EXPORT BELOW:',
   '[Paste QuinnOS export here]',
@@ -2813,27 +2814,28 @@ function QuinnConversationSurface({
   }
 
   function importSessionPatternCardsFromComposer() {
-    const parsedCards = parseSessionPatternCardsFromExport(packetText);
+    const parsedSessionCards = parseSessionPatternCardsFromExport(packetText);
+    const parsedSavedCards = parseSavedPatternCardsFromExport(packetText);
 
-    if (!parsedCards.length) {
-      setSessionPatternCardImportMessage('No Session Pattern Cards found in this export.');
+    if (!parsedSessionCards.length && !parsedSavedCards.length) {
+      setSessionPatternCardImportMessage('No Pattern Cards found in this export.');
       focusLiteralComposerSoon();
       return;
     }
 
-    const existingKeys = new Set(sessionPatternCards.map(getSessionPatternCardDuplicateKey));
     const importedAt = Date.now();
-    const cardsToRestore = parsedCards.reduce<QuinnSessionPatternCard[]>(
+    const existingSessionKeys = new Set(sessionPatternCards.map(getSessionPatternCardDuplicateKey));
+    const sessionCardsToRestore = parsedSessionCards.reduce<QuinnSessionPatternCard[]>(
       (restoredCards, card, index) => {
         const possiblePattern = String(card.possiblePattern || '').trim();
         const evidence = String(card.evidence || '').trim();
         const duplicateKey = getSessionPatternCardDuplicateKey({ possiblePattern, evidence });
 
-        if ((!possiblePattern && !evidence) || existingKeys.has(duplicateKey)) {
+        if ((!possiblePattern && !evidence) || existingSessionKeys.has(duplicateKey)) {
           return restoredCards;
         }
 
-        existingKeys.add(duplicateKey);
+        existingSessionKeys.add(duplicateKey);
         restoredCards.push({
           id: `session-pattern-card-import-${importedAt}-${index}`,
           createdAt: String(card.createdAt || '').trim() || new Date(importedAt).toISOString(),
@@ -2850,33 +2852,86 @@ function QuinnConversationSurface({
       },
       []
     );
+    const existingSavedKeys = new Set(savedPatternCards.map(getSessionPatternCardDuplicateKey));
+    const savedCardsToRestore = parsedSavedCards.reduce<QuinnSavedPatternCard[]>(
+      (restoredCards, card, index) => {
+        const possiblePattern = String(card.possiblePattern || '').trim();
+        const evidence = String(card.evidence || '').trim();
+        const duplicateKey = getSessionPatternCardDuplicateKey({ possiblePattern, evidence });
 
-    if (!cardsToRestore.length) {
+        if ((!possiblePattern && !evidence) || existingSavedKeys.has(duplicateKey)) {
+          return restoredCards;
+        }
+
+        existingSavedKeys.add(duplicateKey);
+        restoredCards.push({
+          id: `saved-pattern-card-import-${importedAt}-${index}`,
+          savedAt: String(card.savedAt || '').trim() || new Date(importedAt).toISOString(),
+          possiblePattern: possiblePattern || 'Untitled pattern card',
+          evidence,
+          overgeneralizationRisk: String(card.overgeneralizationRisk || '').trim(),
+          beforeStoringDecision: String(card.beforeStoringDecision || '').trim(),
+          sourceRunId: String(card.sourceRunId || '').trim() || 'Imported QuinnOS export',
+          saveIntentReview: card.saveIntentReview || null,
+        });
+
+        return restoredCards;
+      },
+      []
+    );
+
+    if (!sessionCardsToRestore.length && !savedCardsToRestore.length) {
       setSessionPatternCardImportMessage('No new cards restored; matching cards are already here.');
       setShowSessionPatternCards(true);
       setShowLiteralTools(false);
       setLongFormComposerCollapsed(true);
       setSelectedSessionPatternCardId(null);
+      setSelectedSavedPatternCardId(null);
       return;
     }
 
-    onChangeSessionPatternCards((currentCards) => {
-      const currentKeys = new Set(currentCards.map(getSessionPatternCardDuplicateKey));
-      const newCards = cardsToRestore.filter((card) => {
-        const duplicateKey = getSessionPatternCardDuplicateKey(card);
+    if (sessionCardsToRestore.length) {
+      onChangeSessionPatternCards((currentCards) => {
+        const currentKeys = new Set(currentCards.map(getSessionPatternCardDuplicateKey));
+        const newCards = sessionCardsToRestore.filter((card) => {
+          const duplicateKey = getSessionPatternCardDuplicateKey(card);
 
-        if (currentKeys.has(duplicateKey)) {
-          return false;
-        }
+          if (currentKeys.has(duplicateKey)) {
+            return false;
+          }
 
-        currentKeys.add(duplicateKey);
-        return true;
+          currentKeys.add(duplicateKey);
+          return true;
+        });
+
+        return newCards.length ? [...newCards, ...currentCards] : currentCards;
       });
+    }
 
-      return newCards.length ? [...newCards, ...currentCards] : currentCards;
-    });
+    if (savedCardsToRestore.length) {
+      onChangeSavedPatternCards((currentCards) => {
+        const currentKeys = new Set(currentCards.map(getSessionPatternCardDuplicateKey));
+        const newCards = savedCardsToRestore.filter((card) => {
+          const duplicateKey = getSessionPatternCardDuplicateKey(card);
+
+          if (currentKeys.has(duplicateKey)) {
+            return false;
+          }
+
+          currentKeys.add(duplicateKey);
+          return true;
+        });
+
+        return newCards.length ? [...newCards, ...currentCards] : currentCards;
+      });
+    }
+
     setSessionPatternCardImportMessage(
-      `Restored ${cardsToRestore.length} pattern card${cardsToRestore.length === 1 ? '' : 's'}.`
+      `Restored ${sessionCardsToRestore.length} session card${
+        sessionCardsToRestore.length === 1 ? '' : 's'
+      } and ${savedCardsToRestore.length} saved card${
+        savedCardsToRestore.length === 1 ? '' : 's'
+      }.`
     );
     setShowOutcomeHistory(false);
     setShowPatternCandidates(false);
@@ -2885,6 +2940,7 @@ function QuinnConversationSurface({
     setShowLiteralTools(false);
     setLongFormComposerCollapsed(true);
     setSelectedSessionPatternCardId(null);
+    setSelectedSavedPatternCardId(null);
   }
 
   function removeSessionPatternCard(cardId: string) {
@@ -3974,9 +4030,9 @@ function QuinnConversationSurface({
           {isSessionPatternCardImportDraft ? (
             <View style={styles.literalSessionPatternImportControl}>
               <View style={styles.literalSessionPatternImportTextWrap}>
-                <Text style={styles.literalSessionPatternImportTitle}>Session card import</Text>
+                <Text style={styles.literalSessionPatternImportTitle}>Pattern card import</Text>
                 <Text style={styles.literalSessionPatternImportHint}>
-                  Paste export text below, then restore locally.
+                  Paste export text below, then restore session and saved cards locally.
                 </Text>
               </View>
               <Pressable
@@ -4975,6 +5031,7 @@ export default function App() {
       lastRunAt,
       recentRuns,
       sessionPatternCards: sessionPatternCardsForExport,
+      savedPatternCards,
       memories,
       notifications,
       settings,
@@ -4992,6 +5049,7 @@ export default function App() {
       lastRunAt,
       recentRuns,
       sessionPatternCards,
+      savedPatternCards,
       memories,
       notifications,
       settings,

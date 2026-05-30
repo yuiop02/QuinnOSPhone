@@ -91,6 +91,10 @@ export type QuinnSavedPatternCard = {
 };
 
 type SessionPatternCardExportInput = QuinnExportSessionPatternCard;
+type SavedPatternCardExportInput = QuinnSavedPatternCard;
+type ParsedPatternCardExportItem = QuinnExportSessionPatternCard & {
+  savedAt?: string;
+};
 
 function cleanImportedSessionPatternCardValue(value: string) {
   const clean = String(value || '').replace(/\s+/g, ' ').trim();
@@ -122,7 +126,7 @@ function getImportedSessionPatternCardField(lines: string[], label: string) {
 }
 
 function normalizeExportedSessionPatternCardSaveIntentReview(
-  review: QuinnExportSessionPatternCard['saveIntentReview']
+  review: QuinnPatternCardSaveIntentReview | null | undefined
 ) {
   if (!review) {
     return null;
@@ -149,7 +153,9 @@ function normalizeExportedSessionPatternCardSaveIntentReview(
   return cleanReview;
 }
 
-function getSessionPatternCardSaveIntentExportLines(card: QuinnExportSessionPatternCard) {
+function getSessionPatternCardSaveIntentExportLines(card: {
+  saveIntentReview?: QuinnPatternCardSaveIntentReview | null;
+}) {
   const review = normalizeExportedSessionPatternCardSaveIntentReview(card.saveIntentReview);
 
   if (!review) {
@@ -165,11 +171,13 @@ function getSessionPatternCardSaveIntentExportLines(card: QuinnExportSessionPatt
   ];
 }
 
-export function parseSessionPatternCardsFromExport(
-  exportText: string
-): QuinnExportSessionPatternCard[] {
+function parsePatternCardsFromExportSection(
+  exportText: string,
+  heading: string
+): ParsedPatternCardExportItem[] {
   const text = String(exportText || '').replace(/\r\n/g, '\n');
-  const headingMatch = text.match(/^## Session Pattern Cards\s*$/m);
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const headingMatch = text.match(new RegExp(`^## ${escapedHeading}\\s*$`, 'm'));
 
   if (!headingMatch || headingMatch.index === undefined) {
     return [];
@@ -208,13 +216,14 @@ export function parseSessionPatternCardsFromExport(
     cardBlocks.push(currentBlock);
   }
 
-  return cardBlocks.reduce<QuinnExportSessionPatternCard[]>((cards, lines) => {
+  return cardBlocks.reduce<ParsedPatternCardExportItem[]>((cards, lines) => {
       const titleLine = lines[0] || '';
       const possiblePattern = cleanImportedSessionPatternCardValue(
         titleLine.replace(/^###\s+\d+\.\s+/, '')
       );
       const card = {
         createdAt: getImportedSessionPatternCardField(lines, 'Created'),
+        savedAt: getImportedSessionPatternCardField(lines, 'Saved time'),
         possiblePattern,
         evidence: getImportedSessionPatternCardField(lines, 'Evidence'),
         overgeneralizationRisk: getImportedSessionPatternCardField(
@@ -254,6 +263,8 @@ export function parseSessionPatternCardsFromExport(
         !card.overgeneralizationRisk &&
         !card.beforeStoringDecision &&
         !card.sourceRunId &&
+        !card.createdAt &&
+        !card.savedAt &&
         !hasSaveIntentReview
       ) {
         return cards;
@@ -266,6 +277,35 @@ export function parseSessionPatternCardsFromExport(
 
       return cards;
     }, []);
+}
+
+export function parseSessionPatternCardsFromExport(
+  exportText: string
+): QuinnExportSessionPatternCard[] {
+  return parsePatternCardsFromExportSection(exportText, 'Session Pattern Cards').map((card) => ({
+    createdAt: String(card.createdAt || '').trim(),
+    possiblePattern: card.possiblePattern,
+    evidence: card.evidence,
+    overgeneralizationRisk: card.overgeneralizationRisk,
+    beforeStoringDecision: card.beforeStoringDecision,
+    sourceRunId: card.sourceRunId,
+    saveIntentReview: card.saveIntentReview,
+  }));
+}
+
+export function parseSavedPatternCardsFromExport(exportText: string): QuinnSavedPatternCard[] {
+  return parsePatternCardsFromExportSection(exportText, 'Saved Pattern Cards').map(
+    (card, index) => ({
+      id: `saved-pattern-card-import-${Date.now()}-${index}`,
+      savedAt: String(card.savedAt || '').trim() || String(card.createdAt || '').trim(),
+      possiblePattern: card.possiblePattern,
+      evidence: card.evidence,
+      overgeneralizationRisk: card.overgeneralizationRisk,
+      beforeStoringDecision: card.beforeStoringDecision,
+      sourceRunId: card.sourceRunId,
+      saveIntentReview: card.saveIntentReview || null,
+    })
+  );
 }
 
 function buildActiveThreadState({
@@ -321,6 +361,7 @@ export function buildExportBundle({
   lastRunAt,
   recentRuns,
   sessionPatternCards = [],
+  savedPatternCards = [],
   memories,
   notifications,
   settings,
@@ -336,6 +377,7 @@ export function buildExportBundle({
   lastRunAt: string | null;
   recentRuns: RunHistoryItem[];
   sessionPatternCards?: SessionPatternCardExportInput[];
+  savedPatternCards?: SavedPatternCardExportInput[];
   memories: MemoryItem[];
   notifications: NotificationItem[];
   settings: QuinnSettings;
@@ -346,6 +388,18 @@ export function buildExportBundle({
   const latestCompletedRun = recentRuns[0] || null;
   const exportedSessionPatternCards = sessionPatternCards.map((card) => ({
     createdAt: String(card.createdAt || '').trim(),
+    possiblePattern: String(card.possiblePattern || '').trim(),
+    evidence: String(card.evidence || '').trim(),
+    overgeneralizationRisk: String(card.overgeneralizationRisk || '').trim(),
+    beforeStoringDecision: String(card.beforeStoringDecision || '').trim(),
+    sourceRunId: String(card.sourceRunId || '').trim(),
+    saveIntentReview: normalizeExportedSessionPatternCardSaveIntentReview(
+      card.saveIntentReview
+    ),
+  }));
+  const exportedSavedPatternCards = savedPatternCards.map((card) => ({
+    id: String(card.id || '').trim(),
+    savedAt: String(card.savedAt || '').trim(),
     possiblePattern: String(card.possiblePattern || '').trim(),
     evidence: String(card.evidence || '').trim(),
     overgeneralizationRisk: String(card.overgeneralizationRisk || '').trim(),
@@ -395,6 +449,7 @@ export function buildExportBundle({
     currentComposer,
     activeThread,
     sessionPatternCards: exportedSessionPatternCards,
+    savedPatternCards: exportedSavedPatternCards,
     latestCompletedRun,
     settings,
     voiceSettings,
@@ -466,6 +521,23 @@ export function buildExportBundle({
         ? exportedSessionPatternCards.flatMap((card, index) => [
             `### ${index + 1}. ${formatOptionalText(card.possiblePattern, 'Untitled pattern card')}`,
             `- Created: ${formatRunTimestamp(card.createdAt)}`,
+            `- Evidence: ${formatOptionalText(card.evidence)}`,
+            `- Overgeneralization risk: ${formatOptionalText(card.overgeneralizationRisk)}`,
+            `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
+            `- Source run: ${formatOptionalText(card.sourceRunId, '(none)')}`,
+            ...getSessionPatternCardSaveIntentExportLines(card),
+            '',
+          ])
+        : ['(none yet)']
+    ),
+    '',
+    '## Saved Pattern Cards',
+    '',
+    ...(
+      exportedSavedPatternCards.length
+        ? exportedSavedPatternCards.flatMap((card, index) => [
+            `### ${index + 1}. ${formatOptionalText(card.possiblePattern, 'Untitled pattern card')}`,
+            `- Saved time: ${formatRunTimestamp(card.savedAt)}`,
             `- Evidence: ${formatOptionalText(card.evidence)}`,
             `- Overgeneralization risk: ${formatOptionalText(card.overgeneralizationRisk)}`,
             `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
@@ -616,6 +688,20 @@ export function buildExportBundle({
       ? exportedSessionPatternCards.flatMap((card, index) => [
           `${index + 1}. ${formatOptionalText(card.possiblePattern, 'Untitled pattern card')}`,
           `- Created: ${formatRunTimestamp(card.createdAt)}`,
+          `- Evidence: ${formatOptionalText(card.evidence)}`,
+          `- Overgeneralization risk: ${formatOptionalText(card.overgeneralizationRisk)}`,
+          `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
+          `- Source run: ${formatOptionalText(card.sourceRunId, '(none)')}`,
+          ...getSessionPatternCardSaveIntentExportLines(card),
+          '',
+        ])
+      : ['(none yet)']),
+    '',
+    'Saved pattern cards:',
+    ...(exportedSavedPatternCards.length
+      ? exportedSavedPatternCards.flatMap((card, index) => [
+          `${index + 1}. ${formatOptionalText(card.possiblePattern, 'Untitled pattern card')}`,
+          `- Saved time: ${formatRunTimestamp(card.savedAt)}`,
           `- Evidence: ${formatOptionalText(card.evidence)}`,
           `- Overgeneralization risk: ${formatOptionalText(card.overgeneralizationRisk)}`,
           `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
