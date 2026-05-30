@@ -117,6 +117,8 @@ import {
   getQuinnIntakeFormKindFromPacketText,
   getQuinnOutcomeLogHistoryPreview,
   getQuinnOutcomeLogMinimumCaptureStatus,
+  getQuinnPatternCardApplicationPacketPreview,
+  getQuinnPatternCardApplicationResultPreview,
   getQuinnPatternCardSaveIntentPacketPreview,
   getQuinnPatternCardSaveIntentResultPreview,
   getQuinnPatternCandidatePreview,
@@ -124,6 +126,8 @@ import {
   type QuinnDraftPatternCardResultPreview,
   type QuinnIntakeFormDefinition,
   type QuinnOutcomeLogHistoryPreview,
+  type QuinnPatternCardApplicationPacketPreview,
+  type QuinnPatternCardApplicationResultPreview,
   type QuinnPatternCardSaveIntentPacketPreview,
   type QuinnPatternCardSaveIntentResultPreview,
   type QuinnPatternCandidatePreview,
@@ -179,6 +183,12 @@ type QuinnPatternCardSaveIntentReviewItem = QuinnPatternCardSaveIntentPacketPrev
   id: string;
   timestamp: string;
   resultPreview: QuinnPatternCardSaveIntentResultPreview;
+};
+
+type QuinnPatternCardApplicationReviewItem = QuinnPatternCardApplicationPacketPreview & {
+  id: string;
+  timestamp: string;
+  resultPreview: QuinnPatternCardApplicationResultPreview;
 };
 
 type QuinnSessionPatternCard = {
@@ -506,6 +516,32 @@ function buildSaveIntentReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) 
   return items;
 }
 
+function buildApplicationReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) {
+  const items: QuinnPatternCardApplicationReviewItem[] = [];
+
+  for (const run of recentRuns) {
+    const preview = getQuinnPatternCardApplicationPacketPreview(run.packetText || '');
+    const resultPreview = getQuinnPatternCardApplicationResultPreview(
+      sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+    );
+
+    if (preview && resultPreview) {
+      items.push({
+        id: String(run.id || run.timestamp || items.length),
+        timestamp: String(run.timestamp || ''),
+        resultPreview,
+        ...preview,
+      });
+    }
+
+    if (items.length >= 10) {
+      break;
+    }
+  }
+
+  return items;
+}
+
 function getSaveIntentReviewForSessionPatternCard(
   card: QuinnSessionPatternCard,
   saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[]
@@ -531,6 +567,28 @@ function getSaveIntentReviewForSessionPatternCard(
   });
 
   return recentReview?.resultPreview || card.saveIntentReview || null;
+}
+
+function getApplicationReviewForSavedPatternCard(
+  card: QuinnSavedPatternCard,
+  applicationReviewItems: QuinnPatternCardApplicationReviewItem[]
+) {
+  const cardPattern = normalizeSessionPatternCardReviewValue(card.possiblePattern);
+  const cardEvidence = normalizeSessionPatternCardReviewValue(card.evidence);
+
+  const recentReview = applicationReviewItems.find((item) => {
+    const itemPattern = normalizeSessionPatternCardReviewValue(item.savedPattern);
+    const itemEvidence = normalizeSessionPatternCardReviewValue(item.evidence);
+
+    return Boolean(
+      cardPattern &&
+        cardEvidence &&
+        itemPattern === cardPattern &&
+        itemEvidence === cardEvidence
+    );
+  });
+
+  return recentReview?.resultPreview || null;
 }
 
 const TopFadeWall = React.memo(function TopFadeWall() {
@@ -1681,6 +1739,9 @@ function QuinnConversationSurface({
   }, [recentRuns]);
   const saveIntentReviewItems = React.useMemo<QuinnPatternCardSaveIntentReviewItem[]>(() => {
     return buildSaveIntentReviewItemsFromRecentRuns(recentRuns);
+  }, [recentRuns]);
+  const applicationReviewItems = React.useMemo<QuinnPatternCardApplicationReviewItem[]>(() => {
+    return buildApplicationReviewItemsFromRecentRuns(recentRuns);
   }, [recentRuns]);
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
@@ -3637,6 +3698,11 @@ function QuinnConversationSurface({
                     const saveIntentResult = card.saveIntentReview;
                     const saveIntentStatus =
                       saveIntentResult?.saveReadiness || saveIntentResult?.shouldPreserveLater || '';
+                    const applicationResult = getApplicationReviewForSavedPatternCard(
+                      card,
+                      applicationReviewItems
+                    );
+                    const applicationStatus = applicationResult?.applies || '';
 
                     return (
                       <View key={card.id} style={styles.literalOutcomeHistoryRow}>
@@ -3667,6 +3733,14 @@ function QuinnConversationSurface({
                             <Text style={styles.literalOutcomeHistoryLabel}>Save review</Text>
                             <Text style={styles.literalOutcomeHistoryText} numberOfLines={1}>
                               {saveIntentStatus}
+                            </Text>
+                          </>
+                        ) : null}
+                        {applicationStatus ? (
+                          <>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Last check</Text>
+                            <Text style={styles.literalOutcomeHistoryText} numberOfLines={1}>
+                              {applicationStatus}
                             </Text>
                           </>
                         ) : null}
@@ -3803,6 +3877,46 @@ function QuinnConversationSurface({
                             ) : (
                               <Text style={styles.literalSessionPatternCardDetailText}>
                                 No save-intent review captured on this saved card.
+                              </Text>
+                            )}
+                            <Text style={styles.literalSessionPatternCardDetailSectionTitle}>
+                              Application check
+                            </Text>
+                            {applicationResult ? (
+                              <>
+                                <Text style={styles.literalOutcomeHistoryLabel}>Applies?</Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {applicationResult.applies || 'No applies read captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Supporting evidence
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {applicationResult.supportingEvidence ||
+                                    'No supporting evidence captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Limits / misfit
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {applicationResult.limitsMisfit || 'No limits captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Risk of overusing this pattern
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {applicationResult.overuseRisk || 'No overuse risk captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Next best move
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {applicationResult.nextBestMove || 'No next move captured.'}
+                                </Text>
+                              </>
+                            ) : (
+                              <Text style={styles.literalSessionPatternCardDetailText}>
+                                No application check yet.
                               </Text>
                             )}
                           </View>

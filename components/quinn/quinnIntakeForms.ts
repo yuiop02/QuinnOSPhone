@@ -141,6 +141,20 @@ export type QuinnPatternCardSaveIntentResultPreview = {
   nextBestMove: string;
 };
 
+export type QuinnPatternCardApplicationPacketPreview = {
+  savedPattern: string;
+  evidence: string;
+  currentSituation: string;
+};
+
+export type QuinnPatternCardApplicationResultPreview = {
+  applies: string;
+  supportingEvidence: string;
+  limitsMisfit: string;
+  overuseRisk: string;
+  nextBestMove: string;
+};
+
 export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
 
 export type QuinnSessionPatternCardDraftSource = {
@@ -202,6 +216,18 @@ function getQuinnPacketSectionValue(lines: string[], heading: string) {
     .slice(headingIndex + 1, nextHeadingIndex < 0 ? undefined : nextHeadingIndex)
     .join('\n')
     .trim();
+}
+
+function getQuinnPacketSectionValueFromHeadings(lines: string[], headings: string[]) {
+  for (const heading of headings) {
+    const value = getQuinnPacketSectionValue(lines, heading);
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return '';
 }
 
 function getQuinnPacketLabeledLineValue(lines: string[], label: string) {
@@ -597,6 +623,74 @@ export function buildQuinnPatternCardApplicationPacket(
     'NEXT BEST MOVE:',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
+}
+
+export function getQuinnPatternCardApplicationPacketPreview(
+  packetText: string
+): QuinnPatternCardApplicationPacketPreview | null {
+  const text = String(packetText || '');
+
+  if (!text.includes(QUINN_PATTERN_CARD_APPLICATION_MARKER)) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const preview = {
+    savedPattern: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'SAVED PATTERN:')
+    ),
+    evidence: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'EVIDENCE:')),
+    currentSituation: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'CURRENT SITUATION:')
+    ),
+  };
+
+  if (!preview.savedPattern && !preview.evidence && !preview.currentSituation) {
+    return null;
+  }
+
+  return preview;
+}
+
+export function getQuinnPatternCardApplicationResultPreview(
+  responseText: string
+): QuinnPatternCardApplicationResultPreview | null {
+  const text = String(responseText || '').trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const preview = {
+    applies: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValueFromHeadings(lines, ['APPLIES?', 'APPLIES?:'])
+    ),
+    supportingEvidence: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'SUPPORTING EVIDENCE:')
+    ),
+    limitsMisfit: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'LIMITS / MISFIT:')
+    ),
+    overuseRisk: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'RISK OF OVERUSING THIS PATTERN:')
+    ),
+    nextBestMove: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'NEXT BEST MOVE:')
+    ),
+  };
+
+  if (
+    !preview.applies &&
+    !preview.supportingEvidence &&
+    !preview.limitsMisfit &&
+    !preview.overuseRisk &&
+    !preview.nextBestMove
+  ) {
+    return null;
+  }
+
+  return preview;
 }
 
 export function getQuinnPatternCardSaveIntentPacketPreview(
