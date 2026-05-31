@@ -215,6 +215,13 @@ type QuinnPendingUserBubble = {
   status: 'pending' | 'failed';
 };
 
+type QuinnPatternCardFilter =
+  | 'all'
+  | 'saved'
+  | 'session'
+  | 'with-save-review'
+  | 'with-application-check';
+
 type NumberedOption = {
   index: number;
   text: string;
@@ -239,6 +246,16 @@ const LITERAL_PANEL_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.34);
 const LITERAL_PANEL_BODY_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.27);
 const QUINN_LENSES = getQuinnLenses();
 const SNAPSHOT_PERSIST_DEBOUNCE_MS = 250;
+const PATTERN_CARD_FILTER_OPTIONS: readonly {
+  id: QuinnPatternCardFilter;
+  label: string;
+}[] = [
+  { id: 'all', label: 'All' },
+  { id: 'saved', label: 'Saved' },
+  { id: 'session', label: 'Session' },
+  { id: 'with-save-review', label: 'Save review' },
+  { id: 'with-application-check', label: 'App check' },
+];
 const SESSION_PATTERN_CARD_IMPORT_MARKER = 'QUINNOS SESSION PATTERN CARD IMPORT';
 const SESSION_PATTERN_CARD_IMPORT_TEMPLATE = [
   SESSION_PATTERN_CARD_IMPORT_MARKER,
@@ -589,6 +606,49 @@ function getApplicationReviewForSavedPatternCard(
   });
 
   return recentReview?.resultPreview || card.applicationReview || null;
+}
+
+function getSaveIntentReviewSearchFields(
+  review: QuinnPatternCardSaveIntentResultPreview | null | undefined
+) {
+  if (!review) {
+    return [];
+  }
+
+  return [
+    review.saveReadiness,
+    review.shouldPreserveLater,
+    review.clarifyBeforeStorage,
+    review.storageRisk,
+    review.nextBestMove,
+  ];
+}
+
+function getApplicationReviewSearchFields(
+  review: QuinnPatternCardApplicationResultPreview | null | undefined
+) {
+  if (!review) {
+    return [];
+  }
+
+  return [
+    review.applies,
+    review.supportingEvidence,
+    review.limitsMisfit,
+    review.overuseRisk,
+    review.nextBestMove,
+  ];
+}
+
+function patternCardMatchesSearch(
+  fields: (string | null | undefined)[],
+  normalizedSearchQuery: string
+) {
+  if (!normalizedSearchQuery) {
+    return true;
+  }
+
+  return normalizeSessionPatternCardReviewValue(fields.join(' ')).includes(normalizedSearchQuery);
 }
 
 const TopFadeWall = React.memo(function TopFadeWall() {
@@ -2515,6 +2575,8 @@ function QuinnConversationSurface({
     null
   );
   const [selectedSavedPatternCardId, setSelectedSavedPatternCardId] = useState<string | null>(null);
+  const [patternCardSearchText, setPatternCardSearchText] = useState('');
+  const [patternCardFilter, setPatternCardFilter] = useState<QuinnPatternCardFilter>('all');
   const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
@@ -2547,6 +2609,65 @@ function QuinnConversationSurface({
   const literalComposerInputScrollable = shouldUseLongFormComposer
     ? literalComposerContentHeight > maxLongFormComposerHeight
     : literalComposerContentHeight > COMPACT_LITERAL_COMPOSER_MAX_HEIGHT;
+  const patternCardSearchQuery = normalizeSessionPatternCardReviewValue(patternCardSearchText);
+  const visibleSavedPatternCards = React.useMemo(() => {
+    return savedPatternCards.filter((card) => {
+      const applicationReview = getApplicationReviewForSavedPatternCard(card, applicationReviewItems);
+      const matchesFilter =
+        patternCardFilter === 'all' ||
+        patternCardFilter === 'saved' ||
+        (patternCardFilter === 'with-save-review' && Boolean(card.saveIntentReview)) ||
+        (patternCardFilter === 'with-application-check' && Boolean(applicationReview));
+
+      if (!matchesFilter) {
+        return false;
+      }
+
+      return patternCardMatchesSearch(
+        [
+          card.possiblePattern,
+          card.evidence,
+          card.overgeneralizationRisk,
+          card.beforeStoringDecision,
+          card.sourceRunId,
+          ...getSaveIntentReviewSearchFields(card.saveIntentReview),
+          ...getApplicationReviewSearchFields(applicationReview),
+        ],
+        patternCardSearchQuery
+      );
+    });
+  }, [applicationReviewItems, patternCardFilter, patternCardSearchQuery, savedPatternCards]);
+  const visibleSessionPatternCards = React.useMemo(() => {
+    return sessionPatternCards.filter((card) => {
+      const saveIntentReview = getSaveIntentReviewForSessionPatternCard(card, saveIntentReviewItems);
+      const matchesFilter =
+        patternCardFilter === 'all' ||
+        patternCardFilter === 'session' ||
+        (patternCardFilter === 'with-save-review' && Boolean(saveIntentReview));
+
+      if (!matchesFilter) {
+        return false;
+      }
+
+      return patternCardMatchesSearch(
+        [
+          card.possiblePattern,
+          card.evidence,
+          card.overgeneralizationRisk,
+          card.beforeStoringDecision,
+          card.sourceRunId,
+          ...getSaveIntentReviewSearchFields(saveIntentReview),
+        ],
+        patternCardSearchQuery
+      );
+    });
+  }, [patternCardFilter, patternCardSearchQuery, saveIntentReviewItems, sessionPatternCards]);
+  const hasAnyPatternCards = savedPatternCards.length + sessionPatternCards.length > 0;
+  const hasVisiblePatternCards =
+    visibleSavedPatternCards.length + visibleSessionPatternCards.length > 0;
+  const shouldShowSavedPatternCardSection = patternCardFilter !== 'session';
+  const shouldShowSessionPatternCardSection =
+    patternCardFilter !== 'saved' && patternCardFilter !== 'with-application-check';
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
@@ -2694,6 +2815,8 @@ function QuinnConversationSurface({
 
   function handleStartFreshLiteralArc() {
     resetLiteralComposerExpansion();
+    setPatternCardSearchText('');
+    setPatternCardFilter('all');
     setPendingUserBubble(null);
     setRestorableFailedDraft(null);
     setFailedDraftRestoreMessage('');
@@ -3698,14 +3821,72 @@ function QuinnConversationSurface({
                 </Pressable>
               </View>
 
+              <View style={styles.literalPatternCardSearchPanel}>
+                <View style={styles.literalPatternCardSearchBox}>
+                  <Feather name="search" size={13} color="rgba(245, 248, 255, 0.42)" />
+                  <TextInput
+                    value={patternCardSearchText}
+                    onChangeText={setPatternCardSearchText}
+                    placeholder="Search cards"
+                    placeholderTextColor="rgba(245, 248, 255, 0.34)"
+                    returnKeyType="search"
+                    style={styles.literalPatternCardSearchInput}
+                  />
+                  {patternCardSearchText ? (
+                    <Pressable
+                      style={styles.literalPatternCardSearchClear}
+                      onPress={() => setPatternCardSearchText('')}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Feather name="x" size={12} color="rgba(245, 248, 255, 0.56)" />
+                    </Pressable>
+                  ) : null}
+                </View>
+                <View style={styles.literalPatternCardFilterRow}>
+                  {PATTERN_CARD_FILTER_OPTIONS.map((filterOption) => {
+                    const isActive = patternCardFilter === filterOption.id;
+
+                    return (
+                      <Pressable
+                        key={filterOption.id}
+                        style={[
+                          styles.literalPatternCardFilterChip,
+                          isActive && styles.literalPatternCardFilterChipActive,
+                        ]}
+                        onPress={() => setPatternCardFilter(filterOption.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.literalPatternCardFilterChipText,
+                            isActive && styles.literalPatternCardFilterChipTextActive,
+                          ]}
+                        >
+                          {filterOption.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
               <ScrollView
                 nestedScrollEnabled
-                showsVerticalScrollIndicator={savedPatternCards.length + sessionPatternCards.length > 2}
+                showsVerticalScrollIndicator={
+                  visibleSavedPatternCards.length + visibleSessionPatternCards.length > 2
+                }
                 style={styles.literalOutcomeHistoryPanelBody}
               >
-                <Text style={styles.literalPatternCardSectionTitle}>Saved locally</Text>
-                {savedPatternCards.length ? (
-                  savedPatternCards.map((card) => {
+                {hasAnyPatternCards && !hasVisiblePatternCards ? (
+                  <Text style={styles.literalOutcomeHistoryEmpty}>
+                    No cards match this search/filter.
+                  </Text>
+                ) : (
+                  <>
+                    {shouldShowSavedPatternCardSection ? (
+                      <>
+                        <Text style={styles.literalPatternCardSectionTitle}>Saved locally</Text>
+                        {visibleSavedPatternCards.length ? (
+                          visibleSavedPatternCards.map((card) => {
                     const isDetailOpen = selectedSavedPatternCardId === card.id;
                     const saveIntentResult = card.saveIntentReview;
                     const saveIntentStatus =
@@ -3935,16 +4116,20 @@ function QuinnConversationSurface({
                         ) : null}
                       </View>
                     );
-                  })
-                ) : (
-                  <Text style={styles.literalOutcomeHistoryEmpty}>
-                    No saved pattern cards yet.
-                  </Text>
-                )}
+                          })
+                        ) : (
+                          <Text style={styles.literalOutcomeHistoryEmpty}>
+                            No saved pattern cards yet.
+                          </Text>
+                        )}
+                      </>
+                    ) : null}
 
-                <Text style={styles.literalPatternCardSectionTitle}>Session cards</Text>
-                {sessionPatternCards.length ? (
-                  sessionPatternCards.map((card) => {
+                    {shouldShowSessionPatternCardSection ? (
+                      <>
+                        <Text style={styles.literalPatternCardSectionTitle}>Session cards</Text>
+                        {visibleSessionPatternCards.length ? (
+                          visibleSessionPatternCards.map((card) => {
                     const isDetailOpen = selectedSessionPatternCardId === card.id;
                     const saveIntentResult = getSaveIntentReviewForSessionPatternCard(
                       card,
@@ -4163,11 +4348,15 @@ function QuinnConversationSurface({
                         ) : null}
                       </View>
                     );
-                  })
-                ) : (
-                  <Text style={styles.literalOutcomeHistoryEmpty}>
-                    No approved pattern cards yet.
-                  </Text>
+                          })
+                        ) : (
+                          <Text style={styles.literalOutcomeHistoryEmpty}>
+                            No approved pattern cards yet.
+                          </Text>
+                        )}
+                      </>
+                    ) : null}
+                  </>
                 )}
               </ScrollView>
             </View>
@@ -8857,6 +9046,75 @@ responseReplayButton: {
     alignItems: 'center',
     marginTop: 4,
     marginBottom: 2,
+  },
+
+  literalPatternCardSearchPanel: {
+    marginTop: 7,
+    marginBottom: 5,
+  },
+
+  literalPatternCardSearchBox: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    paddingHorizontal: 9,
+  },
+
+  literalPatternCardSearchInput: {
+    flex: 1,
+    color: 'rgba(245, 248, 255, 0.76)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    paddingVertical: 6,
+    paddingHorizontal: 7,
+  },
+
+  literalPatternCardSearchClear: {
+    minWidth: 24,
+    minHeight: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+
+  literalPatternCardFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 6,
+  },
+
+  literalPatternCardFilterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginRight: 6,
+    marginBottom: 5,
+  },
+
+  literalPatternCardFilterChipActive: {
+    borderColor: 'rgba(190, 225, 255, 0.24)',
+    backgroundColor: 'rgba(190, 225, 255, 0.10)',
+  },
+
+  literalPatternCardFilterChipText: {
+    color: 'rgba(245, 248, 255, 0.50)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+  },
+
+  literalPatternCardFilterChipTextActive: {
+    color: 'rgba(245, 248, 255, 0.76)',
   },
 
   literalSessionPatternCardDetail: {
