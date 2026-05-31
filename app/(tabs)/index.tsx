@@ -2668,6 +2668,43 @@ function QuinnConversationSurface({
   const shouldShowSavedPatternCardSection = patternCardFilter !== 'session';
   const shouldShowSessionPatternCardSection =
     patternCardFilter !== 'saved' && patternCardFilter !== 'with-application-check';
+  const savedPatternCardCount = savedPatternCards.length;
+  const sessionPatternCardCount = sessionPatternCards.length;
+  const totalPatternCardCount = savedPatternCardCount + sessionPatternCardCount;
+  const visiblePatternCardCount =
+    visibleSavedPatternCards.length + visibleSessionPatternCards.length;
+  const saveIntentReviewPatternCardCount =
+    savedPatternCards.filter((card) => Boolean(card.saveIntentReview)).length +
+    sessionPatternCards.filter((card) =>
+      Boolean(getSaveIntentReviewForSessionPatternCard(card, saveIntentReviewItems))
+    ).length;
+  const applicationCheckPatternCardCount = savedPatternCards.filter((card) =>
+    Boolean(getApplicationReviewForSavedPatternCard(card, applicationReviewItems))
+  ).length;
+  const patternCardFilterLabel =
+    PATTERN_CARD_FILTER_OPTIONS.find((filterOption) => filterOption.id === patternCardFilter)
+      ?.label || 'All';
+  const patternCardSearchSummaryText = patternCardSearchText.trim();
+  const compactPatternCardSearchSummary =
+    patternCardSearchSummaryText.length > 28
+      ? `${patternCardSearchSummaryText.slice(0, 25).trim()}...`
+      : patternCardSearchSummaryText;
+  const hasActivePatternCardSearchOrFilter =
+    Boolean(patternCardSearchQuery) || patternCardFilter !== 'all';
+  const patternCardResultSummary = hasActivePatternCardSearchOrFilter
+    ? `Showing ${visiblePatternCardCount} of ${totalPatternCardCount} cards`
+    : `${totalPatternCardCount} ${totalPatternCardCount === 1 ? 'card' : 'cards'} total`;
+  const patternCardActiveSummaryParts: string[] = [];
+
+  if (patternCardFilter !== 'all') {
+    patternCardActiveSummaryParts.push(`Filter: ${patternCardFilterLabel}`);
+  }
+
+  if (patternCardSearchSummaryText) {
+    patternCardActiveSummaryParts.push(`Search: "${compactPatternCardSearchSummary}"`);
+  }
+
+  const patternCardActiveSummary = patternCardActiveSummaryParts.join(' / ');
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
@@ -2813,10 +2850,14 @@ function QuinnConversationSurface({
     setShowSessionPatternCards((prev) => !prev);
   }
 
-  function handleStartFreshLiteralArc() {
-    resetLiteralComposerExpansion();
+  function resetPatternCardSearchAndFilter() {
     setPatternCardSearchText('');
     setPatternCardFilter('all');
+  }
+
+  function handleStartFreshLiteralArc() {
+    resetLiteralComposerExpansion();
+    resetPatternCardSearchAndFilter();
     setPendingUserBubble(null);
     setRestorableFailedDraft(null);
     setFailedDraftRestoreMessage('');
@@ -3822,6 +3863,41 @@ function QuinnConversationSurface({
               </View>
 
               <View style={styles.literalPatternCardSearchPanel}>
+                <View style={styles.literalPatternCardSummaryPanel}>
+                  <View style={styles.literalPatternCardSummaryHeader}>
+                    <Text style={styles.literalPatternCardSummaryText}>
+                      {patternCardResultSummary}
+                    </Text>
+                    {hasActivePatternCardSearchOrFilter ? (
+                      <Pressable
+                        style={styles.literalPatternCardSummaryReset}
+                        onPress={resetPatternCardSearchAndFilter}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.literalPatternCardSummaryResetText}>Reset</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <View style={styles.literalPatternCardCountRow}>
+                    <Text style={styles.literalPatternCardCountPill}>
+                      {savedPatternCardCount} saved
+                    </Text>
+                    <Text style={styles.literalPatternCardCountPill}>
+                      {sessionPatternCardCount} session
+                    </Text>
+                    <Text style={styles.literalPatternCardCountPill}>
+                      {saveIntentReviewPatternCardCount} save review
+                    </Text>
+                    <Text style={styles.literalPatternCardCountPill}>
+                      {applicationCheckPatternCardCount} app check
+                    </Text>
+                  </View>
+                  {patternCardActiveSummary ? (
+                    <Text style={styles.literalPatternCardActiveSummary}>
+                      {patternCardActiveSummary}
+                    </Text>
+                  ) : null}
+                </View>
                 <View style={styles.literalPatternCardSearchBox}>
                   <Feather name="search" size={13} color="rgba(245, 248, 255, 0.42)" />
                   <TextInput
@@ -9051,6 +9127,69 @@ responseReplayButton: {
   literalPatternCardSearchPanel: {
     marginTop: 7,
     marginBottom: 5,
+  },
+
+  literalPatternCardSummaryPanel: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    paddingHorizontal: 9,
+    paddingTop: 7,
+    paddingBottom: 6,
+    marginBottom: 6,
+  },
+
+  literalPatternCardSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  literalPatternCardSummaryText: {
+    color: 'rgba(245, 248, 255, 0.72)',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '800',
+  },
+
+  literalPatternCardSummaryReset: {
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.055)',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+
+  literalPatternCardSummaryResetText: {
+    color: 'rgba(245, 248, 255, 0.62)',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '800',
+  },
+
+  literalPatternCardCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 5,
+  },
+
+  literalPatternCardCountPill: {
+    color: 'rgba(245, 248, 255, 0.48)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginRight: 9,
+    marginTop: 2,
+  },
+
+  literalPatternCardActiveSummary: {
+    color: 'rgba(190, 225, 255, 0.74)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '700',
+    marginTop: 5,
   },
 
   literalPatternCardSearchBox: {
