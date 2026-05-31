@@ -588,7 +588,7 @@ function getApplicationReviewForSavedPatternCard(
     );
   });
 
-  return recentReview?.resultPreview || null;
+  return recentReview?.resultPreview || card.applicationReview || null;
 }
 
 const TopFadeWall = React.memo(function TopFadeWall() {
@@ -2942,6 +2942,7 @@ function QuinnConversationSurface({
           beforeStoringDecision: String(card.beforeStoringDecision || '').trim(),
           sourceRunId: String(card.sourceRunId || '').trim() || 'Imported QuinnOS export',
           saveIntentReview: card.saveIntentReview || null,
+          applicationReview: card.applicationReview || null,
         });
 
         return restoredCards;
@@ -5147,11 +5148,19 @@ export default function App() {
 
   const exportBundle = useMemo(() => {
     const exportSaveIntentReviewItems = buildSaveIntentReviewItemsFromRecentRuns(recentRuns);
+    const exportApplicationReviewItems = buildApplicationReviewItemsFromRecentRuns(recentRuns);
     const sessionPatternCardsForExport = sessionPatternCards.map((card) => ({
       ...card,
       saveIntentReview: getSaveIntentReviewForSessionPatternCard(
         card,
         exportSaveIntentReviewItems
+      ),
+    }));
+    const savedPatternCardsForExport = savedPatternCards.map((card) => ({
+      ...card,
+      applicationReview: getApplicationReviewForSavedPatternCard(
+        card,
+        exportApplicationReviewItems
       ),
     }));
 
@@ -5165,7 +5174,7 @@ export default function App() {
       lastRunAt,
       recentRuns,
       sessionPatternCards: sessionPatternCardsForExport,
-      savedPatternCards,
+      savedPatternCards: savedPatternCardsForExport,
       memories,
       notifications,
       settings,

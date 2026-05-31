@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     INITIAL_SETTINGS,
     INITIAL_VOICE_SETTINGS,
+    type QuinnPatternCardApplicationReview,
     type QuinnPatternCardSaveIntentReview,
     type QuinnSavedPatternCard,
 } from './quinnAppState';
@@ -206,6 +207,34 @@ function normalizeSavedPatternCardSaveIntentReview(
   return review;
 }
 
+function normalizeSavedPatternCardApplicationReview(
+  item: any
+): QuinnPatternCardApplicationReview | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const review = {
+    applies: String(item.applies || '').trim(),
+    supportingEvidence: String(item.supportingEvidence || '').trim(),
+    limitsMisfit: String(item.limitsMisfit || '').trim(),
+    overuseRisk: String(item.overuseRisk || '').trim(),
+    nextBestMove: String(item.nextBestMove || '').trim(),
+  };
+
+  if (
+    !review.applies &&
+    !review.supportingEvidence &&
+    !review.limitsMisfit &&
+    !review.overuseRisk &&
+    !review.nextBestMove
+  ) {
+    return null;
+  }
+
+  return review;
+}
+
 function normalizeSavedPatternCard(item: any): QuinnSavedPatternCard | null {
   if (!item || typeof item !== 'object') {
     return null;
@@ -227,6 +256,7 @@ function normalizeSavedPatternCard(item: any): QuinnSavedPatternCard | null {
     beforeStoringDecision: String(item.beforeStoringDecision || '').trim(),
     sourceRunId: String(item.sourceRunId || '').trim(),
     saveIntentReview: normalizeSavedPatternCardSaveIntentReview(item.saveIntentReview),
+    applicationReview: normalizeSavedPatternCardApplicationReview(item.applicationReview),
   };
 }
 

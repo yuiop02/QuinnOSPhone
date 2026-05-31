@@ -69,6 +69,14 @@ export type QuinnPatternCardSaveIntentReview = {
   nextBestMove: string;
 };
 
+export type QuinnPatternCardApplicationReview = {
+  applies: string;
+  supportingEvidence: string;
+  limitsMisfit: string;
+  overuseRisk: string;
+  nextBestMove: string;
+};
+
 export type QuinnExportSessionPatternCard = {
   createdAt: string;
   possiblePattern: string;
@@ -88,12 +96,14 @@ export type QuinnSavedPatternCard = {
   beforeStoringDecision: string;
   sourceRunId: string;
   saveIntentReview: QuinnPatternCardSaveIntentReview | null;
+  applicationReview?: QuinnPatternCardApplicationReview | null;
 };
 
 type SessionPatternCardExportInput = QuinnExportSessionPatternCard;
 type SavedPatternCardExportInput = QuinnSavedPatternCard;
 type ParsedPatternCardExportItem = QuinnExportSessionPatternCard & {
   savedAt?: string;
+  applicationReview?: QuinnPatternCardApplicationReview | null;
 };
 
 function cleanImportedSessionPatternCardValue(value: string) {
@@ -153,6 +163,34 @@ function normalizeExportedSessionPatternCardSaveIntentReview(
   return cleanReview;
 }
 
+function normalizeExportedPatternCardApplicationReview(
+  review: QuinnPatternCardApplicationReview | null | undefined
+) {
+  if (!review) {
+    return null;
+  }
+
+  const cleanReview = {
+    applies: String(review.applies || '').trim(),
+    supportingEvidence: String(review.supportingEvidence || '').trim(),
+    limitsMisfit: String(review.limitsMisfit || '').trim(),
+    overuseRisk: String(review.overuseRisk || '').trim(),
+    nextBestMove: String(review.nextBestMove || '').trim(),
+  };
+
+  if (
+    !cleanReview.applies &&
+    !cleanReview.supportingEvidence &&
+    !cleanReview.limitsMisfit &&
+    !cleanReview.overuseRisk &&
+    !cleanReview.nextBestMove
+  ) {
+    return null;
+  }
+
+  return cleanReview;
+}
+
 function getSessionPatternCardSaveIntentExportLines(card: {
   saveIntentReview?: QuinnPatternCardSaveIntentReview | null;
 }) {
@@ -168,6 +206,24 @@ function getSessionPatternCardSaveIntentExportLines(card: {
     `- Clarify before storage: ${formatOptionalText(review.clarifyBeforeStorage)}`,
     `- Storage risk: ${formatOptionalText(review.storageRisk)}`,
     `- Next best move: ${formatOptionalText(review.nextBestMove)}`,
+  ];
+}
+
+function getSavedPatternCardApplicationReviewExportLines(card: {
+  applicationReview?: QuinnPatternCardApplicationReview | null;
+}) {
+  const review = normalizeExportedPatternCardApplicationReview(card.applicationReview);
+
+  if (!review) {
+    return [];
+  }
+
+  return [
+    `- Applies: ${formatOptionalText(review.applies)}`,
+    `- Supporting evidence: ${formatOptionalText(review.supportingEvidence)}`,
+    `- Limits / misfit: ${formatOptionalText(review.limitsMisfit)}`,
+    `- Risk of overusing this pattern: ${formatOptionalText(review.overuseRisk)}`,
+    `- Application next best move: ${formatOptionalText(review.nextBestMove)}`,
   ];
 }
 
@@ -248,6 +304,22 @@ function parsePatternCardsFromExportSection(
           storageRisk: getImportedSessionPatternCardField(lines, 'Storage risk'),
           nextBestMove: getImportedSessionPatternCardField(lines, 'Next best move'),
         },
+        applicationReview: {
+          applies: getImportedSessionPatternCardField(lines, 'Applies'),
+          supportingEvidence: getImportedSessionPatternCardField(
+            lines,
+            'Supporting evidence'
+          ),
+          limitsMisfit: getImportedSessionPatternCardField(lines, 'Limits / misfit'),
+          overuseRisk: getImportedSessionPatternCardField(
+            lines,
+            'Risk of overusing this pattern'
+          ),
+          nextBestMove: getImportedSessionPatternCardField(
+            lines,
+            'Application next best move'
+          ),
+        },
       };
       const hasSaveIntentReview = Boolean(
         card.saveIntentReview.saveReadiness ||
@@ -255,6 +327,13 @@ function parsePatternCardsFromExportSection(
           card.saveIntentReview.clarifyBeforeStorage ||
           card.saveIntentReview.storageRisk ||
           card.saveIntentReview.nextBestMove
+      );
+      const hasApplicationReview = Boolean(
+        card.applicationReview.applies ||
+          card.applicationReview.supportingEvidence ||
+          card.applicationReview.limitsMisfit ||
+          card.applicationReview.overuseRisk ||
+          card.applicationReview.nextBestMove
       );
 
       if (
@@ -265,7 +344,8 @@ function parsePatternCardsFromExportSection(
         !card.sourceRunId &&
         !card.createdAt &&
         !card.savedAt &&
-        !hasSaveIntentReview
+        !hasSaveIntentReview &&
+        !hasApplicationReview
       ) {
         return cards;
       }
@@ -273,6 +353,7 @@ function parsePatternCardsFromExportSection(
       cards.push({
         ...card,
         saveIntentReview: hasSaveIntentReview ? card.saveIntentReview : null,
+        applicationReview: hasApplicationReview ? card.applicationReview : null,
       });
 
       return cards;
@@ -304,6 +385,7 @@ export function parseSavedPatternCardsFromExport(exportText: string): QuinnSaved
       beforeStoringDecision: card.beforeStoringDecision,
       sourceRunId: card.sourceRunId,
       saveIntentReview: card.saveIntentReview || null,
+      applicationReview: card.applicationReview || null,
     })
   );
 }
@@ -408,6 +490,7 @@ export function buildExportBundle({
     saveIntentReview: normalizeExportedSessionPatternCardSaveIntentReview(
       card.saveIntentReview
     ),
+    applicationReview: normalizeExportedPatternCardApplicationReview(card.applicationReview),
   }));
   const currentComposer = {
     title: packetTitle,
@@ -543,6 +626,7 @@ export function buildExportBundle({
             `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
             `- Source run: ${formatOptionalText(card.sourceRunId, '(none)')}`,
             ...getSessionPatternCardSaveIntentExportLines(card),
+            ...getSavedPatternCardApplicationReviewExportLines(card),
             '',
           ])
         : ['(none yet)']
@@ -707,6 +791,7 @@ export function buildExportBundle({
           `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
           `- Source run: ${formatOptionalText(card.sourceRunId, '(none)')}`,
           ...getSessionPatternCardSaveIntentExportLines(card),
+          ...getSavedPatternCardApplicationReviewExportLines(card),
           '',
         ])
       : ['(none yet)']),
