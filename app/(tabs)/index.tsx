@@ -1527,6 +1527,7 @@ function QuinnConversationSurface({
   onOpenSettings,
   onRunPacket,
 }: QuinnConversationSurfaceProps) {
+  const safeAreaInsets = SafeAreaContext.useSafeAreaInsets();
   const conversationScrollRef = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const autoScrollTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const conversationContentHeightRef = useRef(0);
@@ -2526,6 +2527,14 @@ function QuinnConversationSurface({
   );
   const shouldUseLongFormComposer = isLongFormComposerDraft && !longFormComposerCollapsed;
   const maxLongFormComposerHeight = LONG_FORM_LITERAL_COMPOSER_MAX_HEIGHT;
+  const bottomSafeAreaInset = Math.max(0, safeAreaInsets.bottom || 0);
+  const composerDockBottomOffset = Math.max(24, bottomSafeAreaInset + 10);
+  const composerDockKeyboardBottomOffset = Math.max(literalKeyboardHeight + 56, 236);
+  const closedKeyboardBottomLift =
+    literalKeyboardHeight > 0 ? 0 : Math.max(0, composerDockBottomOffset - 24);
+  const literalChatScrollBottomPadding =
+    (shouldUseLongFormComposer ? 500 : literalKeyboardHeight > 0 ? 330 : 300) +
+    closedKeyboardBottomLift;
   const literalComposerInputHeight = shouldUseLongFormComposer
     ? Math.min(
         Math.max(literalComposerContentHeight, LONG_FORM_LITERAL_COMPOSER_MIN_HEIGHT),
@@ -3069,6 +3078,7 @@ function QuinnConversationSurface({
             styles.literalChatScrollContent,
             literalKeyboardHeight > 0 && styles.literalChatScrollContentKeyboardOpen,
             shouldUseLongFormComposer && styles.literalChatScrollContentLongForm,
+            { paddingBottom: literalChatScrollBottomPadding },
           ]}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
@@ -3250,7 +3260,8 @@ function QuinnConversationSurface({
             styles.literalComposerDock,
             literalKeyboardHeight > 0 && styles.literalComposerDockKeyboardOpen,
             shouldUseLongFormComposer && styles.literalComposerDockLongForm,
-            literalKeyboardHeight > 0 && { bottom: Math.max(literalKeyboardHeight + 56, 236) },
+            { bottom: composerDockBottomOffset },
+            literalKeyboardHeight > 0 && { bottom: composerDockKeyboardBottomOffset },
           ]}
         >
           <ScrollView
