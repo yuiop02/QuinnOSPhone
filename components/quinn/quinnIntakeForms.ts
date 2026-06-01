@@ -22,7 +22,8 @@ export type QuinnPacketKindId =
   | QuinnIntakeFormId
   | 'draft-pattern-card'
   | 'pattern-card-save-intent'
-  | 'pattern-card-application';
+  | 'pattern-card-application'
+  | 'saved-pattern-card-review';
 
 export type QuinnIntakeFormDefinition = {
   id: QuinnIntakeFormId;
@@ -173,10 +174,18 @@ export type QuinnPatternCardApplicationSource = QuinnSessionPatternCardDraftSour
   saveIntentReview?: QuinnPatternCardSaveIntentResultPreview | null;
 };
 
+export type QuinnSavedPatternCardReviewSource = QuinnPatternCardApplicationSource & {
+  pinnedAt?: string | null;
+  retiredAt?: string | null;
+  retiredReason?: string | null;
+  applicationReview?: QuinnPatternCardApplicationResultPreview | null;
+};
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 const QUINN_PATTERN_CARD_SAVE_INTENT_MARKER = 'QUINNOS PATTERN CARD SAVE INTENT';
 const QUINN_PATTERN_CARD_APPLICATION_MARKER = 'QUINNOS PATTERN CARD APPLICATION';
+const QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER = 'QUINNOS SAVED PATTERN CARD REVIEW';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -621,6 +630,134 @@ export function buildQuinnPatternCardApplicationPacket(
     'LIMITS / MISFIT:',
     'RISK OF OVERUSING THIS PATTERN:',
     'NEXT BEST MOVE:',
+    ...QUINNOS_RESPONSE_PROTOCOL,
+  ].join('\n');
+}
+
+export function buildQuinnSavedPatternCardReviewPacket(
+  card: QuinnSavedPatternCardReviewSource
+) {
+  const saveIntentReview = card.saveIntentReview;
+  const applicationReview = card.applicationReview;
+
+  return [
+    'QUINNOS SAVED PATTERN CARD REVIEW',
+    '',
+    'PURPOSE:',
+    "Review this saved Pattern Card's current role without automatically changing it. Decide whether it should stay active, be revised, pinned, retired, restored, or tested again.",
+    '',
+    'CURRENT CARD STATE:',
+    'Saved:',
+    formatQuinnDraftPatternCardValue(card.savedAt || '', '[No saved time captured.]'),
+    '',
+    'Pinned:',
+    formatQuinnDraftPatternCardValue(card.pinnedAt || '', 'none'),
+    '',
+    'Retired:',
+    formatQuinnDraftPatternCardValue(card.retiredAt || '', 'none'),
+    '',
+    'Retired reason:',
+    formatQuinnDraftPatternCardValue(card.retiredReason || '', 'none'),
+    '',
+    'SAVED PATTERN:',
+    formatQuinnDraftPatternCardValue(card.possiblePattern, '[No saved pattern captured.]'),
+    '',
+    'EVIDENCE:',
+    formatQuinnDraftPatternCardValue(card.evidence, '[No evidence captured.]'),
+    '',
+    'OVERGENERALIZATION RISK:',
+    formatQuinnDraftPatternCardValue(
+      card.overgeneralizationRisk,
+      '[No overgeneralization risk captured.]'
+    ),
+    '',
+    'BEFORE USING THIS PATTERN, REMEMBER:',
+    formatQuinnDraftPatternCardValue(
+      card.beforeStoringDecision,
+      '[No before-using note captured.]'
+    ),
+    '',
+    'SAVE INTENT REVIEW:',
+    'Save readiness:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.saveReadiness || '',
+      '[No save readiness captured.]'
+    ),
+    '',
+    'Should preserve later:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.shouldPreserveLater || '',
+      '[No preserve-later read captured.]'
+    ),
+    '',
+    'Clarify before storage:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.clarifyBeforeStorage || '',
+      '[No clarification captured.]'
+    ),
+    '',
+    'Storage risk:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.storageRisk || '',
+      '[No storage risk captured.]'
+    ),
+    '',
+    'Next best move:',
+    formatQuinnDraftPatternCardValue(
+      saveIntentReview?.nextBestMove || '',
+      '[No next move captured.]'
+    ),
+    '',
+    'APPLICATION CHECK:',
+    'Applies:',
+    formatQuinnDraftPatternCardValue(
+      applicationReview?.applies || '',
+      '[No applies read captured.]'
+    ),
+    '',
+    'Supporting evidence:',
+    formatQuinnDraftPatternCardValue(
+      applicationReview?.supportingEvidence || '',
+      '[No supporting evidence captured.]'
+    ),
+    '',
+    'Limits / misfit:',
+    formatQuinnDraftPatternCardValue(
+      applicationReview?.limitsMisfit || '',
+      '[No limits captured.]'
+    ),
+    '',
+    'Risk of overusing this pattern:',
+    formatQuinnDraftPatternCardValue(
+      applicationReview?.overuseRisk || '',
+      '[No overuse risk captured.]'
+    ),
+    '',
+    'Next best move:',
+    formatQuinnDraftPatternCardValue(
+      applicationReview?.nextBestMove || '',
+      '[No next move captured.]'
+    ),
+    '',
+    'WHY I AM REVIEWING THIS CARD NOW:',
+    '[Quinn fills this in.]',
+    '',
+    'WHAT I AM TEMPTED TO DO WITH IT:',
+    '[Quinn fills this in.]',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
+    '',
+    'LIFECYCLE REVIEW OUTPUT SHAPE:',
+    'Return exactly these sections:',
+    'LIFECYCLE READ:',
+    'KEEP / REVISE / RETIRE / RESTORE:',
+    'WHY:',
+    'RISK IF KEPT AS-IS:',
+    'NEXT BEST CARD ACTION:',
+    '',
+    'OUTPUT I NEED FROM REN:',
+    'Use this as a saved-card lifecycle review only. Do not change the card automatically. Tell Quinn whether this card should stay active, be revised, pinned, retired, restored, or tested again. Name the risk of keeping it as-is and the next best card action.',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
@@ -1349,6 +1486,16 @@ export function getQuinnIntakeFormKindFromPacketText(
   packetText: string
 ): QuinnIntakeFormPacketKind | null {
   const text = String(packetText || '');
+
+  if (text.includes(QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER)) {
+    return {
+      id: 'saved-pattern-card-review',
+      label: 'Card Review',
+      icon: 'refresh-cw',
+      marker: QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER,
+      isOutcomeLog: false,
+    };
+  }
 
   if (text.includes(QUINN_PATTERN_CARD_APPLICATION_MARKER)) {
     return {

@@ -112,6 +112,7 @@ import {
   buildQuinnOutcomeLogPacketFromRun,
   buildQuinnPatternCardApplicationPacket,
   buildQuinnPatternCardSaveIntentPacket,
+  buildQuinnSavedPatternCardReviewPacket,
   getQuinnDraftPatternCardHistoryPreview,
   getQuinnDraftPatternCardResultPreview,
   getQuinnIntakeFormKindFromPacketText,
@@ -3269,6 +3270,18 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function stageSavedPatternCardReview(card: QuinnSavedPatternCard) {
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(
+      buildQuinnSavedPatternCardReviewPacket({
+        ...card,
+        applicationReview: getApplicationReviewForSavedPatternCard(card, applicationReviewItems),
+      })
+    );
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
   function toggleSavedPatternCardPin(cardId: string) {
     const pinnedAt = new Date().toISOString();
 
@@ -4429,6 +4442,20 @@ function QuinnConversationSurface({
                           >
                             <Feather name="eye" size={12} color="rgba(245, 248, 255, 0.62)" />
                             <Text style={styles.literalPatternCandidateActionText}>View</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              styles.literalPatternCandidateActionInline,
+                            ]}
+                            onPress={() => stageSavedPatternCardReview(card)}
+                          >
+                            <Feather
+                              name="refresh-cw"
+                              size={12}
+                              color="rgba(245, 248, 255, 0.62)"
+                            />
+                            <Text style={styles.literalPatternCandidateActionText}>Review</Text>
                           </Pressable>
                           <Pressable
                             style={[
