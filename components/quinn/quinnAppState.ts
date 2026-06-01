@@ -77,6 +77,14 @@ export type QuinnPatternCardApplicationReview = {
   nextBestMove: string;
 };
 
+export type QuinnPatternCardLifecycleReview = {
+  lifecycleRead: string;
+  keepReviseRetireRestore: string;
+  why: string;
+  riskIfKeptAsIs: string;
+  nextBestCardAction: string;
+};
+
 export type QuinnExportSessionPatternCard = {
   createdAt: string;
   possiblePattern: string;
@@ -100,6 +108,7 @@ export type QuinnSavedPatternCard = {
   sourceRunId: string;
   saveIntentReview: QuinnPatternCardSaveIntentReview | null;
   applicationReview?: QuinnPatternCardApplicationReview | null;
+  lifecycleReview?: QuinnPatternCardLifecycleReview | null;
 };
 
 type SessionPatternCardExportInput = QuinnExportSessionPatternCard;
@@ -110,6 +119,7 @@ type ParsedPatternCardExportItem = QuinnExportSessionPatternCard & {
   retiredAt?: string | null;
   retiredReason?: string;
   applicationReview?: QuinnPatternCardApplicationReview | null;
+  lifecycleReview?: QuinnPatternCardLifecycleReview | null;
 };
 
 function cleanImportedSessionPatternCardValue(value: string) {
@@ -197,6 +207,34 @@ function normalizeExportedPatternCardApplicationReview(
   return cleanReview;
 }
 
+function normalizeExportedPatternCardLifecycleReview(
+  review: QuinnPatternCardLifecycleReview | null | undefined
+) {
+  if (!review) {
+    return null;
+  }
+
+  const cleanReview = {
+    lifecycleRead: String(review.lifecycleRead || '').trim(),
+    keepReviseRetireRestore: String(review.keepReviseRetireRestore || '').trim(),
+    why: String(review.why || '').trim(),
+    riskIfKeptAsIs: String(review.riskIfKeptAsIs || '').trim(),
+    nextBestCardAction: String(review.nextBestCardAction || '').trim(),
+  };
+
+  if (
+    !cleanReview.lifecycleRead &&
+    !cleanReview.keepReviseRetireRestore &&
+    !cleanReview.why &&
+    !cleanReview.riskIfKeptAsIs &&
+    !cleanReview.nextBestCardAction
+  ) {
+    return null;
+  }
+
+  return cleanReview;
+}
+
 function getSessionPatternCardSaveIntentExportLines(card: {
   saveIntentReview?: QuinnPatternCardSaveIntentReview | null;
 }) {
@@ -233,11 +271,32 @@ function getSavedPatternCardApplicationReviewExportLines(card: {
   ];
 }
 
+function getSavedPatternCardLifecycleReviewExportLines(card: {
+  lifecycleReview?: QuinnPatternCardLifecycleReview | null;
+}) {
+  const review = normalizeExportedPatternCardLifecycleReview(card.lifecycleReview);
+
+  if (!review) {
+    return [];
+  }
+
+  return [
+    `- Lifecycle read: ${formatOptionalText(review.lifecycleRead)}`,
+    `- Keep / revise / retire / restore: ${formatOptionalText(
+      review.keepReviseRetireRestore
+    )}`,
+    `- Lifecycle why: ${formatOptionalText(review.why)}`,
+    `- Risk if kept as-is: ${formatOptionalText(review.riskIfKeptAsIs)}`,
+    `- Lifecycle next best card action: ${formatOptionalText(review.nextBestCardAction)}`,
+  ];
+}
+
 function parsePatternCardsFromExportSection(
   exportText: string,
   heading: string
 ): ParsedPatternCardExportItem[] {
   const text = String(exportText || '').replace(/\r\n/g, '\n');
+  const isSavedPatternCardSection = heading === 'Saved Pattern Cards';
   const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const headingMatch = text.match(new RegExp(`^## ${escapedHeading}\\s*$`, 'm'));
 
@@ -329,6 +388,19 @@ function parsePatternCardsFromExportSection(
             'Application next best move'
           ),
         },
+        lifecycleReview: {
+          lifecycleRead: getImportedSessionPatternCardField(lines, 'Lifecycle read'),
+          keepReviseRetireRestore: getImportedSessionPatternCardField(
+            lines,
+            'Keep / revise / retire / restore'
+          ),
+          why: getImportedSessionPatternCardField(lines, 'Lifecycle why'),
+          riskIfKeptAsIs: getImportedSessionPatternCardField(lines, 'Risk if kept as-is'),
+          nextBestCardAction: getImportedSessionPatternCardField(
+            lines,
+            'Lifecycle next best card action'
+          ),
+        },
       };
       const hasSaveIntentReview = Boolean(
         card.saveIntentReview.saveReadiness ||
@@ -344,6 +416,13 @@ function parsePatternCardsFromExportSection(
           card.applicationReview.overuseRisk ||
           card.applicationReview.nextBestMove
       );
+      const hasLifecycleReview = Boolean(
+        card.lifecycleReview.lifecycleRead ||
+          card.lifecycleReview.keepReviseRetireRestore ||
+          card.lifecycleReview.why ||
+          card.lifecycleReview.riskIfKeptAsIs ||
+          card.lifecycleReview.nextBestCardAction
+      );
 
       if (
         !card.possiblePattern &&
@@ -357,7 +436,8 @@ function parsePatternCardsFromExportSection(
         !card.retiredAt &&
         !card.retiredReason &&
         !hasSaveIntentReview &&
-        !hasApplicationReview
+        !hasApplicationReview &&
+        (!isSavedPatternCardSection || !hasLifecycleReview)
       ) {
         return cards;
       }
@@ -366,6 +446,8 @@ function parsePatternCardsFromExportSection(
         ...card,
         saveIntentReview: hasSaveIntentReview ? card.saveIntentReview : null,
         applicationReview: hasApplicationReview ? card.applicationReview : null,
+        lifecycleReview:
+          isSavedPatternCardSection && hasLifecycleReview ? card.lifecycleReview : null,
       });
 
       return cards;
@@ -401,6 +483,7 @@ export function parseSavedPatternCardsFromExport(exportText: string): QuinnSaved
       sourceRunId: card.sourceRunId,
       saveIntentReview: card.saveIntentReview || null,
       applicationReview: card.applicationReview || null,
+      lifecycleReview: card.lifecycleReview || null,
     })
   );
 }
@@ -509,6 +592,7 @@ export function buildExportBundle({
       card.saveIntentReview
     ),
     applicationReview: normalizeExportedPatternCardApplicationReview(card.applicationReview),
+    lifecycleReview: normalizeExportedPatternCardLifecycleReview(card.lifecycleReview),
   }));
   const currentComposer = {
     title: packetTitle,
@@ -648,6 +732,7 @@ export function buildExportBundle({
             `- Source run: ${formatOptionalText(card.sourceRunId, '(none)')}`,
             ...getSessionPatternCardSaveIntentExportLines(card),
             ...getSavedPatternCardApplicationReviewExportLines(card),
+            ...getSavedPatternCardLifecycleReviewExportLines(card),
             '',
           ])
         : ['(none yet)']
@@ -816,6 +901,7 @@ export function buildExportBundle({
           `- Source run: ${formatOptionalText(card.sourceRunId, '(none)')}`,
           ...getSessionPatternCardSaveIntentExportLines(card),
           ...getSavedPatternCardApplicationReviewExportLines(card),
+          ...getSavedPatternCardLifecycleReviewExportLines(card),
           '',
         ])
       : ['(none yet)']),

@@ -3,6 +3,7 @@ import {
     INITIAL_SETTINGS,
     INITIAL_VOICE_SETTINGS,
     type QuinnPatternCardApplicationReview,
+    type QuinnPatternCardLifecycleReview,
     type QuinnPatternCardSaveIntentReview,
     type QuinnSavedPatternCard,
 } from './quinnAppState';
@@ -235,6 +236,34 @@ function normalizeSavedPatternCardApplicationReview(
   return review;
 }
 
+function normalizeSavedPatternCardLifecycleReview(
+  item: any
+): QuinnPatternCardLifecycleReview | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const review = {
+    lifecycleRead: String(item.lifecycleRead || '').trim(),
+    keepReviseRetireRestore: String(item.keepReviseRetireRestore || '').trim(),
+    why: String(item.why || '').trim(),
+    riskIfKeptAsIs: String(item.riskIfKeptAsIs || '').trim(),
+    nextBestCardAction: String(item.nextBestCardAction || '').trim(),
+  };
+
+  if (
+    !review.lifecycleRead &&
+    !review.keepReviseRetireRestore &&
+    !review.why &&
+    !review.riskIfKeptAsIs &&
+    !review.nextBestCardAction
+  ) {
+    return null;
+  }
+
+  return review;
+}
+
 function normalizeSavedPatternCard(item: any): QuinnSavedPatternCard | null {
   if (!item || typeof item !== 'object') {
     return null;
@@ -260,6 +289,7 @@ function normalizeSavedPatternCard(item: any): QuinnSavedPatternCard | null {
     sourceRunId: String(item.sourceRunId || '').trim(),
     saveIntentReview: normalizeSavedPatternCardSaveIntentReview(item.saveIntentReview),
     applicationReview: normalizeSavedPatternCardApplicationReview(item.applicationReview),
+    lifecycleReview: normalizeSavedPatternCardLifecycleReview(item.lifecycleReview),
   };
 }
 

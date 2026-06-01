@@ -685,7 +685,7 @@ function getLifecycleReviewForSavedPatternCard(
 ) {
   const recentReview = getLifecycleReviewItemForSavedPatternCard(card, lifecycleReviewItems);
 
-  return recentReview?.resultPreview || null;
+  return recentReview?.resultPreview || card.lifecycleReview || null;
 }
 
 function getLifecycleReviewItemForSavedPatternCard(
@@ -3482,6 +3482,7 @@ function QuinnConversationSurface({
           sourceRunId: String(card.sourceRunId || '').trim() || 'Imported QuinnOS export',
           saveIntentReview: card.saveIntentReview || null,
           applicationReview: card.applicationReview || null,
+          lifecycleReview: card.lifecycleReview || null,
         });
 
         return restoredCards;
@@ -6001,6 +6002,7 @@ export default function App() {
   const exportBundle = useMemo(() => {
     const exportSaveIntentReviewItems = buildSaveIntentReviewItemsFromRecentRuns(recentRuns);
     const exportApplicationReviewItems = buildApplicationReviewItemsFromRecentRuns(recentRuns);
+    const exportLifecycleReviewItems = buildLifecycleReviewItemsFromRecentRuns(recentRuns);
     const sessionPatternCardsForExport = sessionPatternCards.map((card) => ({
       ...card,
       saveIntentReview: getSaveIntentReviewForSessionPatternCard(
@@ -6013,6 +6015,10 @@ export default function App() {
       applicationReview: getApplicationReviewForSavedPatternCard(
         card,
         exportApplicationReviewItems
+      ),
+      lifecycleReview: getLifecycleReviewForSavedPatternCard(
+        card,
+        exportLifecycleReviewItems
       ),
     }));
 
