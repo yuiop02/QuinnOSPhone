@@ -250,6 +250,7 @@ function normalizeSavedPatternCard(item: any): QuinnSavedPatternCard | null {
   return {
     id: String(item.id || `saved-pattern-card-${String(item.savedAt || Date.now())}`),
     savedAt: String(item.savedAt || new Date().toISOString()),
+    pinnedAt: String(item.pinnedAt || '').trim() || null,
     possiblePattern: possiblePattern || 'Untitled pattern card',
     evidence,
     overgeneralizationRisk: String(item.overgeneralizationRisk || '').trim(),

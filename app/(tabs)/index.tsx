@@ -218,6 +218,7 @@ type QuinnPendingUserBubble = {
 type QuinnPatternCardFilter =
   | 'all'
   | 'saved'
+  | 'pinned'
   | 'session'
   | 'with-save-review'
   | 'with-application-check';
@@ -254,6 +255,7 @@ const PATTERN_CARD_FILTER_OPTIONS: readonly {
 }[] = [
   { id: 'all', label: 'All' },
   { id: 'saved', label: 'Saved' },
+  { id: 'pinned', label: 'Pinned' },
   { id: 'session', label: 'Session' },
   { id: 'with-save-review', label: 'Save review' },
   { id: 'with-application-check', label: 'App check' },
@@ -705,6 +707,15 @@ function compareSavedPatternCardsForSort(
   saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[],
   applicationReviewItems: QuinnPatternCardApplicationReviewItem[]
 ) {
+  const firstPinnedAt = getPatternCardTimestampValue(firstCard.pinnedAt);
+  const secondPinnedAt = getPatternCardTimestampValue(secondCard.pinnedAt);
+  const firstIsPinned = Boolean(firstPinnedAt);
+  const secondIsPinned = Boolean(secondPinnedAt);
+
+  if (firstIsPinned !== secondIsPinned) {
+    return firstIsPinned ? -1 : 1;
+  }
+
   const firstSavedAt = getPatternCardTimestampValue(firstCard.savedAt);
   const secondSavedAt = getPatternCardTimestampValue(secondCard.savedAt);
 
@@ -2777,6 +2788,7 @@ function QuinnConversationSurface({
       const matchesFilter =
         patternCardFilter === 'all' ||
         patternCardFilter === 'saved' ||
+        (patternCardFilter === 'pinned' && Boolean(card.pinnedAt)) ||
         (patternCardFilter === 'with-save-review' && Boolean(card.saveIntentReview)) ||
         (patternCardFilter === 'with-application-check' && Boolean(applicationReview));
 
@@ -2791,6 +2803,7 @@ function QuinnConversationSurface({
           card.overgeneralizationRisk,
           card.beforeStoringDecision,
           card.sourceRunId,
+          card.pinnedAt ? 'pinned' : '',
           ...getSaveIntentReviewSearchFields(card.saveIntentReview),
           ...getApplicationReviewSearchFields(applicationReview),
         ],
@@ -2854,7 +2867,9 @@ function QuinnConversationSurface({
     visibleSavedPatternCards.length + visibleSessionPatternCards.length > 0;
   const shouldShowSavedPatternCardSection = patternCardFilter !== 'session';
   const shouldShowSessionPatternCardSection =
-    patternCardFilter !== 'saved' && patternCardFilter !== 'with-application-check';
+    patternCardFilter !== 'saved' &&
+    patternCardFilter !== 'pinned' &&
+    patternCardFilter !== 'with-application-check';
   const savedPatternCardCount = savedPatternCards.length;
   const sessionPatternCardCount = sessionPatternCards.length;
   const totalPatternCardCount = savedPatternCardCount + sessionPatternCardCount;
@@ -2867,6 +2882,9 @@ function QuinnConversationSurface({
     ).length;
   const applicationCheckPatternCardCount = savedPatternCards.filter((card) =>
     Boolean(getApplicationReviewForSavedPatternCard(card, applicationReviewItems))
+  ).length;
+  const pinnedSavedPatternCardCount = savedPatternCards.filter((card) =>
+    Boolean(card.pinnedAt)
   ).length;
   const patternCardFilterLabel =
     PATTERN_CARD_FILTER_OPTIONS.find((filterOption) => filterOption.id === patternCardFilter)
@@ -3223,6 +3241,21 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function toggleSavedPatternCardPin(cardId: string) {
+    const pinnedAt = new Date().toISOString();
+
+    onChangeSavedPatternCards((currentCards) =>
+      currentCards.map((card) =>
+        card.id === cardId
+          ? {
+              ...card,
+              pinnedAt: card.pinnedAt ? null : pinnedAt,
+            }
+          : card
+      )
+    );
+  }
+
   function getSessionPatternCardDuplicateKey(card: {
     possiblePattern: string;
     evidence: string;
@@ -3296,6 +3329,7 @@ function QuinnConversationSurface({
         restoredCards.push({
           id: `saved-pattern-card-import-${importedAt}-${index}`,
           savedAt: String(card.savedAt || '').trim() || new Date(importedAt).toISOString(),
+          pinnedAt: String(card.pinnedAt || '').trim() || null,
           possiblePattern: possiblePattern || 'Untitled pattern card',
           evidence,
           overgeneralizationRisk: String(card.overgeneralizationRisk || '').trim(),
@@ -4073,6 +4107,9 @@ function QuinnConversationSurface({
                       {sessionPatternCardCount} session
                     </Text>
                     <Text style={styles.literalPatternCardCountPill}>
+                      {pinnedSavedPatternCardCount} pinned
+                    </Text>
+                    <Text style={styles.literalPatternCardCountPill}>
                       {saveIntentReviewPatternCardCount} save review
                     </Text>
                     <Text style={styles.literalPatternCardCountPill}>
@@ -4187,9 +4224,29 @@ function QuinnConversationSurface({
                     const applicationStatus = applicationResult?.applies || '';
 
                     return (
-                      <View key={card.id} style={styles.literalOutcomeHistoryRow}>
+                      <View
+                        key={card.id}
+                        style={[
+                          styles.literalOutcomeHistoryRow,
+                          card.pinnedAt ? styles.literalPinnedPatternCardRow : null,
+                        ]}
+                      >
                         <View style={styles.literalOutcomeHistoryRowHeader}>
-                          <Text style={styles.literalPatternCandidateStatus}>Saved locally</Text>
+                          <View style={styles.literalPatternCardStatusStack}>
+                            {card.pinnedAt ? (
+                              <View style={styles.literalPinnedPatternCardStatus}>
+                                <Feather
+                                  name="bookmark"
+                                  size={11}
+                                  color="rgba(255, 214, 153, 0.86)"
+                                />
+                                <Text style={styles.literalPinnedPatternCardStatusText}>
+                                  Pinned
+                                </Text>
+                              </View>
+                            ) : null}
+                            <Text style={styles.literalPatternCandidateStatus}>Saved locally</Text>
+                          </View>
                           {card.savedAt ? (
                             <Text style={styles.literalOutcomeHistoryTime}>
                               {formatOutcomeHistoryTimestamp(card.savedAt)}
@@ -4227,6 +4284,26 @@ function QuinnConversationSurface({
                           </>
                         ) : null}
                         <View style={styles.literalPatternCandidateActionRow}>
+                          <Pressable
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              styles.literalPatternCandidateActionInline,
+                            ]}
+                            onPress={() => toggleSavedPatternCardPin(card.id)}
+                          >
+                            <Feather
+                              name="bookmark"
+                              size={12}
+                              color={
+                                card.pinnedAt
+                                  ? 'rgba(255, 214, 153, 0.78)'
+                                  : 'rgba(245, 248, 255, 0.62)'
+                              }
+                            />
+                            <Text style={styles.literalPatternCandidateActionText}>
+                              {card.pinnedAt ? 'Unpin' : 'Pin'}
+                            </Text>
+                          </Pressable>
                           <Pressable
                             style={[
                               styles.literalPatternCandidateAction,
@@ -4316,6 +4393,14 @@ function QuinnConversationSurface({
                                 ? formatOutcomeHistoryTimestamp(card.savedAt)
                                 : 'No saved time captured.'}
                             </Text>
+                            {card.pinnedAt ? (
+                              <>
+                                <Text style={styles.literalOutcomeHistoryLabel}>Pinned at</Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {formatOutcomeHistoryTimestamp(card.pinnedAt)}
+                                </Text>
+                              </>
+                            ) : null}
                             <Text style={styles.literalOutcomeHistoryLabel}>Source run</Text>
                             <Text style={styles.literalSessionPatternCardDetailText}>
                               {card.sourceRunId || 'No source run captured.'}
@@ -9251,6 +9336,31 @@ responseReplayButton: {
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 5,
+  },
+
+  literalPinnedPatternCardRow: {
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(255, 214, 153, 0.26)',
+    paddingLeft: 8,
+  },
+
+  literalPatternCardStatusStack: {
+    flexShrink: 1,
+    paddingRight: 8,
+  },
+
+  literalPinnedPatternCardStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+
+  literalPinnedPatternCardStatusText: {
+    color: 'rgba(255, 214, 153, 0.86)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+    marginLeft: 4,
   },
 
   literalOutcomeHistoryHelp: {
