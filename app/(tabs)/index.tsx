@@ -233,7 +233,8 @@ type QuinnPatternCardFilter =
   | 'retired'
   | 'session'
   | 'with-save-review'
-  | 'with-application-check';
+  | 'with-application-check'
+  | 'with-lifecycle-review';
 
 type QuinnPatternCardSort = 'newest' | 'oldest' | 'alphabetical' | 'recently-checked';
 
@@ -272,6 +273,7 @@ const PATTERN_CARD_FILTER_OPTIONS: readonly {
   { id: 'session', label: 'Session' },
   { id: 'with-save-review', label: 'Save review' },
   { id: 'with-application-check', label: 'App check' },
+  { id: 'with-lifecycle-review', label: 'Lifecycle' },
 ];
 const PATTERN_CARD_SORT_OPTIONS: readonly {
   id: QuinnPatternCardSort;
@@ -744,6 +746,22 @@ function getApplicationReviewSearchFields(
   ];
 }
 
+function getLifecycleReviewSearchFields(
+  review: QuinnSavedPatternCardReviewResultPreview | null | undefined
+) {
+  if (!review) {
+    return [];
+  }
+
+  return [
+    review.lifecycleRead,
+    review.keepReviseRetireRestore,
+    review.why,
+    review.riskIfKeptAsIs,
+    review.nextBestCardAction,
+  ];
+}
+
 function patternCardMatchesSearch(
   fields: (string | null | undefined)[],
   normalizedSearchQuery: string
@@ -777,7 +795,8 @@ function compareSavedPatternCardsForSort(
   secondCard: QuinnSavedPatternCard,
   sort: QuinnPatternCardSort,
   saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[],
-  applicationReviewItems: QuinnPatternCardApplicationReviewItem[]
+  applicationReviewItems: QuinnPatternCardApplicationReviewItem[],
+  lifecycleReviewItems: QuinnSavedPatternCardLifecycleReviewItem[]
 ) {
   const firstPinnedAt = getPatternCardTimestampValue(firstCard.pinnedAt);
   const secondPinnedAt = getPatternCardTimestampValue(secondCard.pinnedAt);
@@ -816,13 +835,23 @@ function compareSavedPatternCardsForSort(
       secondCard,
       saveIntentReviewItems
     );
+    const firstLifecycleReview = getLifecycleReviewItemForSavedPatternCard(
+      firstCard,
+      lifecycleReviewItems
+    );
+    const secondLifecycleReview = getLifecycleReviewItemForSavedPatternCard(
+      secondCard,
+      lifecycleReviewItems
+    );
     const firstReviewTimestamp = Math.max(
       getPatternCardTimestampValue(firstApplicationReview?.timestamp),
-      getPatternCardTimestampValue(firstSaveIntentReview?.timestamp)
+      getPatternCardTimestampValue(firstSaveIntentReview?.timestamp),
+      getPatternCardTimestampValue(firstLifecycleReview?.timestamp)
     );
     const secondReviewTimestamp = Math.max(
       getPatternCardTimestampValue(secondApplicationReview?.timestamp),
-      getPatternCardTimestampValue(secondSaveIntentReview?.timestamp)
+      getPatternCardTimestampValue(secondSaveIntentReview?.timestamp),
+      getPatternCardTimestampValue(secondLifecycleReview?.timestamp)
     );
 
     if (firstReviewTimestamp || secondReviewTimestamp) {
@@ -832,14 +861,18 @@ function compareSavedPatternCardsForSort(
     const firstHasReview = Boolean(
       firstApplicationReview ||
         firstSaveIntentReview ||
+        firstLifecycleReview ||
         firstCard.applicationReview ||
-        firstCard.saveIntentReview
+        firstCard.saveIntentReview ||
+        firstCard.lifecycleReview
     );
     const secondHasReview = Boolean(
       secondApplicationReview ||
         secondSaveIntentReview ||
+        secondLifecycleReview ||
         secondCard.applicationReview ||
-        secondCard.saveIntentReview
+        secondCard.saveIntentReview ||
+        secondCard.lifecycleReview
     );
 
     if (firstHasReview !== secondHasReview) {
@@ -2860,6 +2893,7 @@ function QuinnConversationSurface({
   const visibleSavedPatternCards = React.useMemo(() => {
     const filteredCards = savedPatternCards.filter((card) => {
       const applicationReview = getApplicationReviewForSavedPatternCard(card, applicationReviewItems);
+      const lifecycleReview = getLifecycleReviewForSavedPatternCard(card, lifecycleReviewItems);
       const isRetired = Boolean(card.retiredAt);
       const matchesFilter =
         patternCardFilter === 'retired'
@@ -2869,7 +2903,8 @@ function QuinnConversationSurface({
               patternCardFilter === 'saved' ||
               (patternCardFilter === 'pinned' && Boolean(card.pinnedAt)) ||
               (patternCardFilter === 'with-save-review' && Boolean(card.saveIntentReview)) ||
-              (patternCardFilter === 'with-application-check' && Boolean(applicationReview)));
+              (patternCardFilter === 'with-application-check' && Boolean(applicationReview)) ||
+              (patternCardFilter === 'with-lifecycle-review' && Boolean(lifecycleReview)));
 
       if (!matchesFilter) {
         return false;
@@ -2887,6 +2922,7 @@ function QuinnConversationSurface({
           card.retiredReason,
           ...getSaveIntentReviewSearchFields(card.saveIntentReview),
           ...getApplicationReviewSearchFields(applicationReview),
+          ...getLifecycleReviewSearchFields(lifecycleReview),
         ],
         patternCardSearchQuery
       );
@@ -2898,11 +2934,13 @@ function QuinnConversationSurface({
         secondCard,
         patternCardSort,
         saveIntentReviewItems,
-        applicationReviewItems
+        applicationReviewItems,
+        lifecycleReviewItems
       )
     );
   }, [
     applicationReviewItems,
+    lifecycleReviewItems,
     patternCardFilter,
     patternCardSearchQuery,
     patternCardSort,
@@ -2951,7 +2989,8 @@ function QuinnConversationSurface({
     patternCardFilter !== 'saved' &&
     patternCardFilter !== 'pinned' &&
     patternCardFilter !== 'retired' &&
-    patternCardFilter !== 'with-application-check';
+    patternCardFilter !== 'with-application-check' &&
+    patternCardFilter !== 'with-lifecycle-review';
   const activeSavedPatternCardCount = savedPatternCards.filter((card) => !card.retiredAt).length;
   const retiredSavedPatternCardCount = savedPatternCards.filter((card) =>
     Boolean(card.retiredAt)
@@ -2970,6 +3009,9 @@ function QuinnConversationSurface({
     ).length;
   const applicationCheckPatternCardCount = savedPatternCards.filter((card) =>
     !card.retiredAt && Boolean(getApplicationReviewForSavedPatternCard(card, applicationReviewItems))
+  ).length;
+  const lifecycleReviewPatternCardCount = savedPatternCards.filter((card) =>
+    !card.retiredAt && Boolean(getLifecycleReviewForSavedPatternCard(card, lifecycleReviewItems))
   ).length;
   const pinnedSavedPatternCardCount = savedPatternCards.filter((card) =>
     Boolean(card.pinnedAt && !card.retiredAt)
@@ -4267,6 +4309,9 @@ function QuinnConversationSurface({
                     </Text>
                     <Text style={styles.literalPatternCardCountPill}>
                       {applicationCheckPatternCardCount} app check
+                    </Text>
+                    <Text style={styles.literalPatternCardCountPill}>
+                      {lifecycleReviewPatternCardCount} lifecycle
                     </Text>
                   </View>
                   {patternCardActiveSummary ? (
