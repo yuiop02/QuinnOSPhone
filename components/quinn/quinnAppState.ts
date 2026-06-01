@@ -91,6 +91,8 @@ export type QuinnSavedPatternCard = {
   id: string;
   savedAt: string;
   pinnedAt?: string | null;
+  retiredAt?: string | null;
+  retiredReason?: string;
   possiblePattern: string;
   evidence: string;
   overgeneralizationRisk: string;
@@ -105,6 +107,8 @@ type SavedPatternCardExportInput = QuinnSavedPatternCard;
 type ParsedPatternCardExportItem = QuinnExportSessionPatternCard & {
   savedAt?: string;
   pinnedAt?: string | null;
+  retiredAt?: string | null;
+  retiredReason?: string;
   applicationReview?: QuinnPatternCardApplicationReview | null;
 };
 
@@ -283,6 +287,8 @@ function parsePatternCardsFromExportSection(
         createdAt: getImportedSessionPatternCardField(lines, 'Created'),
         savedAt: getImportedSessionPatternCardField(lines, 'Saved time'),
         pinnedAt: getImportedSessionPatternCardField(lines, 'Pinned time'),
+        retiredAt: getImportedSessionPatternCardField(lines, 'Retired time'),
+        retiredReason: getImportedSessionPatternCardField(lines, 'Retired reason'),
         possiblePattern,
         evidence: getImportedSessionPatternCardField(lines, 'Evidence'),
         overgeneralizationRisk: getImportedSessionPatternCardField(
@@ -348,6 +354,8 @@ function parsePatternCardsFromExportSection(
         !card.createdAt &&
         !card.savedAt &&
         !card.pinnedAt &&
+        !card.retiredAt &&
+        !card.retiredReason &&
         !hasSaveIntentReview &&
         !hasApplicationReview
       ) {
@@ -384,6 +392,8 @@ export function parseSavedPatternCardsFromExport(exportText: string): QuinnSaved
       id: `saved-pattern-card-import-${Date.now()}-${index}`,
       savedAt: String(card.savedAt || '').trim() || String(card.createdAt || '').trim(),
       pinnedAt: String(card.pinnedAt || '').trim() || null,
+      retiredAt: String(card.retiredAt || '').trim() || null,
+      retiredReason: String(card.retiredReason || '').trim(),
       possiblePattern: card.possiblePattern,
       evidence: card.evidence,
       overgeneralizationRisk: card.overgeneralizationRisk,
@@ -488,6 +498,8 @@ export function buildExportBundle({
     id: String(card.id || '').trim(),
     savedAt: String(card.savedAt || '').trim(),
     pinnedAt: String(card.pinnedAt || '').trim() || null,
+    retiredAt: String(card.retiredAt || '').trim() || null,
+    retiredReason: String(card.retiredReason || '').trim(),
     possiblePattern: String(card.possiblePattern || '').trim(),
     evidence: String(card.evidence || '').trim(),
     overgeneralizationRisk: String(card.overgeneralizationRisk || '').trim(),
@@ -628,6 +640,8 @@ export function buildExportBundle({
             `### ${index + 1}. ${formatOptionalText(card.possiblePattern, 'Untitled pattern card')}`,
             `- Saved time: ${formatRunTimestamp(card.savedAt)}`,
             `- Pinned time: ${formatRunTimestamp(card.pinnedAt)}`,
+            `- Retired time: ${formatRunTimestamp(card.retiredAt)}`,
+            `- Retired reason: ${formatOptionalText(card.retiredReason)}`,
             `- Evidence: ${formatOptionalText(card.evidence)}`,
             `- Overgeneralization risk: ${formatOptionalText(card.overgeneralizationRisk)}`,
             `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,
@@ -794,6 +808,8 @@ export function buildExportBundle({
           `${index + 1}. ${formatOptionalText(card.possiblePattern, 'Untitled pattern card')}`,
           `- Saved time: ${formatRunTimestamp(card.savedAt)}`,
           `- Pinned time: ${formatRunTimestamp(card.pinnedAt)}`,
+          `- Retired time: ${formatRunTimestamp(card.retiredAt)}`,
+          `- Retired reason: ${formatOptionalText(card.retiredReason)}`,
           `- Evidence: ${formatOptionalText(card.evidence)}`,
           `- Overgeneralization risk: ${formatOptionalText(card.overgeneralizationRisk)}`,
           `- Before storing decision: ${formatOptionalText(card.beforeStoringDecision)}`,

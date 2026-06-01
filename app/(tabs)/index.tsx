@@ -219,6 +219,7 @@ type QuinnPatternCardFilter =
   | 'all'
   | 'saved'
   | 'pinned'
+  | 'retired'
   | 'session'
   | 'with-save-review'
   | 'with-application-check';
@@ -256,6 +257,7 @@ const PATTERN_CARD_FILTER_OPTIONS: readonly {
   { id: 'all', label: 'All' },
   { id: 'saved', label: 'Saved' },
   { id: 'pinned', label: 'Pinned' },
+  { id: 'retired', label: 'Retired' },
   { id: 'session', label: 'Session' },
   { id: 'with-save-review', label: 'Save review' },
   { id: 'with-application-check', label: 'App check' },
@@ -2785,12 +2787,16 @@ function QuinnConversationSurface({
   const visibleSavedPatternCards = React.useMemo(() => {
     const filteredCards = savedPatternCards.filter((card) => {
       const applicationReview = getApplicationReviewForSavedPatternCard(card, applicationReviewItems);
+      const isRetired = Boolean(card.retiredAt);
       const matchesFilter =
-        patternCardFilter === 'all' ||
-        patternCardFilter === 'saved' ||
-        (patternCardFilter === 'pinned' && Boolean(card.pinnedAt)) ||
-        (patternCardFilter === 'with-save-review' && Boolean(card.saveIntentReview)) ||
-        (patternCardFilter === 'with-application-check' && Boolean(applicationReview));
+        patternCardFilter === 'retired'
+          ? isRetired
+          : !isRetired &&
+            (patternCardFilter === 'all' ||
+              patternCardFilter === 'saved' ||
+              (patternCardFilter === 'pinned' && Boolean(card.pinnedAt)) ||
+              (patternCardFilter === 'with-save-review' && Boolean(card.saveIntentReview)) ||
+              (patternCardFilter === 'with-application-check' && Boolean(applicationReview)));
 
       if (!matchesFilter) {
         return false;
@@ -2804,6 +2810,8 @@ function QuinnConversationSurface({
           card.beforeStoringDecision,
           card.sourceRunId,
           card.pinnedAt ? 'pinned' : '',
+          isRetired ? 'retired' : '',
+          card.retiredReason,
           ...getSaveIntentReviewSearchFields(card.saveIntentReview),
           ...getApplicationReviewSearchFields(applicationReview),
         ],
@@ -2869,22 +2877,29 @@ function QuinnConversationSurface({
   const shouldShowSessionPatternCardSection =
     patternCardFilter !== 'saved' &&
     patternCardFilter !== 'pinned' &&
+    patternCardFilter !== 'retired' &&
     patternCardFilter !== 'with-application-check';
-  const savedPatternCardCount = savedPatternCards.length;
+  const activeSavedPatternCardCount = savedPatternCards.filter((card) => !card.retiredAt).length;
+  const retiredSavedPatternCardCount = savedPatternCards.filter((card) =>
+    Boolean(card.retiredAt)
+  ).length;
+  const savedPatternCardCount = activeSavedPatternCardCount;
   const sessionPatternCardCount = sessionPatternCards.length;
-  const totalPatternCardCount = savedPatternCardCount + sessionPatternCardCount;
+  const activePatternCardCount = activeSavedPatternCardCount + sessionPatternCardCount;
+  const totalPatternCardCount =
+    patternCardFilter === 'retired' ? retiredSavedPatternCardCount : activePatternCardCount;
   const visiblePatternCardCount =
     visibleSavedPatternCards.length + visibleSessionPatternCards.length;
   const saveIntentReviewPatternCardCount =
-    savedPatternCards.filter((card) => Boolean(card.saveIntentReview)).length +
+    savedPatternCards.filter((card) => !card.retiredAt && Boolean(card.saveIntentReview)).length +
     sessionPatternCards.filter((card) =>
       Boolean(getSaveIntentReviewForSessionPatternCard(card, saveIntentReviewItems))
     ).length;
   const applicationCheckPatternCardCount = savedPatternCards.filter((card) =>
-    Boolean(getApplicationReviewForSavedPatternCard(card, applicationReviewItems))
+    !card.retiredAt && Boolean(getApplicationReviewForSavedPatternCard(card, applicationReviewItems))
   ).length;
   const pinnedSavedPatternCardCount = savedPatternCards.filter((card) =>
-    Boolean(card.pinnedAt)
+    Boolean(card.pinnedAt && !card.retiredAt)
   ).length;
   const patternCardFilterLabel =
     PATTERN_CARD_FILTER_OPTIONS.find((filterOption) => filterOption.id === patternCardFilter)
@@ -2899,6 +2914,15 @@ function QuinnConversationSurface({
   const patternCardResultSummary = hasActivePatternCardSearchOrFilter
     ? `Showing ${visiblePatternCardCount} of ${totalPatternCardCount} cards`
     : `${totalPatternCardCount} ${totalPatternCardCount === 1 ? 'card' : 'cards'} total`;
+  let patternCardNoMatchMessage = 'No cards match this search/filter.';
+
+  if (patternCardFilter === 'retired') {
+    patternCardNoMatchMessage = patternCardSearchQuery
+      ? 'No retired pattern cards match this search.'
+      : 'No retired pattern cards yet.';
+  } else if (!activePatternCardCount && retiredSavedPatternCardCount) {
+    patternCardNoMatchMessage = 'No active pattern cards. Use Retired to view retired saved cards.';
+  }
   const patternCardActiveSummaryParts: string[] = [];
 
   if (patternCardFilter !== 'all') {
@@ -3235,6 +3259,10 @@ function QuinnConversationSurface({
   }
 
   function stageSavedPatternCardApplication(card: QuinnSavedPatternCard) {
+    if (card.retiredAt) {
+      return;
+    }
+
     setLongFormComposerCollapsed(false);
     onChangePacketText(buildQuinnPatternCardApplicationPacket(card));
     closeLiteralPanelsForDraftLoad();
@@ -3250,6 +3278,36 @@ function QuinnConversationSurface({
           ? {
               ...card,
               pinnedAt: card.pinnedAt ? null : pinnedAt,
+            }
+          : card
+      )
+    );
+  }
+
+  function retireSavedPatternCard(cardId: string) {
+    const retiredAt = new Date().toISOString();
+
+    onChangeSavedPatternCards((currentCards) =>
+      currentCards.map((card) =>
+        card.id === cardId
+          ? {
+              ...card,
+              retiredAt,
+              retiredReason: 'Retired locally by Quinn.',
+            }
+          : card
+      )
+    );
+  }
+
+  function restoreSavedPatternCard(cardId: string) {
+    onChangeSavedPatternCards((currentCards) =>
+      currentCards.map((card) =>
+        card.id === cardId
+          ? {
+              ...card,
+              retiredAt: null,
+              retiredReason: '',
             }
           : card
       )
@@ -3330,6 +3388,8 @@ function QuinnConversationSurface({
           id: `saved-pattern-card-import-${importedAt}-${index}`,
           savedAt: String(card.savedAt || '').trim() || new Date(importedAt).toISOString(),
           pinnedAt: String(card.pinnedAt || '').trim() || null,
+          retiredAt: String(card.retiredAt || '').trim() || null,
+          retiredReason: String(card.retiredReason || '').trim(),
           possiblePattern: possiblePattern || 'Untitled pattern card',
           evidence,
           overgeneralizationRisk: String(card.overgeneralizationRisk || '').trim(),
@@ -4052,8 +4112,12 @@ function QuinnConversationSurface({
                 <Text style={styles.literalOutcomeHistoryTitle}>Pattern cards</Text>
                 <View style={styles.literalOutcomeHistoryHeaderActions}>
                   <Text style={styles.literalOutcomeHistoryCount}>
-                    {savedPatternCards.length || sessionPatternCards.length
-                      ? `${savedPatternCards.length} saved / ${sessionPatternCards.length} session`
+                    {activePatternCardCount || retiredSavedPatternCardCount
+                      ? `${savedPatternCardCount} saved / ${sessionPatternCardCount} session${
+                          retiredSavedPatternCardCount
+                            ? ` / ${retiredSavedPatternCardCount} retired`
+                            : ''
+                        }`
                       : 'Local'}
                   </Text>
                   <Pressable
@@ -4108,6 +4172,9 @@ function QuinnConversationSurface({
                     </Text>
                     <Text style={styles.literalPatternCardCountPill}>
                       {pinnedSavedPatternCardCount} pinned
+                    </Text>
+                    <Text style={styles.literalPatternCardCountPill}>
+                      {retiredSavedPatternCardCount} retired
                     </Text>
                     <Text style={styles.literalPatternCardCountPill}>
                       {saveIntentReviewPatternCardCount} save review
@@ -4204,16 +4271,19 @@ function QuinnConversationSurface({
               >
                 {hasAnyPatternCards && !hasVisiblePatternCards ? (
                   <Text style={styles.literalOutcomeHistoryEmpty}>
-                    No cards match this search/filter.
+                    {patternCardNoMatchMessage}
                   </Text>
                 ) : (
                   <>
                     {shouldShowSavedPatternCardSection ? (
                       <>
-                        <Text style={styles.literalPatternCardSectionTitle}>Saved locally</Text>
+                        <Text style={styles.literalPatternCardSectionTitle}>
+                          {patternCardFilter === 'retired' ? 'Retired saved' : 'Saved locally'}
+                        </Text>
                         {visibleSavedPatternCards.length ? (
                           visibleSavedPatternCards.map((card) => {
                     const isDetailOpen = selectedSavedPatternCardId === card.id;
+                    const isRetired = Boolean(card.retiredAt);
                     const saveIntentResult = card.saveIntentReview;
                     const saveIntentStatus =
                       saveIntentResult?.saveReadiness || saveIntentResult?.shouldPreserveLater || '';
@@ -4229,10 +4299,23 @@ function QuinnConversationSurface({
                         style={[
                           styles.literalOutcomeHistoryRow,
                           card.pinnedAt ? styles.literalPinnedPatternCardRow : null,
+                          isRetired ? styles.literalRetiredPatternCardRow : null,
                         ]}
                       >
                         <View style={styles.literalOutcomeHistoryRowHeader}>
                           <View style={styles.literalPatternCardStatusStack}>
+                            {isRetired ? (
+                              <View style={styles.literalRetiredPatternCardStatus}>
+                                <Feather
+                                  name="archive"
+                                  size={11}
+                                  color="rgba(245, 248, 255, 0.54)"
+                                />
+                                <Text style={styles.literalRetiredPatternCardStatusText}>
+                                  Retired
+                                </Text>
+                              </View>
+                            ) : null}
                             {card.pinnedAt ? (
                               <View style={styles.literalPinnedPatternCardStatus}>
                                 <Feather
@@ -4245,7 +4328,9 @@ function QuinnConversationSurface({
                                 </Text>
                               </View>
                             ) : null}
-                            <Text style={styles.literalPatternCandidateStatus}>Saved locally</Text>
+                            <Text style={styles.literalPatternCandidateStatus}>
+                              {isRetired ? 'Retired saved' : 'Saved locally'}
+                            </Text>
                           </View>
                           {card.savedAt ? (
                             <Text style={styles.literalOutcomeHistoryTime}>
@@ -4284,38 +4369,42 @@ function QuinnConversationSurface({
                           </>
                         ) : null}
                         <View style={styles.literalPatternCandidateActionRow}>
-                          <Pressable
-                            style={[
-                              styles.literalPatternCandidateAction,
-                              styles.literalPatternCandidateActionInline,
-                            ]}
-                            onPress={() => toggleSavedPatternCardPin(card.id)}
-                          >
-                            <Feather
-                              name="bookmark"
-                              size={12}
-                              color={
-                                card.pinnedAt
-                                  ? 'rgba(255, 214, 153, 0.78)'
-                                  : 'rgba(245, 248, 255, 0.62)'
-                              }
-                            />
-                            <Text style={styles.literalPatternCandidateActionText}>
-                              {card.pinnedAt ? 'Unpin' : 'Pin'}
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            style={[
-                              styles.literalPatternCandidateAction,
-                              styles.literalPatternCandidateActionInline,
-                            ]}
-                            onPress={() => stageSavedPatternCardApplication(card)}
-                          >
-                            <Feather name="target" size={12} color="rgba(245, 248, 255, 0.62)" />
-                            <Text style={styles.literalPatternCandidateActionText}>
-                              Apply card
-                            </Text>
-                          </Pressable>
+                          {!isRetired ? (
+                            <Pressable
+                              style={[
+                                styles.literalPatternCandidateAction,
+                                styles.literalPatternCandidateActionInline,
+                              ]}
+                              onPress={() => toggleSavedPatternCardPin(card.id)}
+                            >
+                              <Feather
+                                name="bookmark"
+                                size={12}
+                                color={
+                                  card.pinnedAt
+                                    ? 'rgba(255, 214, 153, 0.78)'
+                                    : 'rgba(245, 248, 255, 0.62)'
+                                }
+                              />
+                              <Text style={styles.literalPatternCandidateActionText}>
+                                {card.pinnedAt ? 'Unpin' : 'Pin'}
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                          {!isRetired ? (
+                            <Pressable
+                              style={[
+                                styles.literalPatternCandidateAction,
+                                styles.literalPatternCandidateActionInline,
+                              ]}
+                              onPress={() => stageSavedPatternCardApplication(card)}
+                            >
+                              <Feather name="target" size={12} color="rgba(245, 248, 255, 0.62)" />
+                              <Text style={styles.literalPatternCandidateActionText}>
+                                Apply card
+                              </Text>
+                            </Pressable>
+                          ) : null}
                           <Pressable
                             style={[
                               styles.literalPatternCandidateAction,
@@ -4340,6 +4429,26 @@ function QuinnConversationSurface({
                           >
                             <Feather name="eye" size={12} color="rgba(245, 248, 255, 0.62)" />
                             <Text style={styles.literalPatternCandidateActionText}>View</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.literalPatternCandidateAction,
+                              styles.literalPatternCandidateActionInline,
+                            ]}
+                            onPress={() =>
+                              isRetired
+                                ? restoreSavedPatternCard(card.id)
+                                : retireSavedPatternCard(card.id)
+                            }
+                          >
+                            <Feather
+                              name={isRetired ? 'rotate-ccw' : 'archive'}
+                              size={12}
+                              color="rgba(245, 248, 255, 0.62)"
+                            />
+                            <Text style={styles.literalPatternCandidateActionText}>
+                              {isRetired ? 'Restore' : 'Retire'}
+                            </Text>
                           </Pressable>
                           <Pressable
                             style={styles.literalPatternCandidateAction}
@@ -4398,6 +4507,20 @@ function QuinnConversationSurface({
                                 <Text style={styles.literalOutcomeHistoryLabel}>Pinned at</Text>
                                 <Text style={styles.literalSessionPatternCardDetailText}>
                                   {formatOutcomeHistoryTimestamp(card.pinnedAt)}
+                                </Text>
+                              </>
+                            ) : null}
+                            {isRetired ? (
+                              <>
+                                <Text style={styles.literalOutcomeHistoryLabel}>Retired at</Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {card.retiredAt
+                                    ? formatOutcomeHistoryTimestamp(card.retiredAt)
+                                    : 'No retired time captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>Retired reason</Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {card.retiredReason || 'No retired reason captured.'}
                                 </Text>
                               </>
                             ) : null}
@@ -9344,6 +9467,13 @@ responseReplayButton: {
     paddingLeft: 8,
   },
 
+  literalRetiredPatternCardRow: {
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(245, 248, 255, 0.16)',
+    opacity: 0.78,
+    paddingLeft: 8,
+  },
+
   literalPatternCardStatusStack: {
     flexShrink: 1,
     paddingRight: 8,
@@ -9357,6 +9487,20 @@ responseReplayButton: {
 
   literalPinnedPatternCardStatusText: {
     color: 'rgba(255, 214, 153, 0.86)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+    marginLeft: 4,
+  },
+
+  literalRetiredPatternCardStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+
+  literalRetiredPatternCardStatusText: {
+    color: 'rgba(245, 248, 255, 0.54)',
     fontSize: 10.5,
     lineHeight: 14,
     fontWeight: '800',
