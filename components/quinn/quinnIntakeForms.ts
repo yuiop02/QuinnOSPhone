@@ -23,7 +23,8 @@ export type QuinnPacketKindId =
   | 'draft-pattern-card'
   | 'pattern-card-save-intent'
   | 'pattern-card-application'
-  | 'saved-pattern-card-review';
+  | 'saved-pattern-card-review'
+  | 'saved-card-shelf-review';
 
 export type QuinnIntakeFormDefinition = {
   id: QuinnIntakeFormId;
@@ -195,6 +196,39 @@ export type QuinnSavedPatternCardReviewSource = QuinnPatternCardApplicationSourc
   retiredAt?: string | null;
   retiredReason?: string | null;
   applicationReview?: QuinnPatternCardApplicationResultPreview | null;
+  lifecycleReview?: QuinnSavedPatternCardReviewResultPreview | null;
+};
+
+export type QuinnSavedCardShelfReviewCard = {
+  possiblePattern: string;
+  savedAt: string;
+  pinnedAt?: string | null;
+  retiredAt?: string | null;
+  retiredReason?: string | null;
+  evidence: string;
+  overgeneralizationRisk: string;
+  saveIntentReview?: QuinnPatternCardSaveIntentResultPreview | null;
+  applicationReview?: QuinnPatternCardApplicationResultPreview | null;
+  lifecycleReview?: QuinnSavedPatternCardReviewResultPreview | null;
+};
+
+export type QuinnSavedCardShelfReviewSource = {
+  counts: {
+    activeSavedCards: number;
+    retiredSavedCards: number;
+    pinnedSavedCards: number;
+    withSaveIntentReview: number;
+    withApplicationCheck: number;
+    withLifecycleReview: number;
+    sessionCards?: number;
+  };
+  currentView: {
+    filter: string;
+    search: string;
+    sort: string;
+  };
+  activeSavedCards: QuinnSavedCardShelfReviewCard[];
+  retiredSavedCards: QuinnSavedCardShelfReviewCard[];
 };
 
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
@@ -202,6 +236,7 @@ const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 const QUINN_PATTERN_CARD_SAVE_INTENT_MARKER = 'QUINNOS PATTERN CARD SAVE INTENT';
 const QUINN_PATTERN_CARD_APPLICATION_MARKER = 'QUINNOS PATTERN CARD APPLICATION';
 const QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER = 'QUINNOS SAVED PATTERN CARD REVIEW';
+const QUINN_SAVED_CARD_SHELF_REVIEW_MARKER = 'QUINNOS SAVED CARD SHELF REVIEW';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -414,6 +449,69 @@ function formatQuinnDraftPatternCardValue(value: string, fallback: string) {
   const clean = String(value || '').trim();
 
   return clean || fallback;
+}
+
+function formatQuinnShelfReviewValue(value: string, fallback: string, maxLength = 180) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+
+  if (!clean) {
+    return fallback;
+  }
+
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 3).trim()}...` : clean;
+}
+
+function formatQuinnShelfReviewBoolean(value: unknown) {
+  return value ? 'yes' : 'no';
+}
+
+function buildQuinnSavedCardShelfReviewList(
+  cards: QuinnSavedCardShelfReviewCard[],
+  limit: number
+) {
+  if (!cards.length) {
+    return ['(none yet)'];
+  }
+
+  const visibleCards = cards.slice(0, limit);
+  const omittedCount = Math.max(0, cards.length - visibleCards.length);
+  const lines = visibleCards.flatMap((card, index) => {
+    const retiredAt = String(card.retiredAt || '').trim();
+    const retiredReason = String(card.retiredReason || '').trim();
+    const pinnedAt = String(card.pinnedAt || '').trim();
+
+    return [
+      `${index + 1}. ${formatQuinnShelfReviewValue(
+        card.possiblePattern,
+        'Untitled saved pattern card',
+        120
+      )}`,
+      `   - Saved: ${formatQuinnShelfReviewValue(card.savedAt, 'unknown', 90)}`,
+      ...(pinnedAt
+        ? [`   - Pinned: ${formatQuinnShelfReviewValue(pinnedAt, 'unknown', 90)}`]
+        : []),
+      ...(retiredAt
+        ? [`   - Retired: ${formatQuinnShelfReviewValue(retiredAt, 'unknown', 90)}`]
+        : []),
+      ...(retiredReason
+        ? [`   - Retired reason: ${formatQuinnShelfReviewValue(retiredReason, 'none', 120)}`]
+        : []),
+      `   - Evidence: ${formatQuinnShelfReviewValue(card.evidence, 'none captured')}`,
+      `   - Risk: ${formatQuinnShelfReviewValue(
+        card.overgeneralizationRisk,
+        'none captured'
+      )}`,
+      `   - Has Save Intent review: ${formatQuinnShelfReviewBoolean(card.saveIntentReview)}`,
+      `   - Has Application check: ${formatQuinnShelfReviewBoolean(card.applicationReview)}`,
+      `   - Has Lifecycle review: ${formatQuinnShelfReviewBoolean(card.lifecycleReview)}`,
+    ];
+  });
+
+  if (omittedCount) {
+    lines.push(`(${omittedCount} more saved cards omitted from this compact packet.)`);
+  }
+
+  return lines;
 }
 
 export function buildQuinnDraftPatternCardPacket(candidate: QuinnDraftPatternCardSource) {
@@ -802,6 +900,58 @@ export function buildQuinnSavedPatternCardReviewPacket(
     '',
     'OUTPUT I NEED FROM REN:',
     'Use this as a saved-card lifecycle review only. Do not change the card automatically. Tell Quinn whether this card should stay active, be revised, pinned, retired, restored, or tested again. Name the risk of keeping it as-is and the next best card action.',
+    ...QUINNOS_RESPONSE_PROTOCOL,
+  ].join('\n');
+}
+
+export function buildQuinnSavedCardShelfReviewPacket(input: QuinnSavedCardShelfReviewSource) {
+  const activeSavedCards = input.activeSavedCards || [];
+  const retiredSavedCards = input.retiredSavedCards || [];
+  const counts = input.counts;
+  const currentView = input.currentView;
+
+  return [
+    'QUINNOS SAVED CARD SHELF REVIEW',
+    '',
+    'PURPOSE:',
+    'Review the saved Pattern Card shelf as a whole without automatically changing any cards. Identify what should stay active, what may need revision, what may be stale, what may deserve pinning, what may deserve retirement, and what should be tested again.',
+    '',
+    'SHELF COUNTS:',
+    `Active saved cards: ${counts.activeSavedCards}`,
+    `Retired saved cards: ${counts.retiredSavedCards}`,
+    `Pinned saved cards: ${counts.pinnedSavedCards}`,
+    `With Save Intent review: ${counts.withSaveIntentReview}`,
+    `With Application check: ${counts.withApplicationCheck}`,
+    `With Lifecycle review: ${counts.withLifecycleReview}`,
+    `Session cards, count only: ${counts.sessionCards ?? 0}`,
+    '',
+    'CURRENT VIEW:',
+    `Filter: ${formatQuinnShelfReviewValue(currentView.filter, 'All', 80)}`,
+    `Search: ${formatQuinnShelfReviewValue(currentView.search, '(none)', 120)}`,
+    `Sort: ${formatQuinnShelfReviewValue(currentView.sort, 'Newest', 80)}`,
+    '',
+    'SCOPE NOTE:',
+    'Review all saved cards below, not only the currently visible filtered cards. Session cards are included as count only.',
+    '',
+    'ACTIVE SAVED CARDS:',
+    ...buildQuinnSavedCardShelfReviewList(activeSavedCards, 12),
+    '',
+    'RETIRED SAVED CARDS:',
+    ...buildQuinnSavedCardShelfReviewList(retiredSavedCards, 8),
+    '',
+    'WHAT I NEED FROM REN:',
+    'Use this as a shelf-level review only. Do not change any cards automatically. Identify the most important maintenance pattern in this shelf, the cards that look most useful, the cards that look stale or risky, and the next best manual card action for Quinn.',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
+    '',
+    'SHELF REVIEW OUTPUT SHAPE:',
+    'Return exactly these sections:',
+    'SHELF READ:',
+    'MOST USEFUL ACTIVE CARDS:',
+    'STALE / RISKY / OVERFIT CARDS:',
+    'MISSING OR UNDERTESTED AREAS:',
+    'NEXT BEST MANUAL CARD ACTION:',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
@@ -1602,6 +1752,16 @@ export function getQuinnIntakeFormKindFromPacketText(
   packetText: string
 ): QuinnIntakeFormPacketKind | null {
   const text = String(packetText || '');
+
+  if (text.includes(QUINN_SAVED_CARD_SHELF_REVIEW_MARKER)) {
+    return {
+      id: 'saved-card-shelf-review',
+      label: 'Shelf Review',
+      icon: 'layers',
+      marker: QUINN_SAVED_CARD_SHELF_REVIEW_MARKER,
+      isOutcomeLog: false,
+    };
+  }
 
   if (text.includes(QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER)) {
     return {

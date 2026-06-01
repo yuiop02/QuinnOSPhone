@@ -112,6 +112,7 @@ import {
   buildQuinnOutcomeLogPacketFromRun,
   buildQuinnPatternCardApplicationPacket,
   buildQuinnPatternCardSaveIntentPacket,
+  buildQuinnSavedCardShelfReviewPacket,
   buildQuinnSavedPatternCardReviewPacket,
   getQuinnDraftPatternCardHistoryPreview,
   getQuinnDraftPatternCardResultPreview,
@@ -3019,6 +3020,9 @@ function QuinnConversationSurface({
   const patternCardFilterLabel =
     PATTERN_CARD_FILTER_OPTIONS.find((filterOption) => filterOption.id === patternCardFilter)
       ?.label || 'All';
+  const patternCardSortLabel =
+    PATTERN_CARD_SORT_OPTIONS.find((sortOption) => sortOption.id === patternCardSort)?.label ||
+    'Newest';
   const patternCardSearchSummaryText = patternCardSearchText.trim();
   const compactPatternCardSearchSummary =
     patternCardSearchSummaryText.length > 28
@@ -3390,6 +3394,60 @@ function QuinnConversationSurface({
       buildQuinnSavedPatternCardReviewPacket({
         ...card,
         applicationReview: getApplicationReviewForSavedPatternCard(card, applicationReviewItems),
+      })
+    );
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
+  function stageSavedCardShelfReview() {
+    const toShelfReviewCard = (card: QuinnSavedPatternCard) => ({
+      possiblePattern: card.possiblePattern,
+      savedAt: card.savedAt,
+      pinnedAt: card.pinnedAt,
+      retiredAt: card.retiredAt,
+      retiredReason: card.retiredReason,
+      evidence: card.evidence,
+      overgeneralizationRisk: card.overgeneralizationRisk,
+      saveIntentReview: card.saveIntentReview,
+      applicationReview: getApplicationReviewForSavedPatternCard(card, applicationReviewItems),
+      lifecycleReview: getLifecycleReviewForSavedPatternCard(card, lifecycleReviewItems),
+    });
+    const sortSavedCards = (cards: QuinnSavedPatternCard[]) =>
+      [...cards].sort((firstCard, secondCard) =>
+        compareSavedPatternCardsForSort(
+          firstCard,
+          secondCard,
+          patternCardSort,
+          saveIntentReviewItems,
+          applicationReviewItems,
+          lifecycleReviewItems
+        )
+      );
+    const activeSavedCards = sortSavedCards(savedPatternCards.filter((card) => !card.retiredAt));
+    const retiredSavedCards = sortSavedCards(savedPatternCards.filter((card) => card.retiredAt));
+
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(
+      buildQuinnSavedCardShelfReviewPacket({
+        counts: {
+          activeSavedCards: activeSavedPatternCardCount,
+          retiredSavedCards: retiredSavedPatternCardCount,
+          pinnedSavedCards: pinnedSavedPatternCardCount,
+          withSaveIntentReview: savedPatternCards.filter(
+            (card) => !card.retiredAt && Boolean(card.saveIntentReview)
+          ).length,
+          withApplicationCheck: applicationCheckPatternCardCount,
+          withLifecycleReview: lifecycleReviewPatternCardCount,
+          sessionCards: sessionPatternCardCount,
+        },
+        currentView: {
+          filter: patternCardFilterLabel,
+          search: patternCardSearchSummaryText || '(none)',
+          sort: patternCardSortLabel,
+        },
+        activeSavedCards: activeSavedCards.map(toShelfReviewCard),
+        retiredSavedCards: retiredSavedCards.map(toShelfReviewCard),
       })
     );
     closeLiteralPanelsForDraftLoad();
@@ -4265,13 +4323,23 @@ function QuinnConversationSurface({
 
               <View style={styles.literalPatternCardImportRow}>
                 <Pressable
-                  style={styles.literalPatternCandidateAction}
+                  style={[
+                    styles.literalPatternCandidateAction,
+                    styles.literalPatternCandidateActionInline,
+                  ]}
                   onPress={stageSessionPatternCardImport}
                 >
                   <Feather name="download" size={12} color="rgba(245, 248, 255, 0.62)" />
                   <Text style={styles.literalPatternCandidateActionText}>
                     Import from export
                   </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.literalPatternCandidateAction}
+                  onPress={stageSavedCardShelfReview}
+                >
+                  <Feather name="layers" size={12} color="rgba(245, 248, 255, 0.62)" />
+                  <Text style={styles.literalPatternCandidateActionText}>Shelf review</Text>
                 </Pressable>
               </View>
 
