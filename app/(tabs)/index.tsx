@@ -222,6 +222,8 @@ type QuinnPatternCardFilter =
   | 'with-save-review'
   | 'with-application-check';
 
+type QuinnPatternCardSort = 'newest' | 'oldest' | 'alphabetical' | 'recently-checked';
+
 type NumberedOption = {
   index: number;
   text: string;
@@ -255,6 +257,15 @@ const PATTERN_CARD_FILTER_OPTIONS: readonly {
   { id: 'session', label: 'Session' },
   { id: 'with-save-review', label: 'Save review' },
   { id: 'with-application-check', label: 'App check' },
+];
+const PATTERN_CARD_SORT_OPTIONS: readonly {
+  id: QuinnPatternCardSort;
+  label: string;
+}[] = [
+  { id: 'newest', label: 'Newest' },
+  { id: 'oldest', label: 'Oldest' },
+  { id: 'alphabetical', label: 'A-Z' },
+  { id: 'recently-checked', label: 'Checked' },
 ];
 const SESSION_PATTERN_CARD_IMPORT_MARKER = 'QUINNOS SESSION PATTERN CARD IMPORT';
 const SESSION_PATTERN_CARD_IMPORT_TEMPLATE = [
@@ -563,10 +574,24 @@ function getSaveIntentReviewForSessionPatternCard(
   card: QuinnSessionPatternCard,
   saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[]
 ) {
+  const recentReview = getSaveIntentReviewItemForPatternCard(card, saveIntentReviewItems);
+
+  return recentReview?.resultPreview || card.saveIntentReview || null;
+}
+
+function getSaveIntentReviewItemForPatternCard(
+  card: {
+    possiblePattern: string;
+    evidence: string;
+    sourceRunId?: string;
+  },
+  saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[]
+) {
   const cardPattern = normalizeSessionPatternCardReviewValue(card.possiblePattern);
   const cardEvidence = normalizeSessionPatternCardReviewValue(card.evidence);
-  const cardSourceRunId = normalizeSessionPatternCardReviewValue(card.sourceRunId);
-  const recentReview = saveIntentReviewItems.find((item) => {
+  const cardSourceRunId = normalizeSessionPatternCardReviewValue(card.sourceRunId || '');
+
+  return saveIntentReviewItems.find((item) => {
     const itemPattern = normalizeSessionPatternCardReviewValue(item.possiblePattern);
     const itemEvidence = normalizeSessionPatternCardReviewValue(item.evidence);
     const itemSourceRunId = normalizeSessionPatternCardReviewValue(item.sourceRunId);
@@ -582,18 +607,25 @@ function getSaveIntentReviewForSessionPatternCard(
 
     return coreMatch || sourceMatch;
   });
-
-  return recentReview?.resultPreview || card.saveIntentReview || null;
 }
 
 function getApplicationReviewForSavedPatternCard(
   card: QuinnSavedPatternCard,
   applicationReviewItems: QuinnPatternCardApplicationReviewItem[]
 ) {
+  const recentReview = getApplicationReviewItemForSavedPatternCard(card, applicationReviewItems);
+
+  return recentReview?.resultPreview || card.applicationReview || null;
+}
+
+function getApplicationReviewItemForSavedPatternCard(
+  card: QuinnSavedPatternCard,
+  applicationReviewItems: QuinnPatternCardApplicationReviewItem[]
+) {
   const cardPattern = normalizeSessionPatternCardReviewValue(card.possiblePattern);
   const cardEvidence = normalizeSessionPatternCardReviewValue(card.evidence);
 
-  const recentReview = applicationReviewItems.find((item) => {
+  return applicationReviewItems.find((item) => {
     const itemPattern = normalizeSessionPatternCardReviewValue(item.savedPattern);
     const itemEvidence = normalizeSessionPatternCardReviewValue(item.evidence);
 
@@ -604,8 +636,6 @@ function getApplicationReviewForSavedPatternCard(
         itemEvidence === cardEvidence
     );
   });
-
-  return recentReview?.resultPreview || card.applicationReview || null;
 }
 
 function getSaveIntentReviewSearchFields(
@@ -649,6 +679,136 @@ function patternCardMatchesSearch(
   }
 
   return normalizeSessionPatternCardReviewValue(fields.join(' ')).includes(normalizedSearchQuery);
+}
+
+function getPatternCardTimestampValue(value: string | null | undefined) {
+  const clean = String(value || '').trim();
+
+  if (!clean) {
+    return 0;
+  }
+
+  const timestamp = new Date(clean).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function comparePatternCardNames(firstName: string, secondName: string) {
+  return normalizeSessionPatternCardReviewValue(firstName).localeCompare(
+    normalizeSessionPatternCardReviewValue(secondName)
+  );
+}
+
+function compareSavedPatternCardsForSort(
+  firstCard: QuinnSavedPatternCard,
+  secondCard: QuinnSavedPatternCard,
+  sort: QuinnPatternCardSort,
+  saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[],
+  applicationReviewItems: QuinnPatternCardApplicationReviewItem[]
+) {
+  const firstSavedAt = getPatternCardTimestampValue(firstCard.savedAt);
+  const secondSavedAt = getPatternCardTimestampValue(secondCard.savedAt);
+
+  if (sort === 'oldest') {
+    return firstSavedAt - secondSavedAt;
+  }
+
+  if (sort === 'alphabetical') {
+    return comparePatternCardNames(firstCard.possiblePattern, secondCard.possiblePattern);
+  }
+
+  if (sort === 'recently-checked') {
+    const firstApplicationReview = getApplicationReviewItemForSavedPatternCard(
+      firstCard,
+      applicationReviewItems
+    );
+    const secondApplicationReview = getApplicationReviewItemForSavedPatternCard(
+      secondCard,
+      applicationReviewItems
+    );
+    const firstSaveIntentReview = getSaveIntentReviewItemForPatternCard(
+      firstCard,
+      saveIntentReviewItems
+    );
+    const secondSaveIntentReview = getSaveIntentReviewItemForPatternCard(
+      secondCard,
+      saveIntentReviewItems
+    );
+    const firstReviewTimestamp = Math.max(
+      getPatternCardTimestampValue(firstApplicationReview?.timestamp),
+      getPatternCardTimestampValue(firstSaveIntentReview?.timestamp)
+    );
+    const secondReviewTimestamp = Math.max(
+      getPatternCardTimestampValue(secondApplicationReview?.timestamp),
+      getPatternCardTimestampValue(secondSaveIntentReview?.timestamp)
+    );
+
+    if (firstReviewTimestamp || secondReviewTimestamp) {
+      return secondReviewTimestamp - firstReviewTimestamp || secondSavedAt - firstSavedAt;
+    }
+
+    const firstHasReview = Boolean(
+      firstApplicationReview ||
+        firstSaveIntentReview ||
+        firstCard.applicationReview ||
+        firstCard.saveIntentReview
+    );
+    const secondHasReview = Boolean(
+      secondApplicationReview ||
+        secondSaveIntentReview ||
+        secondCard.applicationReview ||
+        secondCard.saveIntentReview
+    );
+
+    if (firstHasReview !== secondHasReview) {
+      return firstHasReview ? -1 : 1;
+    }
+  }
+
+  return secondSavedAt - firstSavedAt;
+}
+
+function compareSessionPatternCardsForSort(
+  firstCard: QuinnSessionPatternCard,
+  secondCard: QuinnSessionPatternCard,
+  sort: QuinnPatternCardSort,
+  saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[]
+) {
+  const firstCreatedAt = getPatternCardTimestampValue(firstCard.createdAt);
+  const secondCreatedAt = getPatternCardTimestampValue(secondCard.createdAt);
+
+  if (sort === 'oldest') {
+    return firstCreatedAt - secondCreatedAt;
+  }
+
+  if (sort === 'alphabetical') {
+    return comparePatternCardNames(firstCard.possiblePattern, secondCard.possiblePattern);
+  }
+
+  if (sort === 'recently-checked') {
+    const firstSaveIntentReview = getSaveIntentReviewItemForPatternCard(
+      firstCard,
+      saveIntentReviewItems
+    );
+    const secondSaveIntentReview = getSaveIntentReviewItemForPatternCard(
+      secondCard,
+      saveIntentReviewItems
+    );
+    const firstReviewTimestamp = getPatternCardTimestampValue(firstSaveIntentReview?.timestamp);
+    const secondReviewTimestamp = getPatternCardTimestampValue(secondSaveIntentReview?.timestamp);
+
+    if (firstReviewTimestamp || secondReviewTimestamp) {
+      return secondReviewTimestamp - firstReviewTimestamp || secondCreatedAt - firstCreatedAt;
+    }
+
+    const firstHasReview = Boolean(firstSaveIntentReview || firstCard.saveIntentReview);
+    const secondHasReview = Boolean(secondSaveIntentReview || secondCard.saveIntentReview);
+
+    if (firstHasReview !== secondHasReview) {
+      return firstHasReview ? -1 : 1;
+    }
+  }
+
+  return secondCreatedAt - firstCreatedAt;
 }
 
 const TopFadeWall = React.memo(function TopFadeWall() {
@@ -2577,6 +2737,7 @@ function QuinnConversationSurface({
   const [selectedSavedPatternCardId, setSelectedSavedPatternCardId] = useState<string | null>(null);
   const [patternCardSearchText, setPatternCardSearchText] = useState('');
   const [patternCardFilter, setPatternCardFilter] = useState<QuinnPatternCardFilter>('all');
+  const [patternCardSort, setPatternCardSort] = useState<QuinnPatternCardSort>('newest');
   const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
@@ -2611,7 +2772,7 @@ function QuinnConversationSurface({
     : literalComposerContentHeight > COMPACT_LITERAL_COMPOSER_MAX_HEIGHT;
   const patternCardSearchQuery = normalizeSessionPatternCardReviewValue(patternCardSearchText);
   const visibleSavedPatternCards = React.useMemo(() => {
-    return savedPatternCards.filter((card) => {
+    const filteredCards = savedPatternCards.filter((card) => {
       const applicationReview = getApplicationReviewForSavedPatternCard(card, applicationReviewItems);
       const matchesFilter =
         patternCardFilter === 'all' ||
@@ -2636,9 +2797,26 @@ function QuinnConversationSurface({
         patternCardSearchQuery
       );
     });
-  }, [applicationReviewItems, patternCardFilter, patternCardSearchQuery, savedPatternCards]);
+
+    return filteredCards.sort((firstCard, secondCard) =>
+      compareSavedPatternCardsForSort(
+        firstCard,
+        secondCard,
+        patternCardSort,
+        saveIntentReviewItems,
+        applicationReviewItems
+      )
+    );
+  }, [
+    applicationReviewItems,
+    patternCardFilter,
+    patternCardSearchQuery,
+    patternCardSort,
+    savedPatternCards,
+    saveIntentReviewItems,
+  ]);
   const visibleSessionPatternCards = React.useMemo(() => {
-    return sessionPatternCards.filter((card) => {
+    const filteredCards = sessionPatternCards.filter((card) => {
       const saveIntentReview = getSaveIntentReviewForSessionPatternCard(card, saveIntentReviewItems);
       const matchesFilter =
         patternCardFilter === 'all' ||
@@ -2661,7 +2839,16 @@ function QuinnConversationSurface({
         patternCardSearchQuery
       );
     });
-  }, [patternCardFilter, patternCardSearchQuery, saveIntentReviewItems, sessionPatternCards]);
+
+    return filteredCards.sort((firstCard, secondCard) =>
+      compareSessionPatternCardsForSort(
+        firstCard,
+        secondCard,
+        patternCardSort,
+        saveIntentReviewItems
+      )
+    );
+  }, [patternCardFilter, patternCardSearchQuery, patternCardSort, saveIntentReviewItems, sessionPatternCards]);
   const hasAnyPatternCards = savedPatternCards.length + sessionPatternCards.length > 0;
   const hasVisiblePatternCards =
     visibleSavedPatternCards.length + visibleSessionPatternCards.length > 0;
@@ -3938,6 +4125,32 @@ function QuinnConversationSurface({
                           ]}
                         >
                           {filterOption.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={styles.literalPatternCardSortRow}>
+                  <Text style={styles.literalPatternCardSortLabel}>Sort</Text>
+                  {PATTERN_CARD_SORT_OPTIONS.map((sortOption) => {
+                    const isActive = patternCardSort === sortOption.id;
+
+                    return (
+                      <Pressable
+                        key={sortOption.id}
+                        style={[
+                          styles.literalPatternCardSortChip,
+                          isActive && styles.literalPatternCardSortChipActive,
+                        ]}
+                        onPress={() => setPatternCardSort(sortOption.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.literalPatternCardSortChipText,
+                            isActive && styles.literalPatternCardSortChipTextActive,
+                          ]}
+                        >
+                          {sortOption.label}
                         </Text>
                       </Pressable>
                     );
@@ -9253,6 +9466,49 @@ responseReplayButton: {
   },
 
   literalPatternCardFilterChipTextActive: {
+    color: 'rgba(245, 248, 255, 0.76)',
+  },
+
+  literalPatternCardSortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 1,
+  },
+
+  literalPatternCardSortLabel: {
+    color: 'rgba(245, 248, 255, 0.42)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+    marginRight: 7,
+    marginBottom: 5,
+  },
+
+  literalPatternCardSortChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.075)',
+    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginRight: 6,
+    marginBottom: 5,
+  },
+
+  literalPatternCardSortChipActive: {
+    borderColor: 'rgba(255, 214, 153, 0.22)',
+    backgroundColor: 'rgba(255, 214, 153, 0.08)',
+  },
+
+  literalPatternCardSortChipText: {
+    color: 'rgba(245, 248, 255, 0.48)',
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '800',
+  },
+
+  literalPatternCardSortChipTextActive: {
     color: 'rgba(245, 248, 255, 0.76)',
   },
 
