@@ -123,6 +123,8 @@ import {
   getQuinnPatternCardSaveIntentPacketPreview,
   getQuinnPatternCardSaveIntentResultPreview,
   getQuinnPatternCandidatePreview,
+  getQuinnSavedPatternCardReviewPacketPreview,
+  getQuinnSavedPatternCardReviewResultPreview,
   type QuinnDraftPatternCardHistoryPreview,
   type QuinnDraftPatternCardResultPreview,
   type QuinnIntakeFormDefinition,
@@ -132,6 +134,8 @@ import {
   type QuinnPatternCardSaveIntentPacketPreview,
   type QuinnPatternCardSaveIntentResultPreview,
   type QuinnPatternCandidatePreview,
+  type QuinnSavedPatternCardReviewPacketPreview,
+  type QuinnSavedPatternCardReviewResultPreview,
 } from '../../components/quinn/quinnIntakeForms';
 import type { QuinnVoiceTtsHint } from '../../components/quinn/quinnVoiceProsody';
 import type {
@@ -190,6 +194,12 @@ type QuinnPatternCardApplicationReviewItem = QuinnPatternCardApplicationPacketPr
   id: string;
   timestamp: string;
   resultPreview: QuinnPatternCardApplicationResultPreview;
+};
+
+type QuinnSavedPatternCardLifecycleReviewItem = QuinnSavedPatternCardReviewPacketPreview & {
+  id: string;
+  timestamp: string;
+  resultPreview: QuinnSavedPatternCardReviewResultPreview;
 };
 
 type QuinnSessionPatternCard = {
@@ -575,6 +585,32 @@ function buildApplicationReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[])
   return items;
 }
 
+function buildLifecycleReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) {
+  const items: QuinnSavedPatternCardLifecycleReviewItem[] = [];
+
+  for (const run of recentRuns) {
+    const preview = getQuinnSavedPatternCardReviewPacketPreview(run.packetText || '');
+    const resultPreview = getQuinnSavedPatternCardReviewResultPreview(
+      sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+    );
+
+    if (preview && resultPreview) {
+      items.push({
+        id: String(run.id || run.timestamp || items.length),
+        timestamp: String(run.timestamp || ''),
+        resultPreview,
+        ...preview,
+      });
+    }
+
+    if (items.length >= 10) {
+      break;
+    }
+  }
+
+  return items;
+}
+
 function getSaveIntentReviewForSessionPatternCard(
   card: QuinnSessionPatternCard,
   saveIntentReviewItems: QuinnPatternCardSaveIntentReviewItem[]
@@ -640,6 +676,39 @@ function getApplicationReviewItemForSavedPatternCard(
         itemPattern === cardPattern &&
         itemEvidence === cardEvidence
     );
+  });
+}
+
+function getLifecycleReviewForSavedPatternCard(
+  card: QuinnSavedPatternCard,
+  lifecycleReviewItems: QuinnSavedPatternCardLifecycleReviewItem[]
+) {
+  const recentReview = getLifecycleReviewItemForSavedPatternCard(card, lifecycleReviewItems);
+
+  return recentReview?.resultPreview || null;
+}
+
+function getLifecycleReviewItemForSavedPatternCard(
+  card: QuinnSavedPatternCard,
+  lifecycleReviewItems: QuinnSavedPatternCardLifecycleReviewItem[]
+) {
+  const cardPattern = normalizeSessionPatternCardReviewValue(card.possiblePattern);
+  const cardEvidence = normalizeSessionPatternCardReviewValue(card.evidence);
+  const cardSavedAt = normalizeSessionPatternCardReviewValue(card.savedAt);
+
+  return lifecycleReviewItems.find((item) => {
+    const itemPattern = normalizeSessionPatternCardReviewValue(item.savedPattern);
+    const itemEvidence = normalizeSessionPatternCardReviewValue(item.evidence);
+    const itemSavedAt = normalizeSessionPatternCardReviewValue(item.savedAt);
+    const coreMatch = Boolean(
+      cardPattern &&
+        cardEvidence &&
+        itemPattern === cardPattern &&
+        itemEvidence === cardEvidence
+    );
+    const savedAtMatch = Boolean(cardSavedAt && itemSavedAt && itemSavedAt === cardSavedAt);
+
+    return coreMatch || savedAtMatch;
   });
 }
 
@@ -1977,6 +2046,9 @@ function QuinnConversationSurface({
   }, [recentRuns]);
   const applicationReviewItems = React.useMemo<QuinnPatternCardApplicationReviewItem[]>(() => {
     return buildApplicationReviewItemsFromRecentRuns(recentRuns);
+  }, [recentRuns]);
+  const lifecycleReviewItems = React.useMemo<QuinnSavedPatternCardLifecycleReviewItem[]>(() => {
+    return buildLifecycleReviewItemsFromRecentRuns(recentRuns);
   }, [recentRuns]);
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
@@ -4305,6 +4377,12 @@ function QuinnConversationSurface({
                       applicationReviewItems
                     );
                     const applicationStatus = applicationResult?.applies || '';
+                    const lifecycleResult = getLifecycleReviewForSavedPatternCard(
+                      card,
+                      lifecycleReviewItems
+                    );
+                    const lifecycleStatus =
+                      lifecycleResult?.keepReviseRetireRestore || lifecycleResult?.lifecycleRead || '';
 
                     return (
                       <View
@@ -4378,6 +4456,14 @@ function QuinnConversationSurface({
                             <Text style={styles.literalOutcomeHistoryLabel}>Last check</Text>
                             <Text style={styles.literalOutcomeHistoryText} numberOfLines={1}>
                               {applicationStatus}
+                            </Text>
+                          </>
+                        ) : null}
+                        {lifecycleStatus ? (
+                          <>
+                            <Text style={styles.literalOutcomeHistoryLabel}>Lifecycle</Text>
+                            <Text style={styles.literalOutcomeHistoryText} numberOfLines={1}>
+                              {lifecycleStatus}
                             </Text>
                           </>
                         ) : null}
@@ -4634,6 +4720,48 @@ function QuinnConversationSurface({
                             ) : (
                               <Text style={styles.literalSessionPatternCardDetailText}>
                                 No application check yet.
+                              </Text>
+                            )}
+                            <Text style={styles.literalSessionPatternCardDetailSectionTitle}>
+                              Lifecycle review
+                            </Text>
+                            {lifecycleResult ? (
+                              <>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Lifecycle read
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {lifecycleResult.lifecycleRead ||
+                                    'No lifecycle read captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Keep / revise / retire / restore
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {lifecycleResult.keepReviseRetireRestore ||
+                                    'No lifecycle action captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>Why</Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {lifecycleResult.why || 'No why captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Risk if kept as-is
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {lifecycleResult.riskIfKeptAsIs || 'No risk captured.'}
+                                </Text>
+                                <Text style={styles.literalOutcomeHistoryLabel}>
+                                  Next best card action
+                                </Text>
+                                <Text style={styles.literalSessionPatternCardDetailText}>
+                                  {lifecycleResult.nextBestCardAction ||
+                                    'No next card action captured.'}
+                                </Text>
+                              </>
+                            ) : (
+                              <Text style={styles.literalSessionPatternCardDetailText}>
+                                No lifecycle review yet.
                               </Text>
                             )}
                           </View>

@@ -156,6 +156,22 @@ export type QuinnPatternCardApplicationResultPreview = {
   nextBestMove: string;
 };
 
+export type QuinnSavedPatternCardReviewPacketPreview = {
+  savedPattern: string;
+  evidence: string;
+  savedAt: string;
+  pinnedAt: string;
+  retiredAt: string;
+};
+
+export type QuinnSavedPatternCardReviewResultPreview = {
+  lifecycleRead: string;
+  keepReviseRetireRestore: string;
+  why: string;
+  riskIfKeptAsIs: string;
+  nextBestCardAction: string;
+};
+
 export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
 
 export type QuinnSessionPatternCardDraftSource = {
@@ -250,6 +266,28 @@ function getQuinnPacketLabeledLineValue(lines: string[], label: string) {
   return line.trim().slice(label.length).trim();
 }
 
+function getQuinnPacketLabeledBlockValue(lines: string[], label: string) {
+  const cleanLabel = label.trim().toLowerCase();
+  const labelIndex = lines.findIndex((item) =>
+    item.trim().toLowerCase().startsWith(cleanLabel)
+  );
+
+  if (labelIndex < 0) {
+    return '';
+  }
+
+  const sameLineValue = lines[labelIndex].trim().slice(label.length).trim();
+
+  if (sameLineValue) {
+    return sameLineValue;
+  }
+
+  const valueLine = lines.slice(labelIndex + 1).find((item) => item.trim());
+  const cleanValueLine = valueLine?.trim() || '';
+
+  return isQuinnPacketSectionHeading(cleanValueLine) ? '' : cleanValueLine;
+}
+
 function cleanQuinnOutcomeHistoryValue(value: string) {
   const clean = String(value || '').replace(/\s+/g, ' ').trim();
 
@@ -258,6 +296,12 @@ function cleanQuinnOutcomeHistoryValue(value: string) {
   }
 
   return clean.length > 180 ? `${clean.slice(0, 177).trim()}...` : clean;
+}
+
+function cleanQuinnPatternCardStateValue(value: string) {
+  const clean = cleanQuinnOutcomeHistoryValue(value);
+
+  return clean.toLowerCase() === 'none' ? '' : clean;
 }
 
 export function getQuinnOutcomeLogMinimumCaptureStatus(
@@ -823,6 +867,78 @@ export function getQuinnPatternCardApplicationResultPreview(
     !preview.limitsMisfit &&
     !preview.overuseRisk &&
     !preview.nextBestMove
+  ) {
+    return null;
+  }
+
+  return preview;
+}
+
+export function getQuinnSavedPatternCardReviewPacketPreview(
+  packetText: string
+): QuinnSavedPatternCardReviewPacketPreview | null {
+  const text = String(packetText || '');
+
+  if (!text.includes(QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER)) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const preview = {
+    savedPattern: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'SAVED PATTERN:')
+    ),
+    evidence: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'EVIDENCE:')),
+    savedAt: cleanQuinnPatternCardStateValue(getQuinnPacketLabeledBlockValue(lines, 'Saved:')),
+    pinnedAt: cleanQuinnPatternCardStateValue(getQuinnPacketLabeledBlockValue(lines, 'Pinned:')),
+    retiredAt: cleanQuinnPatternCardStateValue(getQuinnPacketLabeledBlockValue(lines, 'Retired:')),
+  };
+
+  if (
+    !preview.savedPattern &&
+    !preview.evidence &&
+    !preview.savedAt &&
+    !preview.pinnedAt &&
+    !preview.retiredAt
+  ) {
+    return null;
+  }
+
+  return preview;
+}
+
+export function getQuinnSavedPatternCardReviewResultPreview(
+  responseText: string
+): QuinnSavedPatternCardReviewResultPreview | null {
+  const text = String(responseText || '').trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const preview = {
+    lifecycleRead: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'LIFECYCLE READ:')
+    ),
+    keepReviseRetireRestore: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'KEEP / REVISE / RETIRE / RESTORE:')
+    ),
+    why: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'WHY:')),
+    riskIfKeptAsIs: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'RISK IF KEPT AS-IS:')
+    ),
+    nextBestCardAction: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'NEXT BEST CARD ACTION:')
+    ),
+  };
+
+  if (
+    !preview.lifecycleRead &&
+    !preview.keepReviseRetireRestore &&
+    !preview.why &&
+    !preview.riskIfKeptAsIs &&
+    !preview.nextBestCardAction
   ) {
     return null;
   }
