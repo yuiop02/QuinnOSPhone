@@ -114,6 +114,7 @@ import {
   buildQuinnOutcomeLogPacketFromRun,
   buildQuinnPatternCardApplicationPacket,
   buildQuinnPatternCardSaveIntentPacket,
+  buildQuinnReleaseReadinessAuditPacket,
   buildQuinnSavedCardShelfReviewPacket,
   buildQuinnSavedPatternCardReviewPacket,
   getQuinnDraftPatternCardHistoryPreview,
@@ -1971,6 +1972,8 @@ type QuinnConversationSurfaceProps = {
   writtenResult: string;
   compressedSummary: string;
   memoryResonance: MemoryResonanceItem[];
+  memoryCount: number;
+  notificationCount: number;
   sessionArc: SessionArc | null;
   isRunning: boolean;
   activeLensId: QuinnLensId;
@@ -1979,6 +1982,8 @@ type QuinnConversationSurfaceProps = {
   sessionPatternCards: QuinnSessionPatternCard[];
   savedPatternCards: QuinnSavedPatternCard[];
   savedCardShelfReviews: QuinnSavedCardShelfReview[];
+  settings: QuinnSettings;
+  voiceSettings: VoiceSettings;
   onTriggerWave: () => void;
   onChangePacketText: (value: string) => void;
   onChangeSessionPatternCards: React.Dispatch<React.SetStateAction<QuinnSessionPatternCard[]>>;
@@ -2011,6 +2016,8 @@ function QuinnConversationSurface({
   writtenResult,
   compressedSummary,
   memoryResonance,
+  memoryCount,
+  notificationCount,
   sessionArc,
   isRunning,
   activeLensId,
@@ -2019,6 +2026,8 @@ function QuinnConversationSurface({
   sessionPatternCards,
   savedPatternCards,
   savedCardShelfReviews,
+  settings,
+  voiceSettings,
   onTriggerWave,
   onChangePacketText,
   onChangeSessionPatternCards,
@@ -3649,6 +3658,45 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function stageReleaseReadinessAudit() {
+    const savedCardsWithSaveIntentReview = savedPatternCards.filter(
+      (card) => !card.retiredAt && Boolean(card.saveIntentReview)
+    ).length;
+
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(
+      buildQuinnReleaseReadinessAuditPacket({
+        counts: {
+          recentRuns: recentRuns.length,
+          memories: memoryCount,
+          notifications: notificationCount,
+          sessionCards: sessionPatternCardCount,
+          savedCards: activeSavedPatternCardCount,
+          retiredSavedCards: retiredSavedPatternCardCount,
+          pinnedSavedCards: pinnedSavedPatternCardCount,
+          savedCardsWithSaveIntentReview,
+          savedCardsWithApplicationCheck: applicationCheckPatternCardCount,
+          savedCardsWithLifecycleReview: lifecycleReviewPatternCardCount,
+          shelfReviews: shelfReviewItems.length + savedCardShelfReviews.length,
+        },
+        composerState: packetText.trim() ? 'staged' : 'blank',
+        activeThreadTitle: sessionArc?.title || '',
+        settings: {
+          reduceMotion: settings.reduceMotion,
+          quietNotifications: settings.quietNotifications,
+          focusMode: settings.focusMode,
+        },
+        voiceSettings: {
+          autoSpeakPreview: voiceSettings.autoSpeakPreview,
+          saveRecordingsLocally: voiceSettings.saveRecordingsLocally,
+          transcriptionProvider: voiceSettings.transcriptionProvider,
+        },
+      })
+    );
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
   function toggleSavedPatternCardPin(cardId: string) {
     const pinnedAt = new Date().toISOString();
 
@@ -4616,11 +4664,21 @@ function QuinnConversationSurface({
                   </Text>
                 </Pressable>
                 <Pressable
-                  style={styles.literalPatternCandidateAction}
+                  style={[
+                    styles.literalPatternCandidateAction,
+                    styles.literalPatternCandidateActionInline,
+                  ]}
                   onPress={stageSavedCardShelfReview}
                 >
                   <Feather name="layers" size={12} color="rgba(245, 248, 255, 0.62)" />
                   <Text style={styles.literalPatternCandidateActionText}>Shelf review</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.literalPatternCandidateAction}
+                  onPress={stageReleaseReadinessAudit}
+                >
+                  <Feather name="check-circle" size={12} color="rgba(245, 248, 255, 0.62)" />
+                  <Text style={styles.literalPatternCandidateActionText}>Release audit</Text>
                 </Pressable>
               </View>
 
@@ -7146,6 +7204,8 @@ export default function App() {
           writtenResult={writtenResult}
         compressedSummary={compressedSummary}
         memoryResonance={currentMemoryResonance}
+        memoryCount={memories.length}
+        notificationCount={notifications.length}
         sessionArc={currentSessionArc}
         isRunning={isRunning}
         activeLensId={activeLensId}
@@ -7154,6 +7214,8 @@ export default function App() {
         sessionPatternCards={sessionPatternCards}
         savedPatternCards={savedPatternCards}
         savedCardShelfReviews={savedCardShelfReviews}
+        settings={settings}
+        voiceSettings={voiceSettings}
         onTriggerWave={triggerWave}
         onChangePacketText={setPacketText}
         onChangeSessionPatternCards={setSessionPatternCards}
@@ -10300,6 +10362,7 @@ responseReplayButton: {
 
   literalPatternCandidateActionInline: {
     marginRight: 6,
+    marginBottom: 4,
   },
 
   literalPatternCandidateActionText: {
@@ -10312,6 +10375,7 @@ responseReplayButton: {
 
   literalPatternCardImportRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     marginTop: 4,
     marginBottom: 2,

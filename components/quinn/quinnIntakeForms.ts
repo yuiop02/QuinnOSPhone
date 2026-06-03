@@ -24,7 +24,8 @@ export type QuinnPacketKindId =
   | 'pattern-card-save-intent'
   | 'pattern-card-application'
   | 'saved-pattern-card-review'
-  | 'saved-card-shelf-review';
+  | 'saved-card-shelf-review'
+  | 'release-readiness-audit';
 
 export type QuinnIntakeFormDefinition = {
   id: QuinnIntakeFormId;
@@ -251,12 +252,41 @@ export type QuinnSavedCardShelfReviewSource = {
   retiredSavedCards: QuinnSavedCardShelfReviewCard[];
 };
 
+export type QuinnReleaseReadinessAuditSource = {
+  counts: {
+    recentRuns: number;
+    memories: number;
+    notifications: number;
+    sessionCards: number;
+    savedCards: number;
+    retiredSavedCards: number;
+    pinnedSavedCards: number;
+    savedCardsWithSaveIntentReview: number;
+    savedCardsWithApplicationCheck: number;
+    savedCardsWithLifecycleReview: number;
+    shelfReviews: number;
+  };
+  composerState: 'blank' | 'staged';
+  activeThreadTitle?: string | null;
+  settings?: {
+    reduceMotion?: boolean;
+    quietNotifications?: boolean;
+    focusMode?: boolean;
+  } | null;
+  voiceSettings?: {
+    autoSpeakPreview?: boolean;
+    saveRecordingsLocally?: boolean;
+    transcriptionProvider?: string | null;
+  } | null;
+};
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 const QUINN_PATTERN_CARD_SAVE_INTENT_MARKER = 'QUINNOS PATTERN CARD SAVE INTENT';
 const QUINN_PATTERN_CARD_APPLICATION_MARKER = 'QUINNOS PATTERN CARD APPLICATION';
 const QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER = 'QUINNOS SAVED PATTERN CARD REVIEW';
 const QUINN_SAVED_CARD_SHELF_REVIEW_MARKER = 'QUINNOS SAVED CARD SHELF REVIEW';
+const QUINN_RELEASE_READINESS_AUDIT_MARKER = 'QUINNOS RELEASE READINESS AUDIT';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -494,6 +524,10 @@ function formatQuinnShelfReviewValue(value: string, fallback: string, maxLength 
 
 function formatQuinnShelfReviewBoolean(value: unknown) {
   return value ? 'yes' : 'no';
+}
+
+function formatQuinnReleaseAuditToggle(value: boolean | undefined) {
+  return value ? 'on' : 'off';
 }
 
 function buildQuinnSavedCardShelfReviewList(
@@ -983,6 +1017,96 @@ export function buildQuinnSavedCardShelfReviewPacket(input: QuinnSavedCardShelfR
     'STALE / RISKY / OVERFIT CARDS:',
     'MISSING OR UNDERTESTED AREAS:',
     'NEXT BEST MANUAL CARD ACTION:',
+    ...QUINNOS_RESPONSE_PROTOCOL,
+  ].join('\n');
+}
+
+export function buildQuinnReleaseReadinessAuditPacket(
+  input: QuinnReleaseReadinessAuditSource
+) {
+  const counts = input.counts;
+  const settings = input.settings || {};
+  const voiceSettings = input.voiceSettings || {};
+  const hasCheckpointState = Boolean(
+    counts.savedCards ||
+      counts.retiredSavedCards ||
+      counts.sessionCards ||
+      counts.shelfReviews
+  );
+
+  return [
+    'QUINNOS RELEASE READINESS AUDIT',
+    '',
+    'PURPOSE:',
+    'Audit QuinnOS as a manual, consent-shaped external processing console before calling this first full version complete. Identify whether the system feels coherent, usable, reversible, and safe enough to treat as the v3.0 manual baseline.',
+    '',
+    'SYSTEM STATE:',
+    `Recent runs: ${counts.recentRuns}`,
+    `Memories: ${counts.memories}`,
+    `Notifications: ${counts.notifications}`,
+    `Session Pattern Cards: ${counts.sessionCards}`,
+    `Saved Pattern Cards: ${counts.savedCards}`,
+    `Retired Saved Cards: ${counts.retiredSavedCards}`,
+    `Pinned Saved Cards: ${counts.pinnedSavedCards}`,
+    `Saved cards with Save Intent review: ${counts.savedCardsWithSaveIntentReview}`,
+    `Saved cards with Application check: ${counts.savedCardsWithApplicationCheck}`,
+    `Saved cards with Lifecycle review: ${counts.savedCardsWithLifecycleReview}`,
+    `Saved Card Shelf Reviews: ${counts.shelfReviews}`,
+    `Current composer state: ${input.composerState}`,
+    `Current active thread: ${formatQuinnShelfReviewValue(
+      input.activeThreadTitle || '',
+      '(none)',
+      120
+    )}`,
+    `Reduce motion: ${formatQuinnReleaseAuditToggle(settings.reduceMotion)}`,
+    `Quiet notifications: ${formatQuinnReleaseAuditToggle(settings.quietNotifications)}`,
+    `Focus mode: ${formatQuinnReleaseAuditToggle(settings.focusMode)}`,
+    `Auto speak preview: ${formatQuinnReleaseAuditToggle(voiceSettings.autoSpeakPreview)}`,
+    `Save recordings locally: ${formatQuinnReleaseAuditToggle(
+      voiceSettings.saveRecordingsLocally
+    )}`,
+    `Transcription provider: ${formatQuinnShelfReviewValue(
+      voiceSettings.transcriptionProvider || '',
+      '(unknown)',
+      80
+    )}`,
+    `Checkpoint health: ${
+      hasCheckpointState
+        ? 'cards and/or shelf reviews are present for explicit checkpoint restore'
+        : 'conversation-only state; no cards or shelf reviews are present'
+    }`,
+    '',
+    'CAPABILITY CHECKLIST:',
+    '- Conversation-first normal replies',
+    '- Outcome capture',
+    '- Pattern candidate creation',
+    '- Draft pattern cards',
+    '- Session cards',
+    '- Saved cards',
+    '- Save Intent gate',
+    '- Apply card',
+    '- Lifecycle review',
+    '- Shelf review',
+    '- Export/import',
+    '- Import restore report',
+    '- Export health/handoff',
+    '- Optimistic composer/send bubble',
+    '- Local persistence for saved cards',
+    '- Non-automatic mutation / Quinn approval layer',
+    '',
+    'WHAT I NEED FROM REN:',
+    'Review QuinnOS as a whole system. Tell me whether it feels ready as a v3.0 manual baseline, what still rattles, what should not be automated yet, and what the next post-3.0 direction should be.',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
+    '',
+    'RELEASE AUDIT OUTPUT SHAPE:',
+    'Return exactly these sections:',
+    'READINESS VERDICT:',
+    'WHAT WORKS:',
+    'WHAT STILL RATTLES:',
+    'WHAT NOT TO AUTOMATE YET:',
+    'POST-3.0 NEXT DIRECTION:',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
@@ -1860,6 +1984,16 @@ export function getQuinnIntakeFormKindFromPacketText(
   packetText: string
 ): QuinnIntakeFormPacketKind | null {
   const text = String(packetText || '');
+
+  if (text.includes(QUINN_RELEASE_READINESS_AUDIT_MARKER)) {
+    return {
+      id: 'release-readiness-audit',
+      label: 'Release Audit',
+      icon: 'check-circle',
+      marker: QUINN_RELEASE_READINESS_AUDIT_MARKER,
+      isOutcomeLog: false,
+    };
+  }
 
   if (text.includes(QUINN_SAVED_CARD_SHELF_REVIEW_MARKER)) {
     return {
