@@ -111,6 +111,7 @@ import {
   buildQuinnDraftPatternCardPacket,
   buildQuinnDraftPatternCardPacketFromSessionCard,
   buildQuinnIntakeFormPacket,
+  buildQuinnManualFieldTestChecklistPacket,
   buildQuinnOutcomeLogPacketFromRun,
   buildQuinnPatternCardApplicationPacket,
   buildQuinnPatternCardSaveIntentPacket,
@@ -3697,6 +3698,45 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function stageManualFieldTestChecklist() {
+    const savedCardsWithSaveIntentReview = savedPatternCards.filter(
+      (card) => !card.retiredAt && Boolean(card.saveIntentReview)
+    ).length;
+
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(
+      buildQuinnManualFieldTestChecklistPacket({
+        counts: {
+          recentRuns: recentRuns.length,
+          memories: memoryCount,
+          notifications: notificationCount,
+          sessionCards: sessionPatternCardCount,
+          savedCards: activeSavedPatternCardCount,
+          retiredSavedCards: retiredSavedPatternCardCount,
+          pinnedSavedCards: pinnedSavedPatternCardCount,
+          savedCardsWithSaveIntentReview,
+          savedCardsWithApplicationCheck: applicationCheckPatternCardCount,
+          savedCardsWithLifecycleReview: lifecycleReviewPatternCardCount,
+          shelfReviews: shelfReviewItems.length + savedCardShelfReviews.length,
+        },
+        composerState: packetText.trim() ? 'staged' : 'blank',
+        activeThreadTitle: sessionArc?.title || '',
+        settings: {
+          reduceMotion: settings.reduceMotion,
+          quietNotifications: settings.quietNotifications,
+          focusMode: settings.focusMode,
+        },
+        voiceSettings: {
+          autoSpeakPreview: voiceSettings.autoSpeakPreview,
+          saveRecordingsLocally: voiceSettings.saveRecordingsLocally,
+          transcriptionProvider: voiceSettings.transcriptionProvider,
+        },
+      })
+    );
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
   function toggleSavedPatternCardPin(cardId: string) {
     const pinnedAt = new Date().toISOString();
 
@@ -4674,11 +4714,21 @@ function QuinnConversationSurface({
                   <Text style={styles.literalPatternCandidateActionText}>Shelf review</Text>
                 </Pressable>
                 <Pressable
-                  style={styles.literalPatternCandidateAction}
+                  style={[
+                    styles.literalPatternCandidateAction,
+                    styles.literalPatternCandidateActionInline,
+                  ]}
                   onPress={stageReleaseReadinessAudit}
                 >
                   <Feather name="check-circle" size={12} color="rgba(245, 248, 255, 0.62)" />
                   <Text style={styles.literalPatternCandidateActionText}>Release audit</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.literalPatternCandidateAction}
+                  onPress={stageManualFieldTestChecklist}
+                >
+                  <Feather name="check-square" size={12} color="rgba(245, 248, 255, 0.62)" />
+                  <Text style={styles.literalPatternCandidateActionText}>Field test</Text>
                 </Pressable>
               </View>
 

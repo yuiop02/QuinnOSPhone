@@ -25,7 +25,8 @@ export type QuinnPacketKindId =
   | 'pattern-card-application'
   | 'saved-pattern-card-review'
   | 'saved-card-shelf-review'
-  | 'release-readiness-audit';
+  | 'release-readiness-audit'
+  | 'manual-field-test-checklist';
 
 export type QuinnIntakeFormDefinition = {
   id: QuinnIntakeFormId;
@@ -280,6 +281,8 @@ export type QuinnReleaseReadinessAuditSource = {
   } | null;
 };
 
+export type QuinnManualFieldTestChecklistSource = QuinnReleaseReadinessAuditSource;
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 const QUINN_PATTERN_CARD_SAVE_INTENT_MARKER = 'QUINNOS PATTERN CARD SAVE INTENT';
@@ -287,6 +290,7 @@ const QUINN_PATTERN_CARD_APPLICATION_MARKER = 'QUINNOS PATTERN CARD APPLICATION'
 const QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER = 'QUINNOS SAVED PATTERN CARD REVIEW';
 const QUINN_SAVED_CARD_SHELF_REVIEW_MARKER = 'QUINNOS SAVED CARD SHELF REVIEW';
 const QUINN_RELEASE_READINESS_AUDIT_MARKER = 'QUINNOS RELEASE READINESS AUDIT';
+const QUINN_MANUAL_FIELD_TEST_CHECKLIST_MARKER = 'QUINNOS MANUAL FIELD TEST CHECKLIST';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -1118,6 +1122,105 @@ export function buildQuinnReleaseReadinessAuditPacket(
     'WHAT STILL RATTLES:',
     'WHAT NOT TO AUTOMATE YET:',
     'POST-3.0 NEXT DIRECTION:',
+    ...QUINNOS_RESPONSE_PROTOCOL,
+  ].join('\n');
+}
+
+export function buildQuinnManualFieldTestChecklistPacket(
+  input: QuinnManualFieldTestChecklistSource
+) {
+  const counts = input.counts;
+  const settings = input.settings || {};
+  const voiceSettings = input.voiceSettings || {};
+
+  return [
+    'QUINNOS MANUAL FIELD TEST CHECKLIST',
+    '',
+    'PURPOSE:',
+    'Create a manual field test plan for QuinnOS now that the v3.0 manual-console architecture is capability-ready but not yet field-proven. The goal is to exercise major flows, collect evidence, and identify trust gaps without automating anything.',
+    '',
+    'CURRENT SYSTEM STATE:',
+    `Recent runs: ${counts.recentRuns}`,
+    `Memories: ${counts.memories}`,
+    `Notifications: ${counts.notifications}`,
+    `Session Pattern Cards: ${counts.sessionCards}`,
+    `Saved Pattern Cards: ${counts.savedCards}`,
+    `Retired Saved Cards: ${counts.retiredSavedCards}`,
+    `Pinned Saved Cards: ${counts.pinnedSavedCards}`,
+    `Saved cards with Save Intent review: ${counts.savedCardsWithSaveIntentReview}`,
+    `Saved cards with Application check: ${counts.savedCardsWithApplicationCheck}`,
+    `Saved cards with Lifecycle review: ${counts.savedCardsWithLifecycleReview}`,
+    `Saved Card Shelf Reviews: ${counts.shelfReviews}`,
+    `Current composer state: ${input.composerState}`,
+    `Current active thread: ${formatQuinnShelfReviewValue(
+      input.activeThreadTitle || '',
+      '(none)',
+      120
+    )}`,
+    `Reduce motion: ${formatQuinnReleaseAuditToggle(settings.reduceMotion)}`,
+    `Quiet notifications: ${formatQuinnReleaseAuditToggle(settings.quietNotifications)}`,
+    `Focus mode: ${formatQuinnReleaseAuditToggle(settings.focusMode)}`,
+    `Auto speak preview: ${formatQuinnReleaseAuditToggle(voiceSettings.autoSpeakPreview)}`,
+    `Save recordings locally: ${formatQuinnReleaseAuditToggle(
+      voiceSettings.saveRecordingsLocally
+    )}`,
+    `Transcription provider: ${formatQuinnShelfReviewValue(
+      voiceSettings.transcriptionProvider || '',
+      '(unknown)',
+      80
+    )}`,
+    '',
+    'TESTING PRINCIPLE:',
+    'Manual testing should prove behavior through real use. Do not treat untested features as broken by default. Do not automate any card or memory mutation. Quinn remains the approval layer.',
+    '',
+    'FIELD TEST CHECKLIST:',
+    'Conversation shell:',
+    '- Normal conversation path',
+    '- Optimistic composer clear + sent bubble',
+    '- Guards and blank-output handling',
+    '',
+    'Outcome and pattern flow:',
+    '- Outcome capture',
+    '- Pattern Candidate generation',
+    '- Draft Pattern Card',
+    '- Session Pattern Card approval',
+    '',
+    'Saved card flow:',
+    '- Save Intent',
+    '- Save locally',
+    '- Saved card View / Apply / Review / Lifecycle Review',
+    '- Pin / Unpin',
+    '- Retire / Restore',
+    '- Retired card Apply restriction',
+    '- Search / Filter / Count / Sort',
+    '',
+    'Shelf and checkpoint flow:',
+    '- Shelf review',
+    '- Shelf review result visibility',
+    '- Export Health Summary',
+    '- Export Handoff Instructions',
+    '- Import from export',
+    '- Import Restore Report',
+    '- Duplicate import behavior',
+    '',
+    'Device/UI fit:',
+    '- Bottom safe area',
+    '- Long-form composer and escape hatch',
+    '',
+    'WHAT I NEED FROM REN:',
+    'Turn this into a practical field test route. Give Quinn a staged test sequence, what to observe, what counts as pass/fail, what evidence to capture, and what should wait until after field testing.',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
+    '',
+    'FIELD TEST OUTPUT SHAPE:',
+    'Return exactly these sections:',
+    'TEST ROUTE:',
+    'PASS / FAIL SIGNALS:',
+    'EVIDENCE TO CAPTURE:',
+    'KNOWN LOW-EVIDENCE AREAS:',
+    'DO NOT AUTOMATE YET:',
+    'NEXT FIELD TEST STEP:',
     ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
@@ -1995,6 +2098,16 @@ export function getQuinnIntakeFormKindFromPacketText(
   packetText: string
 ): QuinnIntakeFormPacketKind | null {
   const text = String(packetText || '');
+
+  if (text.includes(QUINN_MANUAL_FIELD_TEST_CHECKLIST_MARKER)) {
+    return {
+      id: 'manual-field-test-checklist',
+      label: 'Field Test',
+      icon: 'check-square',
+      marker: QUINN_MANUAL_FIELD_TEST_CHECKLIST_MARKER,
+      isOutcomeLog: false,
+    };
+  }
 
   if (text.includes(QUINN_RELEASE_READINESS_AUDIT_MARKER)) {
     return {
