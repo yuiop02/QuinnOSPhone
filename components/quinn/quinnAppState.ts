@@ -856,6 +856,44 @@ export function buildExportBundle({
         Boolean(review)
     )
     .slice(0, 3);
+  const retiredSavedPatternCardCount = exportedSavedPatternCards.filter((card) =>
+    Boolean(card.retiredAt)
+  ).length;
+  const pinnedSavedPatternCardCount = exportedSavedPatternCards.filter((card) =>
+    Boolean(card.pinnedAt)
+  ).length;
+  const savedCardsWithSaveIntentReviewCount = exportedSavedPatternCards.filter((card) =>
+    Boolean(card.saveIntentReview)
+  ).length;
+  const savedCardsWithApplicationCheckCount = exportedSavedPatternCards.filter((card) =>
+    Boolean(card.applicationReview)
+  ).length;
+  const savedCardsWithLifecycleReviewCount = exportedSavedPatternCards.filter((card) =>
+    Boolean(card.lifecycleReview)
+  ).length;
+  const restoreCoverageSummary =
+    exportedSavedPatternCards.length || exportedSavedCardShelfReviews.length
+      ? 'saved cards + shelf reviews included'
+      : exportedSessionPatternCards.length
+        ? 'session checkpoint cards included'
+        : 'conversation-only export';
+  const exportHealthSummaryLines = [
+    `- Recent runs: ${recentRuns.length}`,
+    `- Memories: ${memories.length}`,
+    `- Notifications: ${notifications.length}`,
+    `- Session Pattern Cards: ${exportedSessionPatternCards.length}`,
+    `- Saved Pattern Cards: ${exportedSavedPatternCards.length}`,
+    `- Retired Saved Cards: ${retiredSavedPatternCardCount}`,
+    `- Pinned Saved Cards: ${pinnedSavedPatternCardCount}`,
+    `- Saved cards with Save Intent review: ${savedCardsWithSaveIntentReviewCount}`,
+    `- Saved cards with Application check: ${savedCardsWithApplicationCheckCount}`,
+    `- Saved cards with Lifecycle review: ${savedCardsWithLifecycleReviewCount}`,
+    `- Saved Card Shelf Reviews: ${exportedSavedCardShelfReviews.length}`,
+    `- Restore coverage: ${restoreCoverageSummary}`,
+    '- Scope: Session cards are included as checkpoint state only.',
+    '- Scope: Saved cards are local-device durable state.',
+    '- Scope: Shelf reviews are review context only and do not mutate cards automatically.',
+  ];
   const currentComposer = {
     title: packetTitle,
     text: packetText,
@@ -914,6 +952,10 @@ export function buildExportBundle({
     '',
     `Generated: ${generatedAt}`,
     `Run endpoint: ${RUN_ENDPOINT}`,
+    '',
+    '## Export Health / Checkpoint Summary',
+    '',
+    ...exportHealthSummaryLines,
     '',
     '## Current Composer',
     '',
@@ -1114,6 +1156,9 @@ export function buildExportBundle({
     '',
     `Generated: ${generatedAt}`,
     `Run endpoint: ${RUN_ENDPOINT}`,
+    '',
+    'Export health / checkpoint summary:',
+    ...exportHealthSummaryLines,
     '',
     `Current composer title: ${formatOptionalText(currentComposer.title, 'Untitled composer draft')}`,
     `Current composer state: ${currentComposer.isBlank ? 'blank composer' : 'draft staged in composer'}`,
