@@ -894,6 +894,16 @@ export function buildExportBundle({
     '- Scope: Saved cards are local-device durable state.',
     '- Scope: Shelf reviews are review context only and do not mutate cards automatically.',
   ];
+  const checkpointHandoffInstructionLines = [
+    '- Restore in QuinnOS: paste this export into Cards -> Import from export.',
+    '- Hand off to Ren / another assistant: provide this export as context and ask it to treat it as a QuinnOS checkpoint.',
+    '- Debug: use Export Health, Latest Completed Run, Recent Runs, Notifications, and relevant card sections.',
+    '- Session Pattern Cards are checkpoint/session-local context only.',
+    '- Saved Pattern Cards are local-device durable user-approved cards.',
+    '- Card reviews and Shelf Reviews are review context only; they do not mean any card action was applied.',
+    '- Recent Runs and Memory are recent context, not necessarily durable identity truth.',
+    '- Import Restore Report is local UI feedback and is not exported.',
+  ];
   const currentComposer = {
     title: packetTitle,
     text: packetText,
@@ -956,6 +966,10 @@ export function buildExportBundle({
     '## Export Health / Checkpoint Summary',
     '',
     ...exportHealthSummaryLines,
+    '',
+    '## How To Use This Checkpoint',
+    '',
+    ...checkpointHandoffInstructionLines,
     '',
     '## Current Composer',
     '',
@@ -1159,6 +1173,9 @@ export function buildExportBundle({
     '',
     'Export health / checkpoint summary:',
     ...exportHealthSummaryLines,
+    '',
+    'How to use this checkpoint:',
+    ...checkpointHandoffInstructionLines,
     '',
     `Current composer title: ${formatOptionalText(currentComposer.title, 'Untitled composer draft')}`,
     `Current composer state: ${currentComposer.isBlank ? 'blank composer' : 'draft staged in composer'}`,
