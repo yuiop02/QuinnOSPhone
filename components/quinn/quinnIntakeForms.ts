@@ -173,6 +173,26 @@ export type QuinnSavedPatternCardReviewResultPreview = {
   nextBestCardAction: string;
 };
 
+export type QuinnSavedCardShelfReviewPacketPreview = {
+  activeSavedCount: number | null;
+  retiredSavedCount: number | null;
+  pinnedSavedCount: number | null;
+  withSaveIntentReviewCount: number | null;
+  withApplicationCheckCount: number | null;
+  withLifecycleReviewCount: number | null;
+  filter: string;
+  search: string;
+  sort: string;
+};
+
+export type QuinnSavedCardShelfReviewResultPreview = {
+  shelfRead: string;
+  mostUsefulActiveCards: string;
+  staleRiskyOverfitCards: string;
+  missingOrUndertestedAreas: string;
+  nextBestManualCardAction: string;
+};
+
 export type QuinnDraftPatternCardSource = QuinnPatternCandidatePreview;
 
 export type QuinnSessionPatternCardDraftSource = {
@@ -337,6 +357,17 @@ function cleanQuinnPatternCardStateValue(value: string) {
   const clean = cleanQuinnOutcomeHistoryValue(value);
 
   return clean.toLowerCase() === 'none' ? '' : clean;
+}
+
+function parseQuinnShelfReviewCount(value: string) {
+  const clean = String(value || '').trim();
+
+  if (!clean) {
+    return null;
+  }
+
+  const count = Number.parseInt(clean, 10);
+  return Number.isFinite(count) ? count : null;
 }
 
 export function getQuinnOutcomeLogMinimumCaptureStatus(
@@ -1157,6 +1188,83 @@ export function getQuinnPatternCardSaveIntentResultPreview(
     !preview.clarifyBeforeStorage &&
     !preview.storageRisk &&
     !preview.nextBestMove
+  ) {
+    return null;
+  }
+
+  return preview;
+}
+
+export function getQuinnSavedCardShelfReviewPacketPreview(
+  packetText: string
+): QuinnSavedCardShelfReviewPacketPreview | null {
+  const text = String(packetText || '');
+
+  if (!text.includes(QUINN_SAVED_CARD_SHELF_REVIEW_MARKER)) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+
+  return {
+    activeSavedCount: parseQuinnShelfReviewCount(
+      getQuinnPacketLabeledLineValue(lines, 'Active saved cards:')
+    ),
+    retiredSavedCount: parseQuinnShelfReviewCount(
+      getQuinnPacketLabeledLineValue(lines, 'Retired saved cards:')
+    ),
+    pinnedSavedCount: parseQuinnShelfReviewCount(
+      getQuinnPacketLabeledLineValue(lines, 'Pinned saved cards:')
+    ),
+    withSaveIntentReviewCount: parseQuinnShelfReviewCount(
+      getQuinnPacketLabeledLineValue(lines, 'With Save Intent review:')
+    ),
+    withApplicationCheckCount: parseQuinnShelfReviewCount(
+      getQuinnPacketLabeledLineValue(lines, 'With Application check:')
+    ),
+    withLifecycleReviewCount: parseQuinnShelfReviewCount(
+      getQuinnPacketLabeledLineValue(lines, 'With Lifecycle review:')
+    ),
+    filter: cleanQuinnPatternCardStateValue(getQuinnPacketLabeledLineValue(lines, 'Filter:')),
+    search: cleanQuinnPatternCardStateValue(getQuinnPacketLabeledLineValue(lines, 'Search:')),
+    sort: cleanQuinnPatternCardStateValue(getQuinnPacketLabeledLineValue(lines, 'Sort:')),
+  };
+}
+
+export function getQuinnSavedCardShelfReviewResultPreview(
+  responseText: string
+): QuinnSavedCardShelfReviewResultPreview | null {
+  const text = String(responseText || '').trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const preview = {
+    shelfRead: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'SHELF READ:')
+    ),
+    mostUsefulActiveCards: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'MOST USEFUL ACTIVE CARDS:')
+    ),
+    staleRiskyOverfitCards: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'STALE / RISKY / OVERFIT CARDS:')
+    ),
+    missingOrUndertestedAreas: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'MISSING OR UNDERTESTED AREAS:')
+    ),
+    nextBestManualCardAction: cleanQuinnOutcomeHistoryValue(
+      getQuinnPacketSectionValue(lines, 'NEXT BEST MANUAL CARD ACTION:')
+    ),
+  };
+
+  if (
+    !preview.shelfRead &&
+    !preview.mostUsefulActiveCards &&
+    !preview.staleRiskyOverfitCards &&
+    !preview.missingOrUndertestedAreas &&
+    !preview.nextBestManualCardAction
   ) {
     return null;
   }

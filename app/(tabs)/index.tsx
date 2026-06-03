@@ -124,8 +124,12 @@ import {
   getQuinnPatternCardSaveIntentPacketPreview,
   getQuinnPatternCardSaveIntentResultPreview,
   getQuinnPatternCandidatePreview,
+  getQuinnSavedCardShelfReviewPacketPreview,
+  getQuinnSavedCardShelfReviewResultPreview,
   getQuinnSavedPatternCardReviewPacketPreview,
   getQuinnSavedPatternCardReviewResultPreview,
+  type QuinnSavedCardShelfReviewPacketPreview,
+  type QuinnSavedCardShelfReviewResultPreview,
   type QuinnDraftPatternCardHistoryPreview,
   type QuinnDraftPatternCardResultPreview,
   type QuinnIntakeFormDefinition,
@@ -201,6 +205,12 @@ type QuinnSavedPatternCardLifecycleReviewItem = QuinnSavedPatternCardReviewPacke
   id: string;
   timestamp: string;
   resultPreview: QuinnSavedPatternCardReviewResultPreview;
+};
+
+type QuinnSavedCardShelfReviewItem = QuinnSavedCardShelfReviewPacketPreview & {
+  id: string;
+  timestamp: string;
+  resultPreview: QuinnSavedCardShelfReviewResultPreview;
 };
 
 type QuinnSessionPatternCard = {
@@ -607,6 +617,32 @@ function buildLifecycleReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) {
     }
 
     if (items.length >= 10) {
+      break;
+    }
+  }
+
+  return items;
+}
+
+function buildShelfReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) {
+  const items: QuinnSavedCardShelfReviewItem[] = [];
+
+  for (const run of recentRuns) {
+    const preview = getQuinnSavedCardShelfReviewPacketPreview(run.packetText || '');
+    const resultPreview = getQuinnSavedCardShelfReviewResultPreview(
+      sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+    );
+
+    if (preview && resultPreview) {
+      items.push({
+        id: String(run.id || run.timestamp || items.length),
+        timestamp: String(run.timestamp || ''),
+        resultPreview,
+        ...preview,
+      });
+    }
+
+    if (items.length >= 5) {
       break;
     }
   }
@@ -2084,6 +2120,10 @@ function QuinnConversationSurface({
   const lifecycleReviewItems = React.useMemo<QuinnSavedPatternCardLifecycleReviewItem[]>(() => {
     return buildLifecycleReviewItemsFromRecentRuns(recentRuns);
   }, [recentRuns]);
+  const shelfReviewItems = React.useMemo<QuinnSavedCardShelfReviewItem[]>(() => {
+    return buildShelfReviewItemsFromRecentRuns(recentRuns);
+  }, [recentRuns]);
+  const latestShelfReviewItem = shelfReviewItems[0] || null;
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -2858,6 +2898,7 @@ function QuinnConversationSurface({
   const [patternCardSearchText, setPatternCardSearchText] = useState('');
   const [patternCardFilter, setPatternCardFilter] = useState<QuinnPatternCardFilter>('all');
   const [patternCardSort, setPatternCardSort] = useState<QuinnPatternCardSort>('newest');
+  const [showShelfReviewDetails, setShowShelfReviewDetails] = useState(false);
   const [literalComposerContentHeight, setLiteralComposerContentHeight] = useState(38);
   const [longFormComposerCollapsed, setLongFormComposerCollapsed] = useState(false);
   const literalComposerInputRef = useRef<React.ElementRef<typeof TextInput> | null>(null);
@@ -4386,6 +4427,74 @@ function QuinnConversationSurface({
                     <Text style={styles.literalPatternCardActiveSummary}>
                       {patternCardActiveSummary}
                     </Text>
+                  ) : null}
+                  {latestShelfReviewItem ? (
+                    <View style={styles.literalPatternCardShelfReviewPanel}>
+                      <View style={styles.literalPatternCardShelfReviewHeader}>
+                        <View style={styles.literalPatternCardShelfReviewTitleStack}>
+                          <Text style={styles.literalPatternCardShelfReviewTitle}>
+                            Latest shelf review
+                          </Text>
+                          {latestShelfReviewItem.timestamp ? (
+                            <Text style={styles.literalPatternCardShelfReviewMeta}>
+                              {formatOutcomeHistoryTimestamp(latestShelfReviewItem.timestamp)}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Pressable
+                          style={styles.literalPatternCardSummaryReset}
+                          onPress={() => setShowShelfReviewDetails((current) => !current)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.literalPatternCardSummaryResetText}>
+                            {showShelfReviewDetails ? 'Hide' : 'View'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      <Text style={styles.literalOutcomeHistoryLabel}>Shelf read</Text>
+                      <Text
+                        style={styles.literalPatternCardShelfReviewText}
+                        numberOfLines={showShelfReviewDetails ? undefined : 2}
+                      >
+                        {latestShelfReviewItem.resultPreview.shelfRead ||
+                          'No shelf read captured.'}
+                      </Text>
+                      {showShelfReviewDetails ? (
+                        <>
+                          <Text style={styles.literalOutcomeHistoryLabel}>
+                            Most useful active cards
+                          </Text>
+                          <Text style={styles.literalPatternCardShelfReviewText}>
+                            {latestShelfReviewItem.resultPreview.mostUsefulActiveCards ||
+                              'No useful-card read captured.'}
+                          </Text>
+                          <Text style={styles.literalOutcomeHistoryLabel}>
+                            Stale / risky / overfit cards
+                          </Text>
+                          <Text style={styles.literalPatternCardShelfReviewText}>
+                            {latestShelfReviewItem.resultPreview.staleRiskyOverfitCards ||
+                              'No stale-card read captured.'}
+                          </Text>
+                          <Text style={styles.literalOutcomeHistoryLabel}>
+                            Missing or undertested areas
+                          </Text>
+                          <Text style={styles.literalPatternCardShelfReviewText}>
+                            {latestShelfReviewItem.resultPreview.missingOrUndertestedAreas ||
+                              'No missing-area read captured.'}
+                          </Text>
+                        </>
+                      ) : null}
+                      <Text style={styles.literalOutcomeHistoryLabel}>
+                        Next best manual card action
+                      </Text>
+                      <Text
+                        style={styles.literalPatternCardShelfReviewText}
+                        numberOfLines={showShelfReviewDetails ? undefined : 2}
+                      >
+                        {latestShelfReviewItem.resultPreview.nextBestManualCardAction ||
+                          'No next card action captured.'}
+                      </Text>
+                    </View>
                   ) : null}
                 </View>
                 <View style={styles.literalPatternCardSearchBox}>
@@ -9931,6 +10040,49 @@ responseReplayButton: {
     lineHeight: 14,
     fontWeight: '700',
     marginTop: 5,
+  },
+
+  literalPatternCardShelfReviewPanel: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.07)',
+    marginTop: 7,
+    paddingTop: 7,
+  },
+
+  literalPatternCardShelfReviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+
+  literalPatternCardShelfReviewTitleStack: {
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  literalPatternCardShelfReviewTitle: {
+    color: 'rgba(245, 248, 255, 0.74)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+  },
+
+  literalPatternCardShelfReviewMeta: {
+    color: 'rgba(245, 248, 255, 0.42)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+
+  literalPatternCardShelfReviewText: {
+    color: 'rgba(245, 248, 255, 0.62)',
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: 5,
   },
 
   literalPatternCardSearchBox: {
