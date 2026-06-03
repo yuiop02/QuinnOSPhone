@@ -294,6 +294,8 @@ const LONG_FORM_LITERAL_COMPOSER_MIN_HEIGHT = Math.round(
 );
 const LITERAL_PANEL_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.34);
 const LITERAL_PANEL_BODY_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.27);
+const LITERAL_PATTERN_CARD_PANEL_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.64);
+const LITERAL_PATTERN_CARD_PANEL_BODY_MAX_HEIGHT = Math.round(WINDOW_HEIGHT * 0.52);
 const QUINN_LENSES = getQuinnLenses();
 const SNAPSHOT_PERSIST_DEBOUNCE_MS = 250;
 const PATTERN_CARD_FILTER_OPTIONS: readonly {
@@ -3110,6 +3112,7 @@ function QuinnConversationSurface({
   const literalChatScrollBottomPadding =
     (shouldUseLongFormComposer ? 500 : literalKeyboardHeight > 0 ? 330 : 300) +
     closedKeyboardBottomLift;
+  const literalPatternCardScrollBottomPadding = Math.max(120, bottomSafeAreaInset + 92);
   const literalComposerInputHeight = shouldUseLongFormComposer
     ? Math.min(
         Math.max(literalComposerContentHeight, LONG_FORM_LITERAL_COMPOSER_MIN_HEIGHT),
@@ -4696,7 +4699,7 @@ function QuinnConversationSurface({
           ) : null}
 
           {showSessionPatternCards ? (
-            <View style={styles.literalOutcomeHistoryPanel}>
+            <View style={[styles.literalOutcomeHistoryPanel, styles.literalPatternCardsPanel]}>
               <View style={styles.literalOutcomeHistoryHeader}>
                 <Text style={styles.literalOutcomeHistoryTitle}>Pattern cards</Text>
                 <View style={styles.literalOutcomeHistoryHeaderActions}>
@@ -4724,6 +4727,16 @@ function QuinnConversationSurface({
                 </View>
               </View>
 
+              <ScrollView
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator
+                style={styles.literalPatternCardsPanelBody}
+                contentContainerStyle={[
+                  styles.literalPatternCardsPanelBodyContent,
+                  { paddingBottom: literalPatternCardScrollBottomPadding },
+                ]}
+              >
               <View style={styles.literalPatternCardImportRow}>
                 <Pressable
                   style={[
@@ -5029,13 +5042,7 @@ function QuinnConversationSurface({
                 </View>
               </View>
 
-              <ScrollView
-                nestedScrollEnabled
-                showsVerticalScrollIndicator={
-                  visibleSavedPatternCards.length + visibleSessionPatternCards.length > 2
-                }
-                style={styles.literalOutcomeHistoryPanelBody}
-              >
+              <View>
                 {hasAnyPatternCards && !hasVisiblePatternCards ? (
                   <Text style={styles.literalOutcomeHistoryEmpty}>
                     {patternCardNoMatchMessage}
@@ -5692,6 +5699,7 @@ function QuinnConversationSurface({
                     ) : null}
                   </>
                 )}
+              </View>
               </ScrollView>
             </View>
           ) : null}
@@ -10272,6 +10280,10 @@ responseReplayButton: {
     maxHeight: LITERAL_PANEL_MAX_HEIGHT,
   },
 
+  literalPatternCardsPanel: {
+    maxHeight: LITERAL_PATTERN_CARD_PANEL_MAX_HEIGHT,
+  },
+
   literalOutcomeHistoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -10320,6 +10332,14 @@ responseReplayButton: {
 
   literalOutcomeHistoryPanelBody: {
     maxHeight: LITERAL_PANEL_BODY_MAX_HEIGHT,
+  },
+
+  literalPatternCardsPanelBody: {
+    maxHeight: LITERAL_PATTERN_CARD_PANEL_BODY_MAX_HEIGHT,
+  },
+
+  literalPatternCardsPanelBodyContent: {
+    paddingTop: 1,
   },
 
   literalOutcomeHistoryRow: {
