@@ -295,6 +295,52 @@ const QUINN_PATTERN_CARD_APPLICATION_NEED =
   'Use this saved card as a possible lens, not as automatic truth. Tell me whether it applies, where it does not apply, what evidence supports or weakens it, and the most useful next move.';
 const QUINN_PATTERN_CARD_APPLICATION_PARTIAL_FRAGMENT =
   'what i need from ren: use this saved card as a p';
+const QUINN_PACKET_KNOWN_SECTION_HEADINGS = [
+  'WHAT I ACTUALLY DID:',
+  'IT CAUSED:',
+  'DID IT HELP?',
+  'WHAT WORKED:',
+  'WHAT MISSED:',
+  'WHAT QUINNOS SHOULD REMEMBER:',
+  'CANDIDATE:',
+  'CONFIDENCE:',
+  'WHEN THIS PATTERN SHOULD MATTER:',
+  'WHEN THIS PATTERN SHOULD NOT MATTER:',
+  'WHAT QUINNOS MIGHT REMEMBER:',
+  'POSSIBLE PATTERN:',
+  'SAVED PATTERN:',
+  'EVIDENCE:',
+  'CURRENT SITUATION:',
+  'APPLIES?',
+  'APPLIES:',
+  'SUPPORTING EVIDENCE:',
+  'LIMITS / MISFIT:',
+  'LIMITS/MISFIT:',
+  'LIMITS OR MISFIT:',
+  'RISK OF OVERUSING THIS PATTERN:',
+  'RISK OF OVERUSE:',
+  'OVERUSE RISK:',
+  'NEXT BEST MOVE:',
+  'LIFECYCLE READ:',
+  'KEEP / REVISE / RETIRE / RESTORE:',
+  'KEEP/REVISE/RETIRE/RESTORE:',
+  'WHY:',
+  'RISK IF KEPT AS-IS:',
+  'RISK IF KEPT AS IS:',
+  'NEXT BEST CARD ACTION:',
+  'SAVE READINESS:',
+  'SHOULD PRESERVE LATER:',
+  'CLARIFY BEFORE STORAGE:',
+  'STORAGE RISK:',
+  'SHELF READ:',
+  'MOST USEFUL ACTIVE CARDS:',
+  'STALE / RISKY / OVERFIT CARDS:',
+  'MISSING OR UNDERTESTED AREAS:',
+  'NEXT BEST MANUAL CARD ACTION:',
+  'Saved:',
+  'Pinned:',
+  'Retired:',
+] as const;
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -314,24 +360,90 @@ const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   },
 ];
 
+function escapeQuinnPacketHeadingRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeQuinnPacketHeadingLine(value: string) {
+  return String(value || '')
+    .trim()
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^[-*•]\s+/, '')
+    .replace(/^\d+[.)]\s+/, '')
+    .replace(/\*\*/g, '')
+    .replace(/__/g, '')
+    .replace(/`/g, '')
+    .trim();
+}
+
+function getQuinnPacketHeadingMatch(line: string, heading: string) {
+  const cleanLine = normalizeQuinnPacketHeadingLine(line);
+  const normalizedHeading = normalizeQuinnPacketHeadingLine(heading);
+  const cleanHeading = normalizedHeading.replace(/:$/, '').trim();
+  const separatorPattern = normalizedHeading.endsWith(':')
+    ? '\\s*:(?:\\s+|$)'
+    : '\\s*:?(?:\\s+|$)';
+
+  if (!cleanLine || !cleanHeading) {
+    return {
+      matches: false,
+      value: '',
+    };
+  }
+
+  const headingPattern = new RegExp(
+    `^${escapeQuinnPacketHeadingRegex(cleanHeading)}${separatorPattern}([\\s\\S]*)$`,
+    'i'
+  );
+  const match = cleanLine.match(headingPattern);
+
+  return {
+    matches: Boolean(match),
+    value: match?.[1]?.trim() || '',
+  };
+}
+
 function isQuinnPacketSectionHeading(line: string) {
-  const clean = line.trim();
-  return Boolean(clean && clean === clean.toUpperCase() && /^[A-Z0-9 /?,'-]+:?$/.test(clean));
+  const clean = normalizeQuinnPacketHeadingLine(line);
+
+  if (!clean) {
+    return false;
+  }
+
+  if (QUINN_PACKET_KNOWN_SECTION_HEADINGS.some((heading) => getQuinnPacketHeadingMatch(clean, heading).matches)) {
+    return true;
+  }
+
+  const colonIndex = clean.indexOf(':');
+  const headingOnly = colonIndex >= 0 ? clean.slice(0, colonIndex + 1).trim() : clean;
+
+  return Boolean(
+    headingOnly &&
+      headingOnly === headingOnly.toUpperCase() &&
+      /^[A-Z0-9 /?,'-]+:?$/.test(headingOnly)
+  );
 }
 
 function getQuinnPacketSectionValue(lines: string[], heading: string) {
-  const headingIndex = lines.findIndex((line) => line.trim() === heading);
+  const headingIndex = lines.findIndex(
+    (line) => getQuinnPacketHeadingMatch(line, heading).matches
+  );
 
   if (headingIndex < 0) {
     return '';
   }
 
+  const sameLineValue = getQuinnPacketHeadingMatch(lines[headingIndex], heading).value;
   const nextHeadingIndex = lines.findIndex(
     (line, index) => index > headingIndex && isQuinnPacketSectionHeading(line)
   );
-
-  return lines
+  const blockValue = lines
     .slice(headingIndex + 1, nextHeadingIndex < 0 ? undefined : nextHeadingIndex)
+    .join('\n')
+    .trim();
+
+  return [sameLineValue, blockValue]
+    .filter(Boolean)
     .join('\n')
     .trim();
 }
@@ -361,15 +473,18 @@ function getQuinnPacketLabeledLineValue(lines: string[], label: string) {
 
 function getQuinnPacketLabeledBlockValue(lines: string[], label: string) {
   const cleanLabel = label.trim().toLowerCase();
-  const labelIndex = lines.findIndex((item) =>
-    item.trim().toLowerCase().startsWith(cleanLabel)
-  );
+  const labelIndex = lines.findIndex((item) => {
+    const cleanItem = normalizeQuinnPacketHeadingLine(item).toLowerCase();
+    return cleanItem.startsWith(cleanLabel);
+  });
 
   if (labelIndex < 0) {
     return '';
   }
 
-  const sameLineValue = lines[labelIndex].trim().slice(label.length).trim();
+  const headingMatch = getQuinnPacketHeadingMatch(lines[labelIndex], label);
+  const sameLineValue =
+    headingMatch.value || normalizeQuinnPacketHeadingLine(lines[labelIndex]).slice(label.length).trim();
 
   if (sameLineValue) {
     return sameLineValue;
@@ -847,6 +962,8 @@ export function buildQuinnPatternCardApplicationPacket(
     '',
     'APPLICATION OUTPUT RULES:',
     '- Return only the APPLICATION OUTPUT SHAPE sections.',
+    '- Use the exact section headings shown below.',
+    '- Do not return a generic summary.',
     '- Use short bullets or short lines.',
     '- Do not narrate the full saved card.',
     '- Do not stop mid-section.',
@@ -985,20 +1102,27 @@ export function buildQuinnSavedPatternCardReviewPacket(
     'WHAT I AM TEMPTED TO DO WITH IT:',
     '[Quinn fills this in.]',
     '',
+    'WHAT I NEED FROM REN:',
+    'Use this as a saved-card lifecycle review only. Do not change the card automatically. Tell Quinn whether this card should stay active, be revised, pinned, retired, restored, or tested again. Name the risk of keeping it as-is and the next best card action.',
+    '',
     'VISIBLE OUTPUT REQUIREMENT:',
     'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
     '',
+    'LIFECYCLE OUTPUT RULES:',
+    '- Return only the LIFECYCLE REVIEW OUTPUT SHAPE sections.',
+    '- Use the exact section headings shown below.',
+    '- Do not return a single-line recommendation.',
+    '- Do not mutate the card automatically; only advise manual action.',
+    '- Use short bullets or short lines.',
+    '- Do not stop mid-section.',
+    '',
     'LIFECYCLE REVIEW OUTPUT SHAPE:',
-    'Return exactly these sections:',
+    'Return exactly these sections and no other sections:',
     'LIFECYCLE READ:',
     'KEEP / REVISE / RETIRE / RESTORE:',
     'WHY:',
     'RISK IF KEPT AS-IS:',
     'NEXT BEST CARD ACTION:',
-    '',
-    'OUTPUT I NEED FROM REN:',
-    'Use this as a saved-card lifecycle review only. Do not change the card automatically. Tell Quinn whether this card should stay active, be revised, pinned, retired, restored, or tested again. Name the risk of keeping it as-is and the next best card action.',
-    ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
 
@@ -1317,16 +1441,24 @@ export function getQuinnPatternCardApplicationResultPreview(
   const lines = text.split(/\r?\n/);
   const preview = {
     applies: cleanQuinnOutcomeHistoryValue(
-      getQuinnPacketSectionValueFromHeadings(lines, ['APPLIES?', 'APPLIES?:'])
+      getQuinnPacketSectionValueFromHeadings(lines, ['APPLIES?', 'APPLIES?:', 'APPLIES:'])
     ),
     supportingEvidence: cleanQuinnOutcomeHistoryValue(
       getQuinnPacketSectionValue(lines, 'SUPPORTING EVIDENCE:')
     ),
     limitsMisfit: cleanQuinnOutcomeHistoryValue(
-      getQuinnPacketSectionValue(lines, 'LIMITS / MISFIT:')
+      getQuinnPacketSectionValueFromHeadings(lines, [
+        'LIMITS / MISFIT:',
+        'LIMITS/MISFIT:',
+        'LIMITS OR MISFIT:',
+      ])
     ),
     overuseRisk: cleanQuinnOutcomeHistoryValue(
-      getQuinnPacketSectionValue(lines, 'RISK OF OVERUSING THIS PATTERN:')
+      getQuinnPacketSectionValueFromHeadings(lines, [
+        'RISK OF OVERUSING THIS PATTERN:',
+        'RISK OF OVERUSE:',
+        'OVERUSE RISK:',
+      ])
     ),
     nextBestMove: cleanQuinnOutcomeHistoryValue(
       getQuinnPacketSectionValue(lines, 'NEXT BEST MOVE:')
@@ -1394,11 +1526,17 @@ export function getQuinnSavedPatternCardReviewResultPreview(
       getQuinnPacketSectionValue(lines, 'LIFECYCLE READ:')
     ),
     keepReviseRetireRestore: cleanQuinnOutcomeHistoryValue(
-      getQuinnPacketSectionValue(lines, 'KEEP / REVISE / RETIRE / RESTORE:')
+      getQuinnPacketSectionValueFromHeadings(lines, [
+        'KEEP / REVISE / RETIRE / RESTORE:',
+        'KEEP/REVISE/RETIRE/RESTORE:',
+      ])
     ),
     why: cleanQuinnOutcomeHistoryValue(getQuinnPacketSectionValue(lines, 'WHY:')),
     riskIfKeptAsIs: cleanQuinnOutcomeHistoryValue(
-      getQuinnPacketSectionValue(lines, 'RISK IF KEPT AS-IS:')
+      getQuinnPacketSectionValueFromHeadings(lines, [
+        'RISK IF KEPT AS-IS:',
+        'RISK IF KEPT AS IS:',
+      ])
     ),
     nextBestCardAction: cleanQuinnOutcomeHistoryValue(
       getQuinnPacketSectionValue(lines, 'NEXT BEST CARD ACTION:')
