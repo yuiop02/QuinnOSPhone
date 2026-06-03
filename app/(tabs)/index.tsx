@@ -1711,7 +1711,6 @@ function isContextHygieneTestText(...parts: (string | null | undefined)[]) {
     /\bjust answer one short sentence so i know you(?:'re| are) alive\b/,
     /\bgive me a quick ren response that would feel good while showing this app to someone\b/,
     /\banswer in one short ren paragraph and speak it\b/,
-    /\btest whether\b/,
       /\bno extra mythology\b/,
       /\bdo not add\b.*\bmeaning\b/,
       /\btest energy\b/,
@@ -2174,12 +2173,40 @@ function QuinnConversationSurface({
   ];
   const responseMetaLine = sessionArc ? 'Continuing chat' : 'New chat';
   const currentSessionArcId = String(sessionArc?.id || '').trim();
-  const visibleThreadMessages = currentSessionArcId
+  const threadMatchedVisibleMessages = currentSessionArcId
     ? recentRuns
         .filter((run) => String(run.sessionArcId || '').trim() === currentSessionArcId)
         .slice(0, 8)
         .reverse()
     : [];
+  const latestCompletedRun = recentRuns.find(
+    (run) =>
+      String(run.packetText || '').trim() ||
+      sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+  );
+  const latestCompletedRunReply = latestCompletedRun
+    ? sanitizeQuinnVisibleReplyText(latestCompletedRun.writtenResult || '')
+    : '';
+  const visibleWrittenResult = sanitizeQuinnVisibleReplyText(writtenResult || '');
+  const visibleThreadMessages =
+    threadMatchedVisibleMessages.length ||
+    !visibleWrittenResult ||
+    !latestCompletedRun ||
+    latestCompletedRunReply !== visibleWrittenResult
+      ? threadMatchedVisibleMessages
+      : [latestCompletedRun];
+  const hasCompletedRunForPendingUserBubble = Boolean(
+    pendingUserBubble?.status === 'pending' &&
+      visibleThreadMessages.some(
+        (run) =>
+          String(run.packetText || '').trim() ===
+            String(pendingUserBubble.packetText || '').trim() &&
+          sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+      )
+  );
+  const visiblePendingUserBubble = hasCompletedRunForPendingUserBubble
+    ? null
+    : pendingUserBubble;
   const latestVisibleOutcomeSource =
     [...visibleThreadMessages]
       .reverse()
@@ -4091,7 +4118,7 @@ function QuinnConversationSurface({
             scheduleConversationAutoScroll(false);
           }}
         >
-          {!visibleThreadMessages.length && !writtenResult && !pendingUserBubble ? (
+          {!visibleThreadMessages.length && !writtenResult && !visiblePendingUserBubble ? (
             <View style={styles.literalChatEmptyState}>
               <Text
                 style={styles.literalChatEmptyTitle}
@@ -4205,15 +4232,18 @@ function QuinnConversationSurface({
             );
           })}
 
-          {pendingUserBubble ? (() => {
-            const packetKind = getQuinnIntakeFormKindFromPacketText(pendingUserBubble.packetText);
+          {visiblePendingUserBubble ? (() => {
+            const packetKind = getQuinnIntakeFormKindFromPacketText(
+              visiblePendingUserBubble.packetText
+            );
 
             return (
               <View style={styles.literalMessagePair}>
                 <View
                   style={[
                     styles.literalUserBubble,
-                    pendingUserBubble.status === 'failed' && styles.literalUserBubbleFailed,
+                    visiblePendingUserBubble.status === 'failed' &&
+                      styles.literalUserBubbleFailed,
                   ]}
                 >
                   {packetKind ? (
@@ -4226,9 +4256,13 @@ function QuinnConversationSurface({
                       <Text style={styles.literalPacketKindBadgeText}>{packetKind.label}</Text>
                     </View>
                   ) : null}
-                  <Text style={styles.literalMessageText}>{pendingUserBubble.packetText}</Text>
+                  <Text style={styles.literalMessageText}>
+                    {visiblePendingUserBubble.packetText}
+                  </Text>
                   <Text style={styles.literalOptimisticBubbleMeta}>
-                    {pendingUserBubble.status === 'failed' ? 'Send failed' : 'Sending...'}
+                    {visiblePendingUserBubble.status === 'failed'
+                      ? 'Send failed'
+                      : 'Sending...'}
                   </Text>
                 </View>
               </View>
@@ -6882,11 +6916,14 @@ export default function App() {
       setCurrentMemoryResonance(result.memoryResonance);
       setCurrentSessionArc(nextSessionArc);
       setLastRunAt(timestamp);
-      setRecentRuns((prev) =>
-        filterContextHygieneRuns(
-          sanitizeRunHistoryItemsForDisplay([runItem, ...prev])
-        ).slice(0, 24)
-      );
+      setRecentRuns((prev) => {
+        const [latestRun, ...previousRuns] = sanitizeRunHistoryItemsForDisplay([
+          runItem,
+          ...prev,
+        ]);
+
+        return [latestRun, ...filterContextHygieneRuns(previousRuns)].slice(0, 24);
+      });
       const shouldKeepReusableMemoryForContextHygiene = !isContextHygieneTestText(
 
         effectiveTitle,
