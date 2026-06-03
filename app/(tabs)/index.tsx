@@ -215,6 +215,25 @@ type QuinnSavedCardShelfReviewItem = QuinnSavedCardShelfReviewPacketPreview & {
   resultPreview: QuinnSavedCardShelfReviewResultPreview;
 };
 
+type QuinnPatternCardImportRestoreReport = {
+  importedAt: string;
+  exportHealthFound: boolean;
+  restoreCoverage: string;
+  exportHealthSessionPatternCards: number | null;
+  exportHealthSavedPatternCards: number | null;
+  exportHealthSavedCardShelfReviews: number | null;
+  parsedSessionCards: number;
+  restoredSessionCards: number;
+  skippedSessionCards: number;
+  parsedSavedCards: number;
+  restoredSavedCards: number;
+  skippedSavedCards: number;
+  parsedShelfReviews: number;
+  restoredShelfReviews: number;
+  skippedShelfReviews: number;
+  message: string;
+};
+
 type QuinnSessionPatternCard = {
   id: string;
   createdAt: string;
@@ -683,6 +702,75 @@ function convertShelfReviewItemToSavedShelfReview(
     search: item.search,
     sort: item.sort,
     resultPreview: item.resultPreview,
+  };
+}
+
+function getQuinnExportHealthSummarySection(exportText: string) {
+  const text = String(exportText || '').replace(/\r\n/g, '\n');
+  const headingMatch = text.match(/^## Export Health \/ Checkpoint Summary\s*$/m);
+
+  if (!headingMatch || headingMatch.index === undefined) {
+    return '';
+  }
+
+  const sectionStart = headingMatch.index + headingMatch[0].length;
+  const remainingText = text.slice(sectionStart);
+  const nextSectionIndex = remainingText.search(/\n##\s+/);
+
+  return (
+    nextSectionIndex >= 0 ? remainingText.slice(0, nextSectionIndex) : remainingText
+  ).trim();
+}
+
+function getQuinnExportHealthField(sectionText: string, label: string) {
+  const prefix = `- ${label}:`;
+  const line = String(sectionText || '')
+    .split('\n')
+    .find((item) => item.trim().toLowerCase().startsWith(prefix.toLowerCase()));
+
+  if (!line) {
+    return '';
+  }
+
+  return line.trim().slice(prefix.length).trim();
+}
+
+function parseQuinnExportHealthCount(value: string) {
+  const clean = String(value || '').trim();
+
+  if (!clean) {
+    return null;
+  }
+
+  const count = Number.parseInt(clean, 10);
+  return Number.isFinite(count) ? count : null;
+}
+
+function getQuinnExportHealthSummaryPreview(exportText: string) {
+  const sectionText = getQuinnExportHealthSummarySection(exportText);
+
+  if (!sectionText) {
+    return {
+      found: false,
+      restoreCoverage: '',
+      sessionPatternCards: null,
+      savedPatternCards: null,
+      savedCardShelfReviews: null,
+    };
+  }
+
+  return {
+    found: true,
+    restoreCoverage: getQuinnExportHealthField(sectionText, 'Restore coverage'),
+    sessionPatternCards: parseQuinnExportHealthCount(
+      getQuinnExportHealthField(sectionText, 'Session Pattern Cards')
+    ),
+    savedPatternCards: parseQuinnExportHealthCount(
+      getQuinnExportHealthField(sectionText, 'Saved Pattern Cards')
+    ),
+    savedCardShelfReviews: parseQuinnExportHealthCount(
+      getQuinnExportHealthField(sectionText, 'Saved Card Shelf Reviews')
+    ),
   };
 }
 
@@ -2008,6 +2096,8 @@ function QuinnConversationSurface({
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [outcomeCaptureGuardMessage, setOutcomeCaptureGuardMessage] = useState('');
   const [sessionPatternCardImportMessage, setSessionPatternCardImportMessage] = useState('');
+  const [latestPatternCardImportReport, setLatestPatternCardImportReport] =
+    useState<QuinnPatternCardImportRestoreReport | null>(null);
   const [restorableFailedDraft, setRestorableFailedDraft] =
     useState<QuinnRestorableFailedDraft | null>(null);
   const [failedDraftRestoreMessage, setFailedDraftRestoreMessage] = useState('');
@@ -3627,9 +3717,28 @@ function QuinnConversationSurface({
     const parsedSessionCards = parseSessionPatternCardsFromExport(packetText);
     const parsedSavedCards = parseSavedPatternCardsFromExport(packetText);
     const parsedShelfReviews = parseSavedCardShelfReviewsFromExport(packetText);
+    const exportHealthPreview = getQuinnExportHealthSummaryPreview(packetText);
 
     if (!parsedSessionCards.length && !parsedSavedCards.length && !parsedShelfReviews.length) {
       setSessionPatternCardImportMessage('No Pattern Cards or shelf reviews found in this export.');
+      setLatestPatternCardImportReport({
+        importedAt: new Date().toISOString(),
+        exportHealthFound: exportHealthPreview.found,
+        restoreCoverage: exportHealthPreview.restoreCoverage,
+        exportHealthSessionPatternCards: exportHealthPreview.sessionPatternCards,
+        exportHealthSavedPatternCards: exportHealthPreview.savedPatternCards,
+        exportHealthSavedCardShelfReviews: exportHealthPreview.savedCardShelfReviews,
+        parsedSessionCards: 0,
+        restoredSessionCards: 0,
+        skippedSessionCards: 0,
+        parsedSavedCards: 0,
+        restoredSavedCards: 0,
+        skippedSavedCards: 0,
+        parsedShelfReviews: 0,
+        restoredShelfReviews: 0,
+        skippedShelfReviews: 0,
+        message: 'No Pattern Cards or shelf reviews found in this export.',
+      });
       focusLiteralComposerSoon();
       return;
     }
@@ -3717,11 +3826,40 @@ function QuinnConversationSurface({
       },
       []
     );
+    const importMessage = `Restored ${sessionCardsToRestore.length} session card${
+      sessionCardsToRestore.length === 1 ? '' : 's'
+    } and ${savedCardsToRestore.length} saved card${
+      savedCardsToRestore.length === 1 ? '' : 's'
+    }, plus ${shelfReviewsToRestore.length} shelf review${
+      shelfReviewsToRestore.length === 1 ? '' : 's'
+    }.`;
+    const nextImportReport: QuinnPatternCardImportRestoreReport = {
+      importedAt: new Date(importedAt).toISOString(),
+      exportHealthFound: exportHealthPreview.found,
+      restoreCoverage: exportHealthPreview.restoreCoverage,
+      exportHealthSessionPatternCards: exportHealthPreview.sessionPatternCards,
+      exportHealthSavedPatternCards: exportHealthPreview.savedPatternCards,
+      exportHealthSavedCardShelfReviews: exportHealthPreview.savedCardShelfReviews,
+      parsedSessionCards: parsedSessionCards.length,
+      restoredSessionCards: sessionCardsToRestore.length,
+      skippedSessionCards: Math.max(0, parsedSessionCards.length - sessionCardsToRestore.length),
+      parsedSavedCards: parsedSavedCards.length,
+      restoredSavedCards: savedCardsToRestore.length,
+      skippedSavedCards: Math.max(0, parsedSavedCards.length - savedCardsToRestore.length),
+      parsedShelfReviews: parsedShelfReviews.length,
+      restoredShelfReviews: shelfReviewsToRestore.length,
+      skippedShelfReviews: Math.max(0, parsedShelfReviews.length - shelfReviewsToRestore.length),
+      message: importMessage,
+    };
 
     if (!sessionCardsToRestore.length && !savedCardsToRestore.length && !shelfReviewsToRestore.length) {
       setSessionPatternCardImportMessage(
         'No new cards or shelf reviews restored; matching items are already here.'
       );
+      setLatestPatternCardImportReport({
+        ...nextImportReport,
+        message: 'No new cards or shelf reviews restored; matching items are already here.',
+      });
       setShowSessionPatternCards(true);
       setShowLiteralTools(false);
       setLongFormComposerCollapsed(true);
@@ -3784,15 +3922,8 @@ function QuinnConversationSurface({
       });
     }
 
-    setSessionPatternCardImportMessage(
-      `Restored ${sessionCardsToRestore.length} session card${
-        sessionCardsToRestore.length === 1 ? '' : 's'
-      } and ${savedCardsToRestore.length} saved card${
-        savedCardsToRestore.length === 1 ? '' : 's'
-      }, plus ${shelfReviewsToRestore.length} shelf review${
-        shelfReviewsToRestore.length === 1 ? '' : 's'
-      }.`
-    );
+    setSessionPatternCardImportMessage(importMessage);
+    setLatestPatternCardImportReport(nextImportReport);
     setShowOutcomeHistory(false);
     setShowPatternCandidates(false);
     setShowDraftPatternCards(false);
@@ -4536,6 +4667,83 @@ function QuinnConversationSurface({
                     <Text style={styles.literalPatternCardActiveSummary}>
                       {patternCardActiveSummary}
                     </Text>
+                  ) : null}
+                  {latestPatternCardImportReport ? (
+                    <View style={styles.literalPatternCardShelfReviewPanel}>
+                      <View style={styles.literalPatternCardShelfReviewHeader}>
+                        <View style={styles.literalPatternCardShelfReviewTitleStack}>
+                          <Text style={styles.literalPatternCardShelfReviewTitle}>
+                            Last import
+                          </Text>
+                          <Text style={styles.literalPatternCardShelfReviewMeta}>
+                            {formatOutcomeHistoryTimestamp(
+                              latestPatternCardImportReport.importedAt
+                            )}
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={styles.literalPatternCardSummaryReset}
+                          onPress={() => setLatestPatternCardImportReport(null)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.literalPatternCardSummaryResetText}>Clear</Text>
+                        </Pressable>
+                      </View>
+                      <Text style={styles.literalPatternCardShelfReviewText}>
+                        {latestPatternCardImportReport.message}
+                      </Text>
+                      <View style={styles.literalPatternCardCountRow}>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          Parsed {latestPatternCardImportReport.parsedSessionCards} session
+                        </Text>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          {latestPatternCardImportReport.parsedSavedCards} saved
+                        </Text>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          {latestPatternCardImportReport.parsedShelfReviews} shelf
+                        </Text>
+                      </View>
+                      <View style={styles.literalPatternCardCountRow}>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          Restored {latestPatternCardImportReport.restoredSessionCards} session
+                        </Text>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          {latestPatternCardImportReport.restoredSavedCards} saved
+                        </Text>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          {latestPatternCardImportReport.restoredShelfReviews} shelf
+                        </Text>
+                      </View>
+                      <View style={styles.literalPatternCardCountRow}>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          Skipped {latestPatternCardImportReport.skippedSessionCards} session
+                        </Text>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          {latestPatternCardImportReport.skippedSavedCards} saved
+                        </Text>
+                        <Text style={styles.literalPatternCardCountPill}>
+                          {latestPatternCardImportReport.skippedShelfReviews} shelf
+                        </Text>
+                      </View>
+                      {latestPatternCardImportReport.exportHealthFound ? (
+                        <>
+                          {latestPatternCardImportReport.restoreCoverage ? (
+                            <Text style={styles.literalPatternCardActiveSummary}>
+                              Restore coverage: {latestPatternCardImportReport.restoreCoverage}
+                            </Text>
+                          ) : null}
+                          <Text style={styles.literalPatternCardActiveSummary}>
+                            Export health: {latestPatternCardImportReport.exportHealthSessionPatternCards ?? '?'} session /{' '}
+                            {latestPatternCardImportReport.exportHealthSavedPatternCards ?? '?'} saved /{' '}
+                            {latestPatternCardImportReport.exportHealthSavedCardShelfReviews ?? '?'} shelf reviews
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.literalPatternCardActiveSummary}>
+                          Export health summary not found.
+                        </Text>
+                      )}
+                    </View>
                   ) : null}
                   {latestShelfReviewItem ? (
                     <View style={styles.literalPatternCardShelfReviewPanel}>
