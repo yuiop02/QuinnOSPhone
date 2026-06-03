@@ -132,6 +132,7 @@ import {
   getQuinnSavedCardShelfReviewResultPreview,
   getQuinnSavedPatternCardReviewPacketPreview,
   getQuinnSavedPatternCardReviewResultPreview,
+  isQuinnPatternCardApplicationPartialFragment,
   type QuinnSavedCardShelfReviewPacketPreview,
   type QuinnSavedCardShelfReviewResultPreview,
   type QuinnDraftPatternCardHistoryPreview,
@@ -2978,6 +2979,14 @@ function QuinnConversationSurface({
     const submittedPacketTitle = packetTitle || 'Quinn Chat';
     const outcomeMinimumCaptureStatus =
       getQuinnOutcomeLogMinimumCaptureStatus(submittedPacketText);
+
+    if (isQuinnPatternCardApplicationPartialFragment(submittedPacketText)) {
+      setOutcomeCaptureGuardMessage(
+        'Apply Card packet looks incomplete. Reopen Apply card from the saved card before sending.'
+      );
+      focusLiteralComposerSoon();
+      return;
+    }
 
     if (outcomeMinimumCaptureStatus.isOutcomeLog && !outcomeMinimumCaptureStatus.hasMinimumData) {
       setOutcomeCaptureGuardMessage(

@@ -291,6 +291,10 @@ const QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER = 'QUINNOS SAVED PATTERN CARD REVIE
 const QUINN_SAVED_CARD_SHELF_REVIEW_MARKER = 'QUINNOS SAVED CARD SHELF REVIEW';
 const QUINN_RELEASE_READINESS_AUDIT_MARKER = 'QUINNOS RELEASE READINESS AUDIT';
 const QUINN_MANUAL_FIELD_TEST_CHECKLIST_MARKER = 'QUINNOS MANUAL FIELD TEST CHECKLIST';
+const QUINN_PATTERN_CARD_APPLICATION_NEED =
+  'Use this saved card as a possible lens, not as automatic truth. Tell me whether it applies, where it does not apply, what evidence supports or weakens it, and the most useful next move.';
+const QUINN_PATTERN_CARD_APPLICATION_PARTIAL_FRAGMENT =
+  'what i need from ren: use this saved card as a p';
 
 const QUINN_OUTCOME_LOG_MINIMUM_CAPTURE_FIELDS: {
   heading: QuinnOutcomeLogMinimumCaptureField;
@@ -773,6 +777,13 @@ export function buildQuinnPatternCardApplicationPacket(
     'PURPOSE:',
     'Test whether this saved Pattern Card applies to a current situation without treating it as automatic truth.',
     '',
+    'APPLICATION SOURCE LOCK:',
+    '- Use this current QUINNOS PATTERN CARD APPLICATION packet as the source of truth.',
+    '- Ignore earlier incomplete fragments or thread summaries if they conflict with this packet.',
+    '- The saved card may include compact excerpts or ellipses; treat them as available context, not as incomplete user instruction.',
+    '- If WHAT I NEED FROM REN is complete in this packet, do not ask Quinn to finish an older cut-off line.',
+    '- Return only the requested APPLICATION OUTPUT SHAPE sections.',
+    '',
     'SAVED PATTERN:',
     formatQuinnDraftPatternCardValue(card.possiblePattern, '[No saved pattern captured.]'),
     '',
@@ -826,23 +837,41 @@ export function buildQuinnPatternCardApplicationPacket(
     '[Quinn describes what is happening now.]',
     '',
     'WHAT I AM TEMPTED TO ASSUME:',
-    '[Quinn fills this in.]',
+    '(not specified)',
     '',
     'WHAT I NEED FROM REN:',
-    'Use this saved card as a possible lens, not as automatic truth. Tell me whether it applies, where it does not apply, what evidence supports or weakens it, and the most useful next move.',
+    QUINN_PATTERN_CARD_APPLICATION_NEED,
     '',
     'VISIBLE OUTPUT REQUIREMENT:',
     'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
     '',
+    'APPLICATION OUTPUT RULES:',
+    '- Return only the APPLICATION OUTPUT SHAPE sections.',
+    '- Use short bullets or short lines.',
+    '- Do not narrate the full saved card.',
+    '- Do not stop mid-section.',
+    '',
     'APPLICATION OUTPUT SHAPE:',
-    'Return exactly these sections:',
+    'Return exactly these sections and no other sections:',
     'APPLIES?',
     'SUPPORTING EVIDENCE:',
     'LIMITS / MISFIT:',
     'RISK OF OVERUSING THIS PATTERN:',
     'NEXT BEST MOVE:',
-    ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
+}
+
+export function isQuinnPatternCardApplicationPartialFragment(packetText: string) {
+  const clean = String(packetText || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+  if (!clean || clean.includes(QUINN_PATTERN_CARD_APPLICATION_MARKER.toLowerCase())) {
+    return false;
+  }
+
+  return (
+    clean.startsWith(QUINN_PATTERN_CARD_APPLICATION_PARTIAL_FRAGMENT) &&
+    !clean.includes(QUINN_PATTERN_CARD_APPLICATION_NEED.toLowerCase())
+  );
 }
 
 export function buildQuinnSavedPatternCardReviewPacket(
