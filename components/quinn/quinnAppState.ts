@@ -56,6 +56,11 @@ function formatComposerText(value: string) {
   return clean || '(blank; no draft is currently staged in the composer)';
 }
 
+function formatExportLineText(value: string, fallback = '(none yet)') {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  return clean || fallback;
+}
+
 function formatRunTimestamp(value: string | null | undefined) {
   const clean = String(value || '').trim();
   return clean || '(none yet)';
@@ -83,6 +88,29 @@ export type QuinnPatternCardLifecycleReview = {
   why: string;
   riskIfKeptAsIs: string;
   nextBestCardAction: string;
+};
+
+export type QuinnSavedCardShelfReviewResult = {
+  shelfRead: string;
+  mostUsefulActiveCards: string;
+  staleRiskyOverfitCards: string;
+  missingOrUndertestedAreas: string;
+  nextBestManualCardAction: string;
+};
+
+export type QuinnSavedCardShelfReview = {
+  id: string;
+  createdAt: string;
+  activeSavedCount: number | null;
+  retiredSavedCount: number | null;
+  pinnedSavedCount: number | null;
+  withSaveIntentReviewCount: number | null;
+  withApplicationCheckCount: number | null;
+  withLifecycleReviewCount: number | null;
+  filter: string;
+  search: string;
+  sort: string;
+  resultPreview: QuinnSavedCardShelfReviewResult;
 };
 
 export type QuinnExportSessionPatternCard = {
@@ -113,6 +141,7 @@ export type QuinnSavedPatternCard = {
 
 type SessionPatternCardExportInput = QuinnExportSessionPatternCard;
 type SavedPatternCardExportInput = QuinnSavedPatternCard;
+type SavedCardShelfReviewExportInput = QuinnSavedCardShelfReview;
 type ParsedPatternCardExportItem = QuinnExportSessionPatternCard & {
   savedAt?: string;
   pinnedAt?: string | null;
@@ -235,6 +264,74 @@ function normalizeExportedPatternCardLifecycleReview(
   return cleanReview;
 }
 
+function normalizeExportedSavedCardShelfReviewResult(
+  review: QuinnSavedCardShelfReviewResult | null | undefined
+) {
+  if (!review) {
+    return null;
+  }
+
+  const cleanReview = {
+    shelfRead: String(review.shelfRead || '').trim(),
+    mostUsefulActiveCards: String(review.mostUsefulActiveCards || '').trim(),
+    staleRiskyOverfitCards: String(review.staleRiskyOverfitCards || '').trim(),
+    missingOrUndertestedAreas: String(review.missingOrUndertestedAreas || '').trim(),
+    nextBestManualCardAction: String(review.nextBestManualCardAction || '').trim(),
+  };
+
+  if (
+    !cleanReview.shelfRead &&
+    !cleanReview.mostUsefulActiveCards &&
+    !cleanReview.staleRiskyOverfitCards &&
+    !cleanReview.missingOrUndertestedAreas &&
+    !cleanReview.nextBestManualCardAction
+  ) {
+    return null;
+  }
+
+  return cleanReview;
+}
+
+function normalizeExportedSavedCardShelfReview(
+  review: SavedCardShelfReviewExportInput | null | undefined
+) {
+  if (!review) {
+    return null;
+  }
+
+  const resultPreview = normalizeExportedSavedCardShelfReviewResult(review.resultPreview);
+
+  if (!resultPreview) {
+    return null;
+  }
+
+  return {
+    id: String(review.id || '').trim(),
+    createdAt: String(review.createdAt || '').trim(),
+    activeSavedCount: normalizeNullableShelfReviewCount(review.activeSavedCount),
+    retiredSavedCount: normalizeNullableShelfReviewCount(review.retiredSavedCount),
+    pinnedSavedCount: normalizeNullableShelfReviewCount(review.pinnedSavedCount),
+    withSaveIntentReviewCount: normalizeNullableShelfReviewCount(
+      review.withSaveIntentReviewCount
+    ),
+    withApplicationCheckCount: normalizeNullableShelfReviewCount(
+      review.withApplicationCheckCount
+    ),
+    withLifecycleReviewCount: normalizeNullableShelfReviewCount(
+      review.withLifecycleReviewCount
+    ),
+    filter: String(review.filter || '').trim(),
+    search: String(review.search || '').trim(),
+    sort: String(review.sort || '').trim(),
+    resultPreview,
+  };
+}
+
+function normalizeNullableShelfReviewCount(value: number | null | undefined) {
+  const count = Number(value);
+  return Number.isFinite(count) ? count : null;
+}
+
 function getSessionPatternCardSaveIntentExportLines(card: {
   saveIntentReview?: QuinnPatternCardSaveIntentReview | null;
 }) {
@@ -289,6 +386,55 @@ function getSavedPatternCardLifecycleReviewExportLines(card: {
     `- Risk if kept as-is: ${formatOptionalText(review.riskIfKeptAsIs)}`,
     `- Lifecycle next best card action: ${formatOptionalText(review.nextBestCardAction)}`,
   ];
+}
+
+function formatShelfReviewCount(value: number | null | undefined) {
+  return value === null || value === undefined ? '(none)' : String(value);
+}
+
+function getSavedCardShelfReviewExportLines(review: QuinnSavedCardShelfReview) {
+  return [
+    `- Created time: ${formatRunTimestamp(review.createdAt)}`,
+    `- Active saved cards: ${formatShelfReviewCount(review.activeSavedCount)}`,
+    `- Retired saved cards: ${formatShelfReviewCount(review.retiredSavedCount)}`,
+    `- Pinned saved cards: ${formatShelfReviewCount(review.pinnedSavedCount)}`,
+    `- With Save Intent review: ${formatShelfReviewCount(
+      review.withSaveIntentReviewCount
+    )}`,
+    `- With Application check: ${formatShelfReviewCount(
+      review.withApplicationCheckCount
+    )}`,
+    `- With Lifecycle review: ${formatShelfReviewCount(
+      review.withLifecycleReviewCount
+    )}`,
+    `- Filter: ${formatExportLineText(review.filter, '(none)')}`,
+    `- Search: ${formatExportLineText(review.search, '(none)')}`,
+    `- Sort: ${formatExportLineText(review.sort, '(none)')}`,
+    `- Shelf read: ${formatExportLineText(review.resultPreview.shelfRead)}`,
+    `- Most useful active cards: ${formatExportLineText(
+      review.resultPreview.mostUsefulActiveCards
+    )}`,
+    `- Stale / risky / overfit cards: ${formatExportLineText(
+      review.resultPreview.staleRiskyOverfitCards
+    )}`,
+    `- Missing or undertested areas: ${formatExportLineText(
+      review.resultPreview.missingOrUndertestedAreas
+    )}`,
+    `- Next best manual card action: ${formatExportLineText(
+      review.resultPreview.nextBestManualCardAction
+    )}`,
+  ];
+}
+
+function parseExportCount(value: string) {
+  const clean = String(value || '').trim();
+
+  if (!clean) {
+    return null;
+  }
+
+  const count = Number.parseInt(clean, 10);
+  return Number.isFinite(count) ? count : null;
 }
 
 function parsePatternCardsFromExportSection(
@@ -488,6 +634,113 @@ export function parseSavedPatternCardsFromExport(exportText: string): QuinnSaved
   );
 }
 
+export function parseSavedCardShelfReviewsFromExport(
+  exportText: string
+): QuinnSavedCardShelfReview[] {
+  const text = String(exportText || '').replace(/\r\n/g, '\n');
+  const headingMatch = text.match(/^## Saved Card Shelf Reviews\s*$/m);
+
+  if (!headingMatch || headingMatch.index === undefined) {
+    return [];
+  }
+
+  const sectionStart = headingMatch.index + headingMatch[0].length;
+  const remainingText = text.slice(sectionStart);
+  const nextSectionIndex = remainingText.search(/\n##\s+/);
+  const sectionText = (
+    nextSectionIndex >= 0 ? remainingText.slice(0, nextSectionIndex) : remainingText
+  ).trim();
+
+  if (!sectionText || sectionText === '(none yet)') {
+    return [];
+  }
+
+  const reviewBlocks: string[][] = [];
+  let currentBlock: string[] = [];
+
+  for (const line of sectionText.split('\n')) {
+    if (/^###\s+\d+\.\s+/.test(line.trim())) {
+      if (currentBlock.length) {
+        reviewBlocks.push(currentBlock);
+      }
+
+      currentBlock = [line];
+      continue;
+    }
+
+    if (currentBlock.length) {
+      currentBlock.push(line);
+    }
+  }
+
+  if (currentBlock.length) {
+    reviewBlocks.push(currentBlock);
+  }
+
+  const importedAt = Date.now();
+
+  return reviewBlocks.reduce<QuinnSavedCardShelfReview[]>((reviews, lines, index) => {
+    const titleLine = lines[0] || '';
+    const headerCreatedAt = cleanImportedSessionPatternCardValue(
+      titleLine.replace(/^###\s+\d+\.\s+/, '')
+    );
+    const createdAt =
+      getImportedSessionPatternCardField(lines, 'Created time') || headerCreatedAt;
+    const resultPreview = normalizeExportedSavedCardShelfReviewResult({
+      shelfRead: getImportedSessionPatternCardField(lines, 'Shelf read'),
+      mostUsefulActiveCards: getImportedSessionPatternCardField(
+        lines,
+        'Most useful active cards'
+      ),
+      staleRiskyOverfitCards: getImportedSessionPatternCardField(
+        lines,
+        'Stale / risky / overfit cards'
+      ),
+      missingOrUndertestedAreas: getImportedSessionPatternCardField(
+        lines,
+        'Missing or undertested areas'
+      ),
+      nextBestManualCardAction: getImportedSessionPatternCardField(
+        lines,
+        'Next best manual card action'
+      ),
+    });
+
+    if (!resultPreview) {
+      return reviews;
+    }
+
+    reviews.push({
+      id: `saved-card-shelf-review-import-${importedAt}-${index}`,
+      createdAt: String(createdAt || '').trim() || new Date(importedAt).toISOString(),
+      activeSavedCount: parseExportCount(
+        getImportedSessionPatternCardField(lines, 'Active saved cards')
+      ),
+      retiredSavedCount: parseExportCount(
+        getImportedSessionPatternCardField(lines, 'Retired saved cards')
+      ),
+      pinnedSavedCount: parseExportCount(
+        getImportedSessionPatternCardField(lines, 'Pinned saved cards')
+      ),
+      withSaveIntentReviewCount: parseExportCount(
+        getImportedSessionPatternCardField(lines, 'With Save Intent review')
+      ),
+      withApplicationCheckCount: parseExportCount(
+        getImportedSessionPatternCardField(lines, 'With Application check')
+      ),
+      withLifecycleReviewCount: parseExportCount(
+        getImportedSessionPatternCardField(lines, 'With Lifecycle review')
+      ),
+      filter: getImportedSessionPatternCardField(lines, 'Filter'),
+      search: getImportedSessionPatternCardField(lines, 'Search'),
+      sort: getImportedSessionPatternCardField(lines, 'Sort'),
+      resultPreview,
+    });
+
+    return reviews;
+  }, []);
+}
+
 function buildActiveThreadState({
   packetTitle,
   writtenResult,
@@ -542,6 +795,7 @@ export function buildExportBundle({
   recentRuns,
   sessionPatternCards = [],
   savedPatternCards = [],
+  savedCardShelfReviews = [],
   memories,
   notifications,
   settings,
@@ -558,6 +812,7 @@ export function buildExportBundle({
   recentRuns: RunHistoryItem[];
   sessionPatternCards?: SessionPatternCardExportInput[];
   savedPatternCards?: SavedPatternCardExportInput[];
+  savedCardShelfReviews?: SavedCardShelfReviewExportInput[];
   memories: MemoryItem[];
   notifications: NotificationItem[];
   settings: QuinnSettings;
@@ -594,6 +849,13 @@ export function buildExportBundle({
     applicationReview: normalizeExportedPatternCardApplicationReview(card.applicationReview),
     lifecycleReview: normalizeExportedPatternCardLifecycleReview(card.lifecycleReview),
   }));
+  const exportedSavedCardShelfReviews = savedCardShelfReviews
+    .map(normalizeExportedSavedCardShelfReview)
+    .filter(
+      (review: QuinnSavedCardShelfReview | null): review is QuinnSavedCardShelfReview =>
+        Boolean(review)
+    )
+    .slice(0, 3);
   const currentComposer = {
     title: packetTitle,
     text: packetText,
@@ -635,6 +897,7 @@ export function buildExportBundle({
     activeThread,
     sessionPatternCards: exportedSessionPatternCards,
     savedPatternCards: exportedSavedPatternCards,
+    savedCardShelfReviews: exportedSavedCardShelfReviews,
     latestCompletedRun,
     settings,
     voiceSettings,
@@ -733,6 +996,18 @@ export function buildExportBundle({
             ...getSessionPatternCardSaveIntentExportLines(card),
             ...getSavedPatternCardApplicationReviewExportLines(card),
             ...getSavedPatternCardLifecycleReviewExportLines(card),
+            '',
+          ])
+      : ['(none yet)']
+    ),
+    '',
+    '## Saved Card Shelf Reviews',
+    '',
+    ...(
+      exportedSavedCardShelfReviews.length
+        ? exportedSavedCardShelfReviews.flatMap((review, index) => [
+            `### ${index + 1}. ${formatRunTimestamp(review.createdAt)}`,
+            ...getSavedCardShelfReviewExportLines(review),
             '',
           ])
         : ['(none yet)']
@@ -902,6 +1177,15 @@ export function buildExportBundle({
           ...getSessionPatternCardSaveIntentExportLines(card),
           ...getSavedPatternCardApplicationReviewExportLines(card),
           ...getSavedPatternCardLifecycleReviewExportLines(card),
+          '',
+        ])
+      : ['(none yet)']),
+    '',
+    'Saved card shelf reviews:',
+    ...(exportedSavedCardShelfReviews.length
+      ? exportedSavedCardShelfReviews.flatMap((review, index) => [
+          `${index + 1}. ${formatRunTimestamp(review.createdAt)}`,
+          ...getSavedCardShelfReviewExportLines(review),
           '',
         ])
       : ['(none yet)']),

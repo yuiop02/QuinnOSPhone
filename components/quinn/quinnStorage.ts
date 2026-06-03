@@ -5,6 +5,7 @@ import {
     type QuinnPatternCardApplicationReview,
     type QuinnPatternCardLifecycleReview,
     type QuinnPatternCardSaveIntentReview,
+    type QuinnSavedCardShelfReview,
     type QuinnSavedPatternCard,
 } from './quinnAppState';
 import {
@@ -36,6 +37,7 @@ export type QuinnSnapshot = {
   memories: MemoryItem[];
   notifications: NotificationItem[];
   savedPatternCards: QuinnSavedPatternCard[];
+  savedCardShelfReviews: QuinnSavedCardShelfReview[];
   settings: QuinnSettings;
   voiceSessions: VoiceSession[];
   voiceSettings: VoiceSettings;
@@ -264,6 +266,74 @@ function normalizeSavedPatternCardLifecycleReview(
   return review;
 }
 
+function normalizeSavedCardShelfReviewResult(
+  item: any
+): QuinnSavedCardShelfReview['resultPreview'] | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const review = {
+    shelfRead: String(item.shelfRead || '').trim(),
+    mostUsefulActiveCards: String(item.mostUsefulActiveCards || '').trim(),
+    staleRiskyOverfitCards: String(item.staleRiskyOverfitCards || '').trim(),
+    missingOrUndertestedAreas: String(item.missingOrUndertestedAreas || '').trim(),
+    nextBestManualCardAction: String(item.nextBestManualCardAction || '').trim(),
+  };
+
+  if (
+    !review.shelfRead &&
+    !review.mostUsefulActiveCards &&
+    !review.staleRiskyOverfitCards &&
+    !review.missingOrUndertestedAreas &&
+    !review.nextBestManualCardAction
+  ) {
+    return null;
+  }
+
+  return review;
+}
+
+function normalizeSavedCardShelfReviewCount(value: any) {
+  const count = Number(value);
+  return Number.isFinite(count) ? count : null;
+}
+
+function normalizeSavedCardShelfReview(item: any): QuinnSavedCardShelfReview | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const resultPreview = normalizeSavedCardShelfReviewResult(item.resultPreview);
+
+  if (!resultPreview) {
+    return null;
+  }
+
+  const createdAt = String(item.createdAt || '').trim();
+
+  return {
+    id: String(item.id || `saved-card-shelf-review-${createdAt || Date.now()}`),
+    createdAt: createdAt || new Date().toISOString(),
+    activeSavedCount: normalizeSavedCardShelfReviewCount(item.activeSavedCount),
+    retiredSavedCount: normalizeSavedCardShelfReviewCount(item.retiredSavedCount),
+    pinnedSavedCount: normalizeSavedCardShelfReviewCount(item.pinnedSavedCount),
+    withSaveIntentReviewCount: normalizeSavedCardShelfReviewCount(
+      item.withSaveIntentReviewCount
+    ),
+    withApplicationCheckCount: normalizeSavedCardShelfReviewCount(
+      item.withApplicationCheckCount
+    ),
+    withLifecycleReviewCount: normalizeSavedCardShelfReviewCount(
+      item.withLifecycleReviewCount
+    ),
+    filter: String(item.filter || '').trim(),
+    search: String(item.search || '').trim(),
+    sort: String(item.sort || '').trim(),
+    resultPreview,
+  };
+}
+
 function normalizeSavedPatternCard(item: any): QuinnSavedPatternCard | null {
   if (!item || typeof item !== 'object') {
     return null;
@@ -440,6 +510,16 @@ function normalizeSnapshot(data: any): QuinnSnapshot {
         )
     : [];
 
+  const savedCardShelfReviews = Array.isArray(data?.savedCardShelfReviews)
+    ? data.savedCardShelfReviews
+        .map(normalizeSavedCardShelfReview)
+        .filter(
+          (item: QuinnSavedCardShelfReview | null): item is QuinnSavedCardShelfReview =>
+            Boolean(item)
+        )
+        .slice(0, 3)
+    : [];
+
   const voiceSessions = Array.isArray(data?.voiceSessions)
     ? data.voiceSessions
         .map(normalizeVoiceSession)
@@ -458,6 +538,7 @@ function normalizeSnapshot(data: any): QuinnSnapshot {
     memories,
     notifications,
     savedPatternCards,
+    savedCardShelfReviews,
     settings: data?.settings ? normalizeSettings(data.settings) : INITIAL_SETTINGS,
     voiceSessions,
     voiceSettings: data?.voiceSettings

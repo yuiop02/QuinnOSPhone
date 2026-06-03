@@ -58,8 +58,10 @@ import {
   INITIAL_PACKET_TITLE,
   INITIAL_SETTINGS,
   INITIAL_VOICE_SETTINGS,
+  parseSavedCardShelfReviewsFromExport,
   parseSavedPatternCardsFromExport,
   parseSessionPatternCardsFromExport,
+  type QuinnSavedCardShelfReview,
   type QuinnSavedPatternCard,
 } from '../../components/quinn/quinnAppState';
 import {
@@ -648,6 +650,40 @@ function buildShelfReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) {
   }
 
   return items;
+}
+
+function getSavedCardShelfReviewDuplicateKey(review: {
+  createdAt?: string;
+  timestamp?: string;
+  resultPreview: {
+    shelfRead: string;
+    nextBestManualCardAction: string;
+  };
+}) {
+  return [
+    normalizeSessionPatternCardReviewValue(review.createdAt || review.timestamp || ''),
+    normalizeSessionPatternCardReviewValue(review.resultPreview.shelfRead),
+    normalizeSessionPatternCardReviewValue(review.resultPreview.nextBestManualCardAction),
+  ].join('|');
+}
+
+function convertShelfReviewItemToSavedShelfReview(
+  item: QuinnSavedCardShelfReviewItem
+): QuinnSavedCardShelfReview {
+  return {
+    id: item.id,
+    createdAt: item.timestamp,
+    activeSavedCount: item.activeSavedCount,
+    retiredSavedCount: item.retiredSavedCount,
+    pinnedSavedCount: item.pinnedSavedCount,
+    withSaveIntentReviewCount: item.withSaveIntentReviewCount,
+    withApplicationCheckCount: item.withApplicationCheckCount,
+    withLifecycleReviewCount: item.withLifecycleReviewCount,
+    filter: item.filter,
+    search: item.search,
+    sort: item.sort,
+    resultPreview: item.resultPreview,
+  };
 }
 
 function getSaveIntentReviewForSessionPatternCard(
@@ -1854,10 +1890,14 @@ type QuinnConversationSurfaceProps = {
   runError: string;
   sessionPatternCards: QuinnSessionPatternCard[];
   savedPatternCards: QuinnSavedPatternCard[];
+  savedCardShelfReviews: QuinnSavedCardShelfReview[];
   onTriggerWave: () => void;
   onChangePacketText: (value: string) => void;
   onChangeSessionPatternCards: React.Dispatch<React.SetStateAction<QuinnSessionPatternCard[]>>;
   onChangeSavedPatternCards: React.Dispatch<React.SetStateAction<QuinnSavedPatternCard[]>>;
+  onChangeSavedCardShelfReviews: React.Dispatch<
+    React.SetStateAction<QuinnSavedCardShelfReview[]>
+  >;
   onSelectLens: (lensId: QuinnLensId) => void;
   onStageNextMove: () => Promise<void>;
   onStartFreshArc: () => void;
@@ -1890,10 +1930,12 @@ function QuinnConversationSurface({
   runError,
   sessionPatternCards,
   savedPatternCards,
+  savedCardShelfReviews,
   onTriggerWave,
   onChangePacketText,
   onChangeSessionPatternCards,
   onChangeSavedPatternCards,
+  onChangeSavedCardShelfReviews,
   onSelectLens,
   onStageNextMove,
   onStartFreshArc,
@@ -2123,7 +2165,29 @@ function QuinnConversationSurface({
   const shelfReviewItems = React.useMemo<QuinnSavedCardShelfReviewItem[]>(() => {
     return buildShelfReviewItemsFromRecentRuns(recentRuns);
   }, [recentRuns]);
-  const latestShelfReviewItem = shelfReviewItems[0] || null;
+  const importedShelfReviewItems = React.useMemo<QuinnSavedCardShelfReviewItem[]>(() => {
+    return savedCardShelfReviews
+      .map((review, index) => ({
+        activeSavedCount: review.activeSavedCount,
+        retiredSavedCount: review.retiredSavedCount,
+        pinnedSavedCount: review.pinnedSavedCount,
+        withSaveIntentReviewCount: review.withSaveIntentReviewCount,
+        withApplicationCheckCount: review.withApplicationCheckCount,
+        withLifecycleReviewCount: review.withLifecycleReviewCount,
+        filter: review.filter,
+        search: review.search,
+        sort: review.sort,
+        id: review.id || `saved-card-shelf-review-${review.createdAt || index}`,
+        timestamp: review.createdAt,
+        resultPreview: review.resultPreview,
+      }))
+      .sort(
+        (firstReview, secondReview) =>
+          getPatternCardTimestampValue(secondReview.timestamp) -
+          getPatternCardTimestampValue(firstReview.timestamp)
+      );
+  }, [savedCardShelfReviews]);
+  const latestShelfReviewItem = shelfReviewItems[0] || importedShelfReviewItems[0] || null;
   const hasResponseDetails = Boolean(writtenResult) && memoryResonance.length + responseContextItems.length > 0;
   const hasThreadDetails = Boolean(sessionArc && sessionArcMeta.beats.length);
   const voicePlaybackActive = isPreparingQuinnVoice || isSpeakingResponse;
@@ -3562,9 +3626,10 @@ function QuinnConversationSurface({
   function importSessionPatternCardsFromComposer() {
     const parsedSessionCards = parseSessionPatternCardsFromExport(packetText);
     const parsedSavedCards = parseSavedPatternCardsFromExport(packetText);
+    const parsedShelfReviews = parseSavedCardShelfReviewsFromExport(packetText);
 
-    if (!parsedSessionCards.length && !parsedSavedCards.length) {
-      setSessionPatternCardImportMessage('No Pattern Cards found in this export.');
+    if (!parsedSessionCards.length && !parsedSavedCards.length && !parsedShelfReviews.length) {
+      setSessionPatternCardImportMessage('No Pattern Cards or shelf reviews found in this export.');
       focusLiteralComposerSoon();
       return;
     }
@@ -3630,9 +3695,33 @@ function QuinnConversationSurface({
       },
       []
     );
+    const existingShelfReviewKeys = new Set(
+      savedCardShelfReviews.map(getSavedCardShelfReviewDuplicateKey)
+    );
+    const shelfReviewsToRestore = parsedShelfReviews.reduce<QuinnSavedCardShelfReview[]>(
+      (restoredReviews, review, index) => {
+        const duplicateKey = getSavedCardShelfReviewDuplicateKey(review);
 
-    if (!sessionCardsToRestore.length && !savedCardsToRestore.length) {
-      setSessionPatternCardImportMessage('No new cards restored; matching cards are already here.');
+        if (existingShelfReviewKeys.has(duplicateKey)) {
+          return restoredReviews;
+        }
+
+        existingShelfReviewKeys.add(duplicateKey);
+        restoredReviews.push({
+          ...review,
+          id: `saved-card-shelf-review-import-${importedAt}-${index}`,
+          createdAt: String(review.createdAt || '').trim() || new Date(importedAt).toISOString(),
+        });
+
+        return restoredReviews;
+      },
+      []
+    );
+
+    if (!sessionCardsToRestore.length && !savedCardsToRestore.length && !shelfReviewsToRestore.length) {
+      setSessionPatternCardImportMessage(
+        'No new cards or shelf reviews restored; matching items are already here.'
+      );
       setShowSessionPatternCards(true);
       setShowLiteralTools(false);
       setLongFormComposerCollapsed(true);
@@ -3677,11 +3766,31 @@ function QuinnConversationSurface({
       });
     }
 
+    if (shelfReviewsToRestore.length) {
+      onChangeSavedCardShelfReviews((currentReviews) => {
+        const currentKeys = new Set(currentReviews.map(getSavedCardShelfReviewDuplicateKey));
+        const newReviews = shelfReviewsToRestore.filter((review) => {
+          const duplicateKey = getSavedCardShelfReviewDuplicateKey(review);
+
+          if (currentKeys.has(duplicateKey)) {
+            return false;
+          }
+
+          currentKeys.add(duplicateKey);
+          return true;
+        });
+
+        return newReviews.length ? [...newReviews, ...currentReviews].slice(0, 3) : currentReviews;
+      });
+    }
+
     setSessionPatternCardImportMessage(
       `Restored ${sessionCardsToRestore.length} session card${
         sessionCardsToRestore.length === 1 ? '' : 's'
       } and ${savedCardsToRestore.length} saved card${
         savedCardsToRestore.length === 1 ? '' : 's'
+      }, plus ${shelfReviewsToRestore.length} shelf review${
+        shelfReviewsToRestore.length === 1 ? '' : 's'
       }.`
     );
     setShowOutcomeHistory(false);
@@ -6042,6 +6151,9 @@ export default function App() {
   const [settings, setSettings] = useState<QuinnSettings>(INITIAL_SETTINGS);
   const [voiceSessions, setVoiceSessions] = useState<VoiceSession[]>([]);
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(INITIAL_VOICE_SETTINGS);
+  const [savedCardShelfReviews, setSavedCardShelfReviews] = useState<QuinnSavedCardShelfReview[]>(
+    []
+  );
   const [waveKey, setWaveKey] = useState(0);
   const activeThreadIdRef = useRef(buildThreadContinuityId());
   const lastAssistantResponseRef = useRef<{ threadId: string; text: string } | null>(null);
@@ -6143,6 +6255,9 @@ export default function App() {
         setSavedPatternCards(
           Array.isArray(snapshot.savedPatternCards) ? snapshot.savedPatternCards : []
         );
+        setSavedCardShelfReviews(
+          Array.isArray(snapshot.savedCardShelfReviews) ? snapshot.savedCardShelfReviews : []
+        );
         setMemories(
           Array.isArray(snapshot.memories) && snapshot.memories.length
             ? snapshot.memories
@@ -6183,6 +6298,7 @@ export default function App() {
         lastRunAt,
         recentRuns,
         savedPatternCards,
+        savedCardShelfReviews,
         memories,
         notifications,
         settings,
@@ -6214,6 +6330,7 @@ export default function App() {
     lastRunAt,
     recentRuns,
     savedPatternCards,
+    savedCardShelfReviews,
     memories,
     notifications,
     settings,
@@ -6225,6 +6342,20 @@ export default function App() {
     const exportSaveIntentReviewItems = buildSaveIntentReviewItemsFromRecentRuns(recentRuns);
     const exportApplicationReviewItems = buildApplicationReviewItemsFromRecentRuns(recentRuns);
     const exportLifecycleReviewItems = buildLifecycleReviewItemsFromRecentRuns(recentRuns);
+    const exportShelfReviewItems = buildShelfReviewItemsFromRecentRuns(recentRuns)
+      .map(convertShelfReviewItemToSavedShelfReview);
+    const exportSavedCardShelfReviews = [
+      ...exportShelfReviewItems,
+      ...savedCardShelfReviews,
+    ].reduce<QuinnSavedCardShelfReview[]>((reviews, review) => {
+      const duplicateKey = getSavedCardShelfReviewDuplicateKey(review);
+
+      if (reviews.some((item) => getSavedCardShelfReviewDuplicateKey(item) === duplicateKey)) {
+        return reviews;
+      }
+
+      return [...reviews, review];
+    }, []).slice(0, 3);
     const sessionPatternCardsForExport = sessionPatternCards.map((card) => ({
       ...card,
       saveIntentReview: getSaveIntentReviewForSessionPatternCard(
@@ -6255,6 +6386,7 @@ export default function App() {
       recentRuns,
       sessionPatternCards: sessionPatternCardsForExport,
       savedPatternCards: savedPatternCardsForExport,
+      savedCardShelfReviews: exportSavedCardShelfReviews,
       memories,
       notifications,
       settings,
@@ -6273,6 +6405,7 @@ export default function App() {
       recentRuns,
       sessionPatternCards,
       savedPatternCards,
+      savedCardShelfReviews,
       memories,
       notifications,
       settings,
@@ -6812,10 +6945,12 @@ export default function App() {
         runError={runError}
         sessionPatternCards={sessionPatternCards}
         savedPatternCards={savedPatternCards}
+        savedCardShelfReviews={savedCardShelfReviews}
         onTriggerWave={triggerWave}
         onChangePacketText={setPacketText}
         onChangeSessionPatternCards={setSessionPatternCards}
         onChangeSavedPatternCards={setSavedPatternCards}
+        onChangeSavedCardShelfReviews={setSavedCardShelfReviews}
         onSelectLens={setActiveLensId}
         onStageNextMove={handleStageNextMove}
         onStartFreshArc={handleStartFreshArc}
