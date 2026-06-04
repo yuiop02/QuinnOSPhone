@@ -299,6 +299,8 @@ const QUINN_APPLICATION_FALLBACK_CAPTURE_MARKER =
   '[Fallback capture from unstructured Application output]';
 const QUINN_LIFECYCLE_FALLBACK_CAPTURE_MARKER =
   '[Fallback capture from unstructured Lifecycle output]';
+const QUINN_SHELF_REVIEW_FALLBACK_CAPTURE_MARKER =
+  '[Fallback capture from unstructured Shelf Review output]';
 const QUINN_PACKET_KNOWN_SECTION_HEADINGS = [
   'WHAT I ACTUALLY DID:',
   'IT CAUSED:',
@@ -1207,14 +1209,22 @@ export function buildQuinnSavedCardShelfReviewPacket(input: QuinnSavedCardShelfR
     'VISIBLE OUTPUT REQUIREMENT:',
     'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
     '',
+    'SHELF REVIEW OUTPUT RULES:',
+    '- Return only the SHELF REVIEW OUTPUT SHAPE sections.',
+    '- Use the exact section headings shown below.',
+    '- Use short bullets or short lines.',
+    '- Do not return a generic paragraph.',
+    '- Do not narrate the full shelf.',
+    '- Do not mutate cards automatically; only advise manual action.',
+    '- Do not stop mid-section.',
+    '',
     'SHELF REVIEW OUTPUT SHAPE:',
-    'Return exactly these sections:',
+    'Return exactly these sections and no other sections:',
     'SHELF READ:',
     'MOST USEFUL ACTIVE CARDS:',
     'STALE / RISKY / OVERFIT CARDS:',
     'MISSING OR UNDERTESTED AREAS:',
     'NEXT BEST MANUAL CARD ACTION:',
-    ...QUINNOS_RESPONSE_PROTOCOL,
   ].join('\n');
 }
 
@@ -1885,8 +1895,107 @@ export function getQuinnSavedCardShelfReviewPacketPreview(
   };
 }
 
-export function getQuinnSavedCardShelfReviewResultPreview(
+function getQuinnSavedCardShelfReviewFallbackResultPreview(
+  packetText: string,
   responseText: string
+): QuinnSavedCardShelfReviewResultPreview | null {
+  const preview = getQuinnSavedCardShelfReviewPacketPreview(packetText);
+  const clean = cleanQuinnFallbackText(responseText, 560);
+
+  if (!preview || clean.length < 12) {
+    return null;
+  }
+
+  const shelfRead = cleanQuinnFallbackText(clean, 180);
+  const mostUsefulActiveCards = findQuinnFallbackSentence(
+    clean,
+    [
+      /\buseful\b/i,
+      /\bactive\b/i,
+      /\bkeep\b/i,
+      /\bstay active\b/i,
+      /\bworth keeping\b/i,
+      /\bstrong/i,
+      /\bworking\b/i,
+    ],
+    'Useful active cards were not section-shaped; manual review needed.'
+  );
+  const staleRiskyOverfitCards = findQuinnFallbackSentence(
+    clean,
+    [
+      /\bstale\b/i,
+      /\brisky\b/i,
+      /\brisk\b/i,
+      /\bthin\b/i,
+      /\bunderspec/i,
+      /\btruncated\b/i,
+      /\boverfit\b/i,
+      /\bovergeneral/i,
+      /\bretire\b/i,
+      /\bnot ready\b/i,
+    ],
+    'Stale or risky cards were not section-shaped; manual review needed.'
+  );
+  const missingOrUndertestedAreas = findQuinnFallbackSentence(
+    clean,
+    [
+      /\bmissing\b/i,
+      /\bundertest/i,
+      /\bneeds?\b/i,
+      /\btesting\b/i,
+      /\breplication\b/i,
+      /\bevidence\b/i,
+      /\bvalidate\b/i,
+      /\bfield-test\b/i,
+    ],
+    'Missing or undertested areas were not section-shaped; manual review needed.'
+  );
+  const nextBestManualCardAction = findQuinnFallbackSentence(
+    clean,
+    [
+      /\bnext\b/i,
+      /\bmanual\b/i,
+      /\baction\b/i,
+      /\btighten\b/i,
+      /\btest\b/i,
+      /\brevise\b/i,
+      /\bvalidate\b/i,
+      /\bsurface\b/i,
+      /\bretry\b/i,
+      /\bno pins?\b/i,
+      /\bno retirements?\b/i,
+      /\bhold off\b/i,
+    ],
+    'Next manual card action was not section-shaped; manual review needed.'
+  );
+
+  return {
+    shelfRead: markQuinnFallbackCapture(
+      QUINN_SHELF_REVIEW_FALLBACK_CAPTURE_MARKER,
+      shelfRead
+    ),
+    mostUsefulActiveCards: markQuinnFallbackCapture(
+      QUINN_SHELF_REVIEW_FALLBACK_CAPTURE_MARKER,
+      mostUsefulActiveCards
+    ),
+    staleRiskyOverfitCards: markQuinnFallbackCapture(
+      QUINN_SHELF_REVIEW_FALLBACK_CAPTURE_MARKER,
+      staleRiskyOverfitCards
+    ),
+    missingOrUndertestedAreas: markQuinnFallbackCapture(
+      QUINN_SHELF_REVIEW_FALLBACK_CAPTURE_MARKER,
+      missingOrUndertestedAreas
+    ),
+    nextBestManualCardAction: markQuinnFallbackCapture(
+      QUINN_SHELF_REVIEW_FALLBACK_CAPTURE_MARKER,
+      nextBestManualCardAction
+    ),
+  };
+}
+
+export function getQuinnSavedCardShelfReviewResultPreview(
+  responseText: string,
+  packetText = ''
 ): QuinnSavedCardShelfReviewResultPreview | null {
   const text = String(responseText || '').trim();
 
@@ -1920,7 +2029,7 @@ export function getQuinnSavedCardShelfReviewResultPreview(
     !preview.missingOrUndertestedAreas &&
     !preview.nextBestManualCardAction
   ) {
-    return null;
+    return getQuinnSavedCardShelfReviewFallbackResultPreview(packetText, text);
   }
 
   return preview;

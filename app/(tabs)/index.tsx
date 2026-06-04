@@ -679,7 +679,8 @@ function buildShelfReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) {
   for (const run of recentRuns) {
     const preview = getQuinnSavedCardShelfReviewPacketPreview(run.packetText || '');
     const resultPreview = getQuinnSavedCardShelfReviewResultPreview(
-      sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+      sanitizeQuinnVisibleReplyText(run.writtenResult || ''),
+      run.packetText || ''
     );
 
     if (preview && resultPreview) {
