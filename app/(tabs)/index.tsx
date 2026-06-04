@@ -112,6 +112,7 @@ import {
   buildQuinnDraftPatternCardPacketFromSessionCard,
   buildQuinnIntakeFormPacket,
   buildQuinnManualFieldTestChecklistPacket,
+  buildQuinnMemoryHygieneReviewPacket,
   buildQuinnOutcomeLogPacketFromRun,
   buildQuinnPatternCardApplicationPacket,
   buildQuinnPatternCardSaveIntentPacket,
@@ -439,6 +440,8 @@ function getQuinnPacketWorkflowRunTitle(packetText: string) {
       return 'Release Audit';
     case 'manual-field-test-checklist':
       return 'Field Test';
+    case 'memory-hygiene-review':
+      return 'Memory Review';
     default:
       return '';
   }
@@ -1999,6 +2002,8 @@ type QuinnConversationSurfaceProps = {
   writtenResult: string;
   compressedSummary: string;
   memoryResonance: MemoryResonanceItem[];
+  memories: MemoryItem[];
+  notifications: NotificationItem[];
   memoryCount: number;
   notificationCount: number;
   sessionArc: SessionArc | null;
@@ -2043,6 +2048,8 @@ function QuinnConversationSurface({
   writtenResult,
   compressedSummary,
   memoryResonance,
+  memories,
+  notifications,
   memoryCount,
   notificationCount,
   sessionArc,
@@ -3800,6 +3807,58 @@ function QuinnConversationSurface({
     focusLiteralComposerSoon();
   }
 
+  function stageMemoryHygieneReview() {
+    const latestThreadBeat =
+      sessionArc?.beats && sessionArc.beats.length
+        ? sessionArc.beats[sessionArc.beats.length - 1]
+        : null;
+
+    setLongFormComposerCollapsed(false);
+    onChangePacketText(
+      buildQuinnMemoryHygieneReviewPacket({
+        counts: {
+          recentRuns: recentRuns.length,
+          memories: memoryCount,
+          notifications: notificationCount,
+          pinnedMemories: memories.filter((memory) => memory.pinned).length,
+          savedCards: savedPatternCards.length,
+          shelfReviews: shelfReviewItems.length + savedCardShelfReviews.length,
+        },
+        activeThread: {
+          title: sessionArc?.title || '',
+          latestSummary: latestThreadBeat?.summary || compressedSummary || '',
+        },
+        memoryResonance: memoryResonance.slice(0, 6).map((item) => ({
+          label: item.label,
+          preview: item.preview,
+        })),
+        recentRuns: recentRuns.slice(0, 8).map((run) => ({
+          title: run.packetTitle,
+          summary: run.compressedSummary || run.writtenResult,
+          timestamp: run.timestamp,
+          source: run.sessionArcTitle || run.lensId || '',
+        })),
+        memories: memories.slice(0, 12).map((memory) => ({
+          label: memory.label,
+          body: memory.body,
+          timestamp: memory.timestamp,
+          source: memory.source,
+          pinned: memory.pinned,
+        })),
+        notifications: notifications.slice(0, 6).map((notification) => ({
+          title: notification.title,
+          body: notification.body,
+          timestamp: notification.timestamp,
+          target: notification.target,
+          tone: notification.tone,
+          read: notification.read,
+        })),
+      })
+    );
+    closeLiteralPanelsForDraftLoad();
+    focusLiteralComposerSoon();
+  }
+
   function toggleSavedPatternCardPin(cardId: string) {
     const pinnedAt = new Date().toISOString();
 
@@ -4804,11 +4863,21 @@ function QuinnConversationSurface({
                   <Text style={styles.literalPatternCandidateActionText}>Release audit</Text>
                 </Pressable>
                 <Pressable
-                  style={styles.literalPatternCandidateAction}
+                  style={[
+                    styles.literalPatternCandidateAction,
+                    styles.literalPatternCandidateActionInline,
+                  ]}
                   onPress={stageManualFieldTestChecklist}
                 >
                   <Feather name="check-square" size={12} color="rgba(245, 248, 255, 0.62)" />
                   <Text style={styles.literalPatternCandidateActionText}>Field test</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.literalPatternCandidateAction}
+                  onPress={stageMemoryHygieneReview}
+                >
+                  <Feather name="database" size={12} color="rgba(245, 248, 255, 0.62)" />
+                  <Text style={styles.literalPatternCandidateActionText}>Memory review</Text>
                 </Pressable>
               </View>
 
@@ -7337,6 +7406,8 @@ export default function App() {
           writtenResult={writtenResult}
         compressedSummary={compressedSummary}
         memoryResonance={currentMemoryResonance}
+        memories={memories}
+        notifications={notifications}
         memoryCount={memories.length}
         notificationCount={notifications.length}
         sessionArc={currentSessionArc}

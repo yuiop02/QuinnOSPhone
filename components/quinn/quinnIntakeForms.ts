@@ -26,7 +26,8 @@ export type QuinnPacketKindId =
   | 'saved-pattern-card-review'
   | 'saved-card-shelf-review'
   | 'release-readiness-audit'
-  | 'manual-field-test-checklist';
+  | 'manual-field-test-checklist'
+  | 'memory-hygiene-review';
 
 export type QuinnIntakeFormDefinition = {
   id: QuinnIntakeFormId;
@@ -283,6 +284,39 @@ export type QuinnReleaseReadinessAuditSource = {
 
 export type QuinnManualFieldTestChecklistSource = QuinnReleaseReadinessAuditSource;
 
+export type QuinnMemoryHygieneReviewSampleItem = {
+  label?: string | null;
+  title?: string | null;
+  body?: string | null;
+  summary?: string | null;
+  preview?: string | null;
+  timestamp?: string | null;
+  source?: string | null;
+  pinned?: boolean | null;
+  target?: string | null;
+  tone?: string | null;
+  read?: boolean | null;
+};
+
+export type QuinnMemoryHygieneReviewSource = {
+  counts: {
+    recentRuns: number;
+    memories: number;
+    notifications: number;
+    pinnedMemories?: number | null;
+    savedCards: number;
+    shelfReviews: number;
+  };
+  activeThread?: {
+    title?: string | null;
+    latestSummary?: string | null;
+  } | null;
+  memoryResonance?: QuinnMemoryHygieneReviewSampleItem[];
+  recentRuns?: QuinnMemoryHygieneReviewSampleItem[];
+  memories?: QuinnMemoryHygieneReviewSampleItem[];
+  notifications?: QuinnMemoryHygieneReviewSampleItem[];
+};
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 const QUINN_PATTERN_CARD_SAVE_INTENT_MARKER = 'QUINNOS PATTERN CARD SAVE INTENT';
@@ -291,6 +325,7 @@ const QUINN_SAVED_PATTERN_CARD_REVIEW_MARKER = 'QUINNOS SAVED PATTERN CARD REVIE
 const QUINN_SAVED_CARD_SHELF_REVIEW_MARKER = 'QUINNOS SAVED CARD SHELF REVIEW';
 const QUINN_RELEASE_READINESS_AUDIT_MARKER = 'QUINNOS RELEASE READINESS AUDIT';
 const QUINN_MANUAL_FIELD_TEST_CHECKLIST_MARKER = 'QUINNOS MANUAL FIELD TEST CHECKLIST';
+const QUINN_MEMORY_HYGIENE_REVIEW_MARKER = 'QUINNOS MEMORY HYGIENE REVIEW';
 const QUINN_PATTERN_CARD_APPLICATION_NEED =
   'Use this saved card as a possible lens, not as automatic truth. Tell me whether it applies, where it does not apply, what evidence supports or weakens it, and the most useful next move.';
 const QUINN_PATTERN_CARD_APPLICATION_PARTIAL_FRAGMENT =
@@ -739,6 +774,158 @@ function buildQuinnSavedCardShelfReviewList(
 
   if (omittedCount) {
     lines.push(`(${omittedCount} more saved cards omitted from this compact packet.)`);
+  }
+
+  return lines;
+}
+
+function getQuinnMemoryHygieneSampleText(item: QuinnMemoryHygieneReviewSampleItem) {
+  return (
+    String(item.summary || '').trim() ||
+    String(item.body || '').trim() ||
+    String(item.preview || '').trim()
+  );
+}
+
+function buildQuinnMemoryHygieneResonanceList(
+  items: QuinnMemoryHygieneReviewSampleItem[],
+  limit: number
+) {
+  const visibleItems = Array.isArray(items) ? items.slice(0, limit) : [];
+  const omittedCount = Math.max(0, Array.isArray(items) ? items.length - visibleItems.length : 0);
+
+  if (!visibleItems.length) {
+    return ['(none currently active)'];
+  }
+
+  const lines = visibleItems.map((item, index) => {
+    const label = formatQuinnShelfReviewValue(
+      String(item.label || item.title || ''),
+      'Untitled resonance signal',
+      90
+    );
+    const preview = formatQuinnShelfReviewValue(
+      getQuinnMemoryHygieneSampleText(item),
+      'no preview captured',
+      160
+    );
+
+    return `${index + 1}. ${label}: ${preview}`;
+  });
+
+  if (omittedCount) {
+    lines.push(`(${omittedCount} more resonance items omitted from this compact packet.)`);
+  }
+
+  return lines;
+}
+
+function buildQuinnMemoryHygieneRunList(
+  items: QuinnMemoryHygieneReviewSampleItem[],
+  limit: number
+) {
+  const visibleItems = Array.isArray(items) ? items.slice(0, limit) : [];
+  const omittedCount = Math.max(0, Array.isArray(items) ? items.length - visibleItems.length : 0);
+
+  if (!visibleItems.length) {
+    return ['(none yet)'];
+  }
+
+  const lines = visibleItems.map((item, index) => {
+    const title = formatQuinnShelfReviewValue(
+      String(item.title || item.label || ''),
+      'Untitled run',
+      90
+    );
+    const summary = formatQuinnShelfReviewValue(
+      getQuinnMemoryHygieneSampleText(item),
+      'no summary captured',
+      180
+    );
+    const timestamp = formatQuinnShelfReviewValue(String(item.timestamp || ''), 'unknown', 80);
+    const source = String(item.source || '').trim();
+    const sourceSuffix = source
+      ? `; source: ${formatQuinnShelfReviewValue(source, 'unknown', 60)}`
+      : '';
+
+    return `${index + 1}. ${title} - ${summary} (${timestamp}${sourceSuffix})`;
+  });
+
+  if (omittedCount) {
+    lines.push(`(${omittedCount} more recent runs omitted from this compact packet.)`);
+  }
+
+  return lines;
+}
+
+function buildQuinnMemoryHygieneMemoryList(
+  items: QuinnMemoryHygieneReviewSampleItem[],
+  limit: number
+) {
+  const visibleItems = Array.isArray(items) ? items.slice(0, limit) : [];
+  const omittedCount = Math.max(0, Array.isArray(items) ? items.length - visibleItems.length : 0);
+
+  if (!visibleItems.length) {
+    return ['(none yet)'];
+  }
+
+  const lines = visibleItems.map((item, index) => {
+    const label = formatQuinnShelfReviewValue(
+      String(item.label || item.title || ''),
+      'Untitled memory',
+      90
+    );
+    const body = formatQuinnShelfReviewValue(
+      getQuinnMemoryHygieneSampleText(item),
+      'no body captured',
+      170
+    );
+    const source = formatQuinnShelfReviewValue(String(item.source || ''), 'unknown', 60);
+    const timestamp = formatQuinnShelfReviewValue(String(item.timestamp || ''), 'unknown', 80);
+    const pinned = item.pinned ? 'pinned' : 'not pinned';
+
+    return `${index + 1}. ${label} - ${body} (${source}; ${pinned}; ${timestamp})`;
+  });
+
+  if (omittedCount) {
+    lines.push(`(${omittedCount} more memory items omitted from this compact packet.)`);
+  }
+
+  return lines;
+}
+
+function buildQuinnMemoryHygieneNotificationList(
+  items: QuinnMemoryHygieneReviewSampleItem[],
+  limit: number
+) {
+  const visibleItems = Array.isArray(items) ? items.slice(0, limit) : [];
+  const omittedCount = Math.max(0, Array.isArray(items) ? items.length - visibleItems.length : 0);
+
+  if (!visibleItems.length) {
+    return ['(none yet)'];
+  }
+
+  const lines = visibleItems.map((item, index) => {
+    const title = formatQuinnShelfReviewValue(
+      String(item.title || item.label || ''),
+      'Untitled notification',
+      90
+    );
+    const body = formatQuinnShelfReviewValue(
+      getQuinnMemoryHygieneSampleText(item),
+      'no body captured',
+      150
+    );
+    const tone = formatQuinnShelfReviewValue(String(item.tone || ''), 'neutral', 40);
+    const target = formatQuinnShelfReviewValue(String(item.target || ''), 'unknown', 60);
+    const readState = item.read ? 'read' : 'unread';
+    const timestamp = formatQuinnShelfReviewValue(String(item.timestamp || ''), 'unknown', 80);
+
+    return `${index + 1}. ${title} - ${body} (${tone}; ${readState}; ${target}; ${timestamp})`;
+  });
+
+  if (omittedCount) {
+    lines.push(`(${omittedCount} more notifications omitted from this compact packet.)`);
   }
 
   return lines;
@@ -1449,6 +1636,79 @@ export function buildQuinnManualFieldTestChecklistPacket(
     '',
     'NEXT FIELD TEST STEP:',
     '[one sentence]',
+  ].join('\n');
+}
+
+export function buildQuinnMemoryHygieneReviewPacket(
+  input: QuinnMemoryHygieneReviewSource
+) {
+  const counts = input.counts;
+  const activeThread = input.activeThread || {};
+
+  return [
+    'QUINNOS MEMORY HYGIENE REVIEW',
+    '',
+    'PURPOSE:',
+    'Review QuinnOS local memory/resonance/recent-run clutter without automatically changing anything. Identify what looks durable, transient, duplicated, stale, over-specific, or unsafe to treat as identity truth.',
+    '',
+    'CURRENT LOCAL MEMORY STATE:',
+    `Recent runs: ${counts.recentRuns}`,
+    `Memories: ${counts.memories}`,
+    `Pinned memories: ${
+      Number.isFinite(Number(counts.pinnedMemories)) ? Number(counts.pinnedMemories) : 'unknown'
+    }`,
+    `Notifications: ${counts.notifications}`,
+    `Saved Pattern Cards: ${counts.savedCards}`,
+    `Saved Card Shelf Reviews: ${counts.shelfReviews}`,
+    '',
+    'ACTIVE THREAD / RESONANCE:',
+    `Active thread: ${formatQuinnShelfReviewValue(
+      activeThread.title || '',
+      '(none)',
+      120
+    )}`,
+    `Latest summary: ${formatQuinnShelfReviewValue(
+      activeThread.latestSummary || '',
+      '(none)',
+      180
+    )}`,
+    ...buildQuinnMemoryHygieneResonanceList(input.memoryResonance || [], 6),
+    '',
+    'RECENT RUNS SAMPLE:',
+    ...buildQuinnMemoryHygieneRunList(input.recentRuns || [], 8),
+    '',
+    'MEMORY SAMPLE:',
+    ...buildQuinnMemoryHygieneMemoryList(input.memories || [], 12),
+    '',
+    'NOTIFICATION SAMPLE:',
+    ...buildQuinnMemoryHygieneNotificationList(input.notifications || [], 6),
+    '',
+    'HYGIENE PRINCIPLE:',
+    'Do not delete, pin, merge, rewrite, or mutate memory automatically. Treat this as advisory triage only. Quinn decides what to preserve, ignore, revise, or retire.',
+    '',
+    'OUTPUT RULES:',
+    '- Use short bullets.',
+    '- Do not moralize.',
+    '- Do not make deletion decisions automatically.',
+    '- Do not create new memories.',
+    '- Do not treat recent testing phrases as durable personality truth unless clearly supported.',
+    '- Separate useful recent context from long-term identity/context.',
+    '- Return only the requested MEMORY HYGIENE OUTPUT SHAPE sections.',
+    '',
+    'WHAT I NEED FROM REN:',
+    'Review this local context shelf. Tell Quinn what looks durable, what looks like temporary testing noise, what looks duplicated/stale, what should not be treated as identity truth, and the next manual cleanup action.',
+    '',
+    'VISIBLE OUTPUT REQUIREMENT:',
+    'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
+    '',
+    'MEMORY HYGIENE OUTPUT SHAPE:',
+    'Return exactly these sections and no other sections:',
+    'MEMORY SHELF READ:',
+    'DURABLE SIGNALS:',
+    'TRANSIENT / TEST NOISE:',
+    'DUPLICATES / STALE CONTEXT:',
+    'DO NOT TREAT AS IDENTITY TRUTH:',
+    'NEXT MANUAL MEMORY ACTION:',
   ].join('\n');
 }
 
@@ -2623,6 +2883,16 @@ export function getQuinnIntakeFormKindFromPacketText(
   packetText: string
 ): QuinnIntakeFormPacketKind | null {
   const text = String(packetText || '');
+
+  if (text.includes(QUINN_MEMORY_HYGIENE_REVIEW_MARKER)) {
+    return {
+      id: 'memory-hygiene-review',
+      label: 'Memory Review',
+      icon: 'database',
+      marker: QUINN_MEMORY_HYGIENE_REVIEW_MARKER,
+      isOutcomeLog: false,
+    };
+  }
 
   if (text.includes(QUINN_MANUAL_FIELD_TEST_CHECKLIST_MARKER)) {
     return {
