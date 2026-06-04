@@ -295,6 +295,10 @@ const QUINN_PATTERN_CARD_APPLICATION_NEED =
   'Use this saved card as a possible lens, not as automatic truth. Tell me whether it applies, where it does not apply, what evidence supports or weakens it, and the most useful next move.';
 const QUINN_PATTERN_CARD_APPLICATION_PARTIAL_FRAGMENT =
   'what i need from ren: use this saved card as a p';
+const QUINN_APPLICATION_FALLBACK_CAPTURE_MARKER =
+  '[Fallback capture from unstructured Application output]';
+const QUINN_LIFECYCLE_FALLBACK_CAPTURE_MARKER =
+  '[Fallback capture from unstructured Lifecycle output]';
 const QUINN_PACKET_KNOWN_SECTION_HEADINGS = [
   'WHAT I ACTUALLY DID:',
   'IT CAUSED:',
@@ -504,6 +508,42 @@ function cleanQuinnOutcomeHistoryValue(value: string) {
   }
 
   return clean.length > 180 ? `${clean.slice(0, 177).trim()}...` : clean;
+}
+
+function cleanQuinnFallbackText(value: string, maxLength = 180) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+
+  if (!clean) {
+    return '';
+  }
+
+  return clean.length > maxLength ? `${clean.slice(0, maxLength - 3).trim()}...` : clean;
+}
+
+function getQuinnFallbackSentences(value: string) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+
+  if (!clean) {
+    return [];
+  }
+
+  const sentences = clean.match(/[^.!?]+[.!?]?/g) || [clean];
+  return sentences
+    .map((sentence) => cleanQuinnFallbackText(sentence, 180))
+    .filter(Boolean);
+}
+
+function findQuinnFallbackSentence(value: string, patterns: RegExp[], fallback = '') {
+  const sentences = getQuinnFallbackSentences(value);
+  const match = sentences.find((sentence) => patterns.some((pattern) => pattern.test(sentence)));
+
+  return match || cleanQuinnFallbackText(fallback || sentences[0] || '', 180);
+}
+
+function markQuinnFallbackCapture(marker: string, value: string) {
+  const clean = cleanQuinnFallbackText(value, 180);
+
+  return `${marker} ${clean || 'Manual review needed.'}`;
 }
 
 function cleanQuinnPatternCardStateValue(value: string) {
@@ -1429,8 +1469,99 @@ export function getQuinnPatternCardApplicationPacketPreview(
   return preview;
 }
 
-export function getQuinnPatternCardApplicationResultPreview(
+function getQuinnPatternCardApplicationFallbackResultPreview(
+  packetText: string,
   responseText: string
+): QuinnPatternCardApplicationResultPreview | null {
+  const preview = getQuinnPatternCardApplicationPacketPreview(packetText);
+  const clean = cleanQuinnFallbackText(responseText, 520);
+  const lower = clean.toLowerCase();
+
+  if (!preview || clean.length < 12) {
+    return null;
+  }
+
+  let applies = 'Unclear / not section-shaped.';
+
+  if (/\b(does not apply|doesn't apply|not apply|misfit|does not fit|doesn't fit)\b/.test(lower)) {
+    applies = 'Does not clearly apply.';
+  } else if (/\b(partially applies|partly applies|somewhat applies|may apply|might apply|mixed)\b/.test(lower)) {
+    applies = 'Partially applies / mixed.';
+  } else if (/\b(applies|fits|useful lens|relevant)\b/.test(lower)) {
+    applies = 'May apply, but output was not section-shaped.';
+  }
+
+  const supportingEvidence = findQuinnFallbackSentence(clean, [
+    /\bevidence\b/i,
+    /\bsupport/i,
+    /\bindicat/i,
+    /\bbecause\b/i,
+    /\bexample\b/i,
+    /\bpattern\b/i,
+  ]);
+  const limitsMisfit = findQuinnFallbackSentence(
+    clean,
+    [
+      /\blimit/i,
+      /\bmisfit\b/i,
+      /\bcaution/i,
+      /\bweak/i,
+      /\bdoes not\b/i,
+      /\bdoesn't\b/i,
+      /\bunclear\b/i,
+    ],
+    'Output was not section-shaped; limits need manual review.'
+  );
+  const overuseRisk = findQuinnFallbackSentence(
+    clean,
+    [
+      /\brisk\b/i,
+      /\boverus/i,
+      /\bovergeneral/i,
+      /\boverfit/i,
+      /\btoo broad\b/i,
+    ],
+    'Risk of overusing this pattern cannot be fully assessed from unstructured output.'
+  );
+  const nextBestMove = findQuinnFallbackSentence(
+    clean,
+    [
+      /\bnext\b/i,
+      /\bmove\b/i,
+      /\btest\b/i,
+      /\btry\b/i,
+      /\brevise\b/i,
+      /\bvalidate\b/i,
+      /\bhold off\b/i,
+      /\bapply\b/i,
+    ],
+    'Output was not section-shaped; next move needs manual review.'
+  );
+
+  return {
+    applies: markQuinnFallbackCapture(QUINN_APPLICATION_FALLBACK_CAPTURE_MARKER, applies),
+    supportingEvidence: markQuinnFallbackCapture(
+      QUINN_APPLICATION_FALLBACK_CAPTURE_MARKER,
+      supportingEvidence
+    ),
+    limitsMisfit: markQuinnFallbackCapture(
+      QUINN_APPLICATION_FALLBACK_CAPTURE_MARKER,
+      limitsMisfit
+    ),
+    overuseRisk: markQuinnFallbackCapture(
+      QUINN_APPLICATION_FALLBACK_CAPTURE_MARKER,
+      overuseRisk
+    ),
+    nextBestMove: markQuinnFallbackCapture(
+      QUINN_APPLICATION_FALLBACK_CAPTURE_MARKER,
+      nextBestMove
+    ),
+  };
+}
+
+export function getQuinnPatternCardApplicationResultPreview(
+  responseText: string,
+  packetText = ''
 ): QuinnPatternCardApplicationResultPreview | null {
   const text = String(responseText || '').trim();
 
@@ -1472,7 +1603,7 @@ export function getQuinnPatternCardApplicationResultPreview(
     !preview.overuseRisk &&
     !preview.nextBestMove
   ) {
-    return null;
+    return getQuinnPatternCardApplicationFallbackResultPreview(packetText, text);
   }
 
   return preview;
@@ -1511,8 +1642,102 @@ export function getQuinnSavedPatternCardReviewPacketPreview(
   return preview;
 }
 
-export function getQuinnSavedPatternCardReviewResultPreview(
+function getQuinnSavedPatternCardReviewFallbackResultPreview(
+  packetText: string,
   responseText: string
+): QuinnSavedPatternCardReviewResultPreview | null {
+  const preview = getQuinnSavedPatternCardReviewPacketPreview(packetText);
+  const clean = cleanQuinnFallbackText(responseText, 520);
+  const lower = clean.toLowerCase();
+
+  if (!preview || clean.length < 12) {
+    return null;
+  }
+
+  let action = 'UNCLEAR';
+
+  if (/\b(retire|retired|retiring|archive)\b/.test(lower)) {
+    action = 'RETIRE';
+  } else if (/\b(restore|unretire)\b/.test(lower)) {
+    action = 'RESTORE';
+  } else if (/\b(revise|revision|validate|draft|not ready|clarify)\b/.test(lower)) {
+    action = /\b(test|try again|validate|field-test)\b/.test(lower)
+      ? 'REVISE / TEST AGAIN'
+      : 'REVISE';
+  } else if (/\b(test|try again|field-test)\b/.test(lower)) {
+    action = 'TEST AGAIN';
+  } else if (/\b(keep|stay active|save|pin)\b/.test(lower)) {
+    action = 'KEEP';
+  }
+
+  const lifecycleRead = cleanQuinnFallbackText(clean, 180);
+  const why = findQuinnFallbackSentence(
+    clean,
+    [
+      /\bbecause\b/i,
+      /\bwhy\b/i,
+      /\bneeds?\b/i,
+      /\bnot ready\b/i,
+      /\bvalidate\b/i,
+      /\bdraft\b/i,
+      /\bspecific/i,
+    ],
+    lifecycleRead
+  );
+  const riskIfKeptAsIs = findQuinnFallbackSentence(
+    clean,
+    [
+      /\brisk\b/i,
+      /\bovergeneral/i,
+      /\bunderspec/i,
+      /\bsingle (data )?point\b/i,
+      /\bnot ready\b/i,
+      /\boverfit\b/i,
+      /\bstale\b/i,
+      /\btoo broad\b/i,
+    ],
+    'Risk not structured; manual review needed.'
+  );
+  const nextBestCardAction = findQuinnFallbackSentence(
+    clean,
+    [
+      /\brevise\b/i,
+      /\bvalidate\b/i,
+      /\btest\b/i,
+      /\bretry\b/i,
+      /\bsave\b/i,
+      /\bpin\b/i,
+      /\bretire\b/i,
+      /\brestore\b/i,
+      /\bhold off\b/i,
+    ],
+    'Next card action was not section-shaped; manual review needed.'
+  );
+
+  return {
+    lifecycleRead: markQuinnFallbackCapture(
+      QUINN_LIFECYCLE_FALLBACK_CAPTURE_MARKER,
+      lifecycleRead
+    ),
+    keepReviseRetireRestore: markQuinnFallbackCapture(
+      QUINN_LIFECYCLE_FALLBACK_CAPTURE_MARKER,
+      action
+    ),
+    why: markQuinnFallbackCapture(QUINN_LIFECYCLE_FALLBACK_CAPTURE_MARKER, why),
+    riskIfKeptAsIs: markQuinnFallbackCapture(
+      QUINN_LIFECYCLE_FALLBACK_CAPTURE_MARKER,
+      riskIfKeptAsIs
+    ),
+    nextBestCardAction: markQuinnFallbackCapture(
+      QUINN_LIFECYCLE_FALLBACK_CAPTURE_MARKER,
+      nextBestCardAction
+    ),
+  };
+}
+
+export function getQuinnSavedPatternCardReviewResultPreview(
+  responseText: string,
+  packetText = ''
 ): QuinnSavedPatternCardReviewResultPreview | null {
   const text = String(responseText || '').trim();
 
@@ -1550,7 +1775,7 @@ export function getQuinnSavedPatternCardReviewResultPreview(
     !preview.riskIfKeptAsIs &&
     !preview.nextBestCardAction
   ) {
-    return null;
+    return getQuinnSavedPatternCardReviewFallbackResultPreview(packetText, text);
   }
 
   return preview;

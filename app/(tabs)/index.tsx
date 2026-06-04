@@ -423,6 +423,27 @@ function buildThreadContinuityId() {
   return `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function getQuinnPacketWorkflowRunTitle(packetText: string) {
+  const packetKind = getQuinnIntakeFormKindFromPacketText(packetText);
+
+  switch (packetKind?.id) {
+    case 'pattern-card-save-intent':
+      return 'Save Intent';
+    case 'pattern-card-application':
+      return 'App Check';
+    case 'saved-pattern-card-review':
+      return 'Card Review';
+    case 'saved-card-shelf-review':
+      return 'Shelf Review';
+    case 'release-readiness-audit':
+      return 'Release Audit';
+    case 'manual-field-test-checklist':
+      return 'Field Test';
+    default:
+      return '';
+  }
+}
+
 function cleanOptionText(value: string, maxLength = 240) {
   const clean = String(value || '').replace(/\s+/g, ' ').trim();
 
@@ -604,7 +625,8 @@ function buildApplicationReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[])
   for (const run of recentRuns) {
     const preview = getQuinnPatternCardApplicationPacketPreview(run.packetText || '');
     const resultPreview = getQuinnPatternCardApplicationResultPreview(
-      sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+      sanitizeQuinnVisibleReplyText(run.writtenResult || ''),
+      run.packetText || ''
     );
 
     if (preview && resultPreview) {
@@ -630,7 +652,8 @@ function buildLifecycleReviewItemsFromRecentRuns(recentRuns: RunHistoryItem[]) {
   for (const run of recentRuns) {
     const preview = getQuinnSavedPatternCardReviewPacketPreview(run.packetText || '');
     const resultPreview = getQuinnSavedPatternCardReviewResultPreview(
-      sanitizeQuinnVisibleReplyText(run.writtenResult || '')
+      sanitizeQuinnVisibleReplyText(run.writtenResult || ''),
+      run.packetText || ''
     );
 
     if (preview && resultPreview) {
@@ -6826,13 +6849,6 @@ export default function App() {
     const stayOnScreen = override?.stayOnScreen ?? true;
     const syncVisibleInput = override?.syncVisibleInput ?? true;
     const onRunStart = override?.onRunStart;
-    const sessionArcForRun = override?.sessionArc ?? currentSessionArc;
-    const runThreadId =
-      String(sessionArcForRun?.id || '').trim() || activeThreadIdRef.current;
-    const previousAssistantReply =
-      lastAssistantResponseRef.current?.threadId === runThreadId
-        ? lastAssistantResponseRef.current.text
-        : '';
     const activeLensLabel = getQuinnLens(effectiveLensId).label;
     const selectedOptionIndex = parseBareNumericSelection(rawNextText);
     const selectedOption =
@@ -6846,11 +6862,23 @@ export default function App() {
     const nextText = selectedOption
       ? `I choose option ${selectedOption.index} from your previous list: ${selectedOption.text}. Please continue from that choice.\n\nMy raw reply was: ${String(rawNextText || '').trim()}`
       : rawNextText;
+    const packetWorkflowTitle = getQuinnPacketWorkflowRunTitle(nextText);
+    const isIsolatedPacketWorkflow = Boolean(packetWorkflowTitle);
+    const sessionArcForRun = isIsolatedPacketWorkflow
+      ? null
+      : override?.sessionArc ?? currentSessionArc;
+    const runThreadId = isIsolatedPacketWorkflow
+      ? buildThreadContinuityId()
+      : String(sessionArcForRun?.id || '').trim() || activeThreadIdRef.current;
+    const previousAssistantReply =
+      !isIsolatedPacketWorkflow && lastAssistantResponseRef.current?.threadId === runThreadId
+        ? lastAssistantResponseRef.current.text
+        : '';
     const effectiveTitle = derivePacketTitle({
-      packetTitle: nextTitle,
+      packetTitle: packetWorkflowTitle || nextTitle,
       packetText: nextText,
       lensLabel: activeLensLabel,
-      sessionArcTitle: sessionArcForRun?.title || '',
+      sessionArcTitle: isIsolatedPacketWorkflow ? '' : sessionArcForRun?.title || '',
     });
 
     if (!String(nextText || '').trim()) {
