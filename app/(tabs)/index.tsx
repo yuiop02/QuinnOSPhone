@@ -737,6 +737,24 @@ function convertShelfReviewItemToSavedShelfReview(
   };
 }
 
+function getEffectiveSavedCardShelfReviewCheckpointCount(
+  shelfReviewItems: QuinnSavedCardShelfReviewItem[],
+  savedCardShelfReviews: QuinnSavedCardShelfReview[]
+) {
+  return [
+    ...shelfReviewItems.map(convertShelfReviewItemToSavedShelfReview),
+    ...savedCardShelfReviews,
+  ].reduce<QuinnSavedCardShelfReview[]>((reviews, review) => {
+    const duplicateKey = getSavedCardShelfReviewDuplicateKey(review);
+
+    if (reviews.some((item) => getSavedCardShelfReviewDuplicateKey(item) === duplicateKey)) {
+      return reviews;
+    }
+
+    return [...reviews, review];
+  }, []).slice(0, 3).length;
+}
+
 function getQuinnExportHealthSummarySection(exportText: string) {
   const text = String(exportText || '').replace(/\r\n/g, '\n');
   const headingMatch = text.match(/^## Export Health \/ Checkpoint Summary\s*$/m);
@@ -3812,6 +3830,8 @@ function QuinnConversationSurface({
       sessionArc?.beats && sessionArc.beats.length
         ? sessionArc.beats[sessionArc.beats.length - 1]
         : null;
+    const effectiveSavedCardShelfReviewCount =
+      getEffectiveSavedCardShelfReviewCheckpointCount(shelfReviewItems, savedCardShelfReviews);
 
     setLongFormComposerCollapsed(false);
     onChangePacketText(
@@ -3822,30 +3842,30 @@ function QuinnConversationSurface({
           notifications: notificationCount,
           pinnedMemories: memories.filter((memory) => memory.pinned).length,
           savedCards: savedPatternCards.length,
-          shelfReviews: shelfReviewItems.length + savedCardShelfReviews.length,
+          shelfReviews: effectiveSavedCardShelfReviewCount,
         },
         activeThread: {
           title: sessionArc?.title || '',
           latestSummary: latestThreadBeat?.summary || compressedSummary || '',
         },
-        memoryResonance: memoryResonance.slice(0, 6).map((item) => ({
+        memoryResonance: memoryResonance.slice(0, 4).map((item) => ({
           label: item.label,
           preview: item.preview,
         })),
-        recentRuns: recentRuns.slice(0, 8).map((run) => ({
+        recentRuns: recentRuns.slice(0, 6).map((run) => ({
           title: run.packetTitle,
           summary: run.compressedSummary || run.writtenResult,
           timestamp: run.timestamp,
           source: run.sessionArcTitle || run.lensId || '',
         })),
-        memories: memories.slice(0, 12).map((memory) => ({
+        memories: memories.slice(0, 10).map((memory) => ({
           label: memory.label,
           body: memory.body,
           timestamp: memory.timestamp,
           source: memory.source,
           pinned: memory.pinned,
         })),
-        notifications: notifications.slice(0, 6).map((notification) => ({
+        notifications: notifications.slice(0, 4).map((notification) => ({
           title: notification.title,
           body: notification.body,
           timestamp: notification.timestamp,

@@ -802,12 +802,12 @@ function buildQuinnMemoryHygieneResonanceList(
     const label = formatQuinnShelfReviewValue(
       String(item.label || item.title || ''),
       'Untitled resonance signal',
-      90
+      72
     );
     const preview = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no preview captured',
-      160
+      130
     );
 
     return `${index + 1}. ${label}: ${preview}`;
@@ -835,17 +835,17 @@ function buildQuinnMemoryHygieneRunList(
     const title = formatQuinnShelfReviewValue(
       String(item.title || item.label || ''),
       'Untitled run',
-      90
+      72
     );
     const summary = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no summary captured',
-      180
+      140
     );
     const timestamp = formatQuinnShelfReviewValue(String(item.timestamp || ''), 'unknown', 80);
     const source = String(item.source || '').trim();
     const sourceSuffix = source
-      ? `; source: ${formatQuinnShelfReviewValue(source, 'unknown', 60)}`
+      ? `; ${formatQuinnShelfReviewValue(source, 'unknown', 48)}`
       : '';
 
     return `${index + 1}. ${title} - ${summary} (${timestamp}${sourceSuffix})`;
@@ -873,12 +873,12 @@ function buildQuinnMemoryHygieneMemoryList(
     const label = formatQuinnShelfReviewValue(
       String(item.label || item.title || ''),
       'Untitled memory',
-      90
+      72
     );
     const body = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no body captured',
-      170
+      135
     );
     const source = formatQuinnShelfReviewValue(String(item.source || ''), 'unknown', 60);
     const timestamp = formatQuinnShelfReviewValue(String(item.timestamp || ''), 'unknown', 80);
@@ -909,12 +909,12 @@ function buildQuinnMemoryHygieneNotificationList(
     const title = formatQuinnShelfReviewValue(
       String(item.title || item.label || ''),
       'Untitled notification',
-      90
+      72
     );
     const body = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no body captured',
-      150
+      120
     );
     const tone = formatQuinnShelfReviewValue(String(item.tone || ''), 'neutral', 40);
     const target = formatQuinnShelfReviewValue(String(item.target || ''), 'unknown', 60);
@@ -1651,6 +1651,14 @@ export function buildQuinnMemoryHygieneReviewPacket(
     'PURPOSE:',
     'Review QuinnOS local memory/resonance/recent-run clutter without automatically changing anything. Identify what looks durable, transient, duplicated, stale, over-specific, or unsafe to treat as identity truth.',
     '',
+    'EXECUTION LOCK:',
+    '- Do the review now.',
+    '- Do not restate or summarize the task.',
+    '- Return only the MEMORY HYGIENE OUTPUT SHAPE sections.',
+    '- Use the samples below as evidence.',
+    '- If evidence is thin, say so inside the requested sections.',
+    '- Do not create, delete, pin, merge, rewrite, or mutate memory.',
+    '',
     'CURRENT LOCAL MEMORY STATE:',
     `Recent runs: ${counts.recentRuns}`,
     `Memories: ${counts.memories}`,
@@ -1672,28 +1680,32 @@ export function buildQuinnMemoryHygieneReviewPacket(
       '(none)',
       180
     )}`,
-    ...buildQuinnMemoryHygieneResonanceList(input.memoryResonance || [], 6),
+    ...buildQuinnMemoryHygieneResonanceList(input.memoryResonance || [], 4),
     '',
     'RECENT RUNS SAMPLE:',
-    ...buildQuinnMemoryHygieneRunList(input.recentRuns || [], 8),
+    ...buildQuinnMemoryHygieneRunList(input.recentRuns || [], 6),
     '',
     'MEMORY SAMPLE:',
-    ...buildQuinnMemoryHygieneMemoryList(input.memories || [], 12),
+    ...buildQuinnMemoryHygieneMemoryList(input.memories || [], 10),
     '',
     'NOTIFICATION SAMPLE:',
-    ...buildQuinnMemoryHygieneNotificationList(input.notifications || [], 6),
+    ...buildQuinnMemoryHygieneNotificationList(input.notifications || [], 4),
     '',
     'HYGIENE PRINCIPLE:',
     'Do not delete, pin, merge, rewrite, or mutate memory automatically. Treat this as advisory triage only. Quinn decides what to preserve, ignore, revise, or retire.',
     '',
     'OUTPUT RULES:',
+    '- Return exactly the requested sections in this order: MEMORY SHELF READ, DURABLE SIGNALS, TRANSIENT / TEST NOISE, DUPLICATES / STALE CONTEXT, DO NOT TREAT AS IDENTITY TRUTH, NEXT MANUAL MEMORY ACTION.',
     '- Use short bullets.',
+    '- No intro paragraph.',
+    '- No generic restatement.',
+    '- Do not stop after the purpose.',
+    '- Put at least one concrete bullet or "Evidence is thin" inside each section.',
     '- Do not moralize.',
     '- Do not make deletion decisions automatically.',
     '- Do not create new memories.',
     '- Do not treat recent testing phrases as durable personality truth unless clearly supported.',
-    '- Separate useful recent context from long-term identity/context.',
-    '- Return only the requested MEMORY HYGIENE OUTPUT SHAPE sections.',
+    '- Separate recent-useful context from durable identity/context.',
     '',
     'WHAT I NEED FROM REN:',
     'Review this local context shelf. Tell Quinn what looks durable, what looks like temporary testing noise, what looks duplicated/stale, what should not be treated as identity truth, and the next manual cleanup action.',
