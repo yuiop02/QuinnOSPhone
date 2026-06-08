@@ -3832,6 +3832,20 @@ function QuinnConversationSurface({
         : null;
     const effectiveSavedCardShelfReviewCount =
       getEffectiveSavedCardShelfReviewCheckpointCount(shelfReviewItems, savedCardShelfReviews);
+    const recentRunSamples = recentRuns.filter((run) => {
+      const kind = getQuinnIntakeFormKindFromPacketText(run.packetText || '');
+
+      return kind?.id !== 'memory-hygiene-review';
+    });
+    const memorySamples = memories.filter((memory) => {
+      const label = String(memory.label || '').toLowerCase();
+      const body = String(memory.body || '').toLowerCase();
+
+      return (
+        !label.includes('memory review') &&
+        !body.startsWith('review quinnos local memory/resonance')
+      );
+    });
 
     setLongFormComposerCollapsed(false);
     onChangePacketText(
@@ -3848,24 +3862,24 @@ function QuinnConversationSurface({
           title: sessionArc?.title || '',
           latestSummary: latestThreadBeat?.summary || compressedSummary || '',
         },
-        memoryResonance: memoryResonance.slice(0, 4).map((item) => ({
+        memoryResonance: memoryResonance.slice(0, 3).map((item) => ({
           label: item.label,
           preview: item.preview,
         })),
-        recentRuns: recentRuns.slice(0, 6).map((run) => ({
+        recentRuns: recentRunSamples.slice(0, 4).map((run) => ({
           title: run.packetTitle,
           summary: run.compressedSummary || run.writtenResult,
           timestamp: run.timestamp,
           source: run.sessionArcTitle || run.lensId || '',
         })),
-        memories: memories.slice(0, 10).map((memory) => ({
+        memories: memorySamples.slice(0, 6).map((memory) => ({
           label: memory.label,
           body: memory.body,
           timestamp: memory.timestamp,
           source: memory.source,
           pinned: memory.pinned,
         })),
-        notifications: notifications.slice(0, 4).map((notification) => ({
+        notifications: notifications.slice(0, 3).map((notification) => ({
           title: notification.title,
           body: notification.body,
           timestamp: notification.timestamp,

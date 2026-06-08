@@ -787,6 +787,12 @@ function getQuinnMemoryHygieneSampleText(item: QuinnMemoryHygieneReviewSampleIte
   );
 }
 
+function formatQuinnMemoryHygieneDate(value: string) {
+  const clean = String(value || '').trim();
+
+  return clean ? clean.slice(0, 10) : '';
+}
+
 function buildQuinnMemoryHygieneResonanceList(
   items: QuinnMemoryHygieneReviewSampleItem[],
   limit: number
@@ -802,12 +808,12 @@ function buildQuinnMemoryHygieneResonanceList(
     const label = formatQuinnShelfReviewValue(
       String(item.label || item.title || ''),
       'Untitled resonance signal',
-      72
+      48
     );
     const preview = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no preview captured',
-      130
+      90
     );
 
     return `${index + 1}. ${label}: ${preview}`;
@@ -835,20 +841,19 @@ function buildQuinnMemoryHygieneRunList(
     const title = formatQuinnShelfReviewValue(
       String(item.title || item.label || ''),
       'Untitled run',
-      72
+      48
     );
     const summary = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no summary captured',
-      140
+      95
     );
-    const timestamp = formatQuinnShelfReviewValue(String(item.timestamp || ''), 'unknown', 80);
+    const timestamp = formatQuinnMemoryHygieneDate(String(item.timestamp || ''));
     const source = String(item.source || '').trim();
-    const sourceSuffix = source
-      ? `; ${formatQuinnShelfReviewValue(source, 'unknown', 48)}`
-      : '';
+    const sourceSuffix = source ? formatQuinnShelfReviewValue(source, 'unknown', 32) : '';
+    const meta = [timestamp, sourceSuffix].filter(Boolean).join('; ');
 
-    return `${index + 1}. ${title} - ${summary} (${timestamp}${sourceSuffix})`;
+    return `${index + 1}. ${title}: ${summary}${meta ? ` (${meta})` : ''}`;
   });
 
   if (omittedCount) {
@@ -873,18 +878,19 @@ function buildQuinnMemoryHygieneMemoryList(
     const label = formatQuinnShelfReviewValue(
       String(item.label || item.title || ''),
       'Untitled memory',
-      72
+      48
     );
     const body = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no body captured',
-      135
+      90
     );
-    const source = formatQuinnShelfReviewValue(String(item.source || ''), 'unknown', 60);
-    const timestamp = formatQuinnShelfReviewValue(String(item.timestamp || ''), 'unknown', 80);
-    const pinned = item.pinned ? 'pinned' : 'not pinned';
+    const source = formatQuinnShelfReviewValue(String(item.source || ''), '', 32);
+    const timestamp = formatQuinnMemoryHygieneDate(String(item.timestamp || ''));
+    const pinned = item.pinned ? 'pinned' : '';
+    const meta = [source, pinned, timestamp].filter(Boolean).join('; ');
 
-    return `${index + 1}. ${label} - ${body} (${source}; ${pinned}; ${timestamp})`;
+    return `${index + 1}. ${label}: ${body}${meta ? ` (${meta})` : ''}`;
   });
 
   if (omittedCount) {
@@ -909,19 +915,20 @@ function buildQuinnMemoryHygieneNotificationList(
     const title = formatQuinnShelfReviewValue(
       String(item.title || item.label || ''),
       'Untitled notification',
-      72
+      48
     );
     const body = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no body captured',
-      120
+      80
     );
-    const tone = formatQuinnShelfReviewValue(String(item.tone || ''), 'neutral', 40);
-    const target = formatQuinnShelfReviewValue(String(item.target || ''), 'unknown', 60);
+    const tone = formatQuinnShelfReviewValue(String(item.tone || ''), '', 28);
+    const target = formatQuinnShelfReviewValue(String(item.target || ''), '', 28);
     const readState = item.read ? 'read' : 'unread';
-    const timestamp = formatQuinnShelfReviewValue(String(item.timestamp || ''), 'unknown', 80);
+    const timestamp = formatQuinnMemoryHygieneDate(String(item.timestamp || ''));
+    const meta = [tone, readState, target, timestamp].filter(Boolean).join('; ');
 
-    return `${index + 1}. ${title} - ${body} (${tone}; ${readState}; ${target}; ${timestamp})`;
+    return `${index + 1}. ${title}: ${body}${meta ? ` (${meta})` : ''}`;
   });
 
   if (omittedCount) {
@@ -1659,6 +1666,19 @@ export function buildQuinnMemoryHygieneReviewPacket(
     '- If evidence is thin, say so inside the requested sections.',
     '- Do not create, delete, pin, merge, rewrite, or mutate memory.',
     '',
+    'HARD OUTPUT LIMIT:',
+    '- Return exactly 6 headings.',
+    '- Use these exact headings verbatim. Do not rename them.',
+    '- Do not use alternate headings like "Durable:".',
+    '- Max 2 bullets per heading.',
+    '- Max 12 words per bullet when possible.',
+    '- No evidence parentheticals unless necessary.',
+    '- No citations.',
+    '- No intro.',
+    '- No outro.',
+    '- Finish all six sections even if brief.',
+    '- If space is tight, write "Evidence is thin" instead of omitting a section.',
+    '',
     'CURRENT LOCAL MEMORY STATE:',
     `Recent runs: ${counts.recentRuns}`,
     `Memories: ${counts.memories}`,
@@ -1680,30 +1700,23 @@ export function buildQuinnMemoryHygieneReviewPacket(
       '(none)',
       180
     )}`,
-    ...buildQuinnMemoryHygieneResonanceList(input.memoryResonance || [], 4),
+    ...buildQuinnMemoryHygieneResonanceList(input.memoryResonance || [], 3),
     '',
     'RECENT RUNS SAMPLE:',
-    ...buildQuinnMemoryHygieneRunList(input.recentRuns || [], 6),
+    ...buildQuinnMemoryHygieneRunList(input.recentRuns || [], 4),
     '',
     'MEMORY SAMPLE:',
-    ...buildQuinnMemoryHygieneMemoryList(input.memories || [], 10),
+    ...buildQuinnMemoryHygieneMemoryList(input.memories || [], 6),
     '',
     'NOTIFICATION SAMPLE:',
-    ...buildQuinnMemoryHygieneNotificationList(input.notifications || [], 4),
+    ...buildQuinnMemoryHygieneNotificationList(input.notifications || [], 3),
     '',
     'HYGIENE PRINCIPLE:',
     'Do not delete, pin, merge, rewrite, or mutate memory automatically. Treat this as advisory triage only. Quinn decides what to preserve, ignore, revise, or retire.',
     '',
     'OUTPUT RULES:',
-    '- Return exactly the requested sections in this order: MEMORY SHELF READ, DURABLE SIGNALS, TRANSIENT / TEST NOISE, DUPLICATES / STALE CONTEXT, DO NOT TREAT AS IDENTITY TRUTH, NEXT MANUAL MEMORY ACTION.',
-    '- Use short bullets.',
-    '- No intro paragraph.',
-    '- No generic restatement.',
-    '- Do not stop after the purpose.',
-    '- Put at least one concrete bullet or "Evidence is thin" inside each section.',
-    '- Do not moralize.',
-    '- Do not make deletion decisions automatically.',
-    '- Do not create new memories.',
+    '- Use short bullets only.',
+    '- Do not moralize or prescribe deletion.',
     '- Do not treat recent testing phrases as durable personality truth unless clearly supported.',
     '- Separate recent-useful context from durable identity/context.',
     '',
@@ -1714,7 +1727,7 @@ export function buildQuinnMemoryHygieneReviewPacket(
     'Return visible text. Do not return blank, metadata only, reasoning only, or an empty response.',
     '',
     'MEMORY HYGIENE OUTPUT SHAPE:',
-    'Return exactly these sections and no other sections:',
+    'Return exactly these six headings and no other headings:',
     'MEMORY SHELF READ:',
     'DURABLE SIGNALS:',
     'TRANSIENT / TEST NOISE:',
