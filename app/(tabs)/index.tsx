@@ -3866,20 +3866,20 @@ function QuinnConversationSurface({
           label: item.label,
           preview: item.preview,
         })),
-        recentRuns: recentRunSamples.slice(0, 4).map((run) => ({
+        recentRuns: recentRunSamples.slice(0, 3).map((run) => ({
           title: run.packetTitle,
           summary: run.compressedSummary || run.writtenResult,
           timestamp: run.timestamp,
           source: run.sessionArcTitle || run.lensId || '',
         })),
-        memories: memorySamples.slice(0, 6).map((memory) => ({
+        memories: memorySamples.slice(0, 3).map((memory) => ({
           label: memory.label,
           body: memory.body,
           timestamp: memory.timestamp,
           source: memory.source,
           pinned: memory.pinned,
         })),
-        notifications: notifications.slice(0, 3).map((notification) => ({
+        notifications: notifications.slice(0, 2).map((notification) => ({
           title: notification.title,
           body: notification.body,
           timestamp: notification.timestamp,
@@ -7113,7 +7113,14 @@ export default function App() {
         return null;
       }
 
-      const message = error instanceof Error ? error.message : 'The backend run failed.';
+      const rawMessage = error instanceof Error ? error.message : 'The backend run failed.';
+      const failedPacketKind = getQuinnIntakeFormKindFromPacketText(nextText);
+      const isMemoryReviewNoVisibleReply =
+        failedPacketKind?.id === 'memory-hygiene-review' &&
+        rawMessage.toLowerCase().includes('returned no visible reply');
+      const message = isMemoryReviewNoVisibleReply
+        ? 'Memory Review returned no visible reply. The draft was preserved. Try again later or reduce context.'
+        : rawMessage;
 
       setRunError(message);
 
