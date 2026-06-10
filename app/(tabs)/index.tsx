@@ -122,6 +122,7 @@ import {
   getQuinnDraftPatternCardHistoryPreview,
   getQuinnDraftPatternCardResultPreview,
   getQuinnIntakeFormKindFromPacketText,
+  getQuinnMemoryHygieneReviewResultPreview,
   getMissingQuinnMemoryHygieneReviewResultHeadings,
   getQuinnOutcomeLogHistoryPreview,
   getQuinnOutcomeLogMinimumCaptureStatus,
@@ -146,6 +147,7 @@ import {
   type QuinnPatternCardSaveIntentPacketPreview,
   type QuinnPatternCardSaveIntentResultPreview,
   type QuinnPatternCandidatePreview,
+  type QuinnMemoryHygieneReviewResultPreview,
   type QuinnSavedPatternCardReviewPacketPreview,
   type QuinnSavedPatternCardReviewResultPreview,
 } from '../../components/quinn/quinnIntakeForms';
@@ -218,6 +220,12 @@ type QuinnSavedCardShelfReviewItem = QuinnSavedCardShelfReviewPacketPreview & {
   id: string;
   timestamp: string;
   resultPreview: QuinnSavedCardShelfReviewResultPreview;
+};
+
+type QuinnMemoryHygieneReviewItem = {
+  id: string;
+  timestamp: string;
+  resultPreview: QuinnMemoryHygieneReviewResultPreview;
 };
 
 type QuinnPatternCardImportRestoreReport = {
@@ -7454,6 +7462,52 @@ export default function App() {
       }),
     [activeLensId, packetText, packetTitle, recentRuns, writtenResult]
   );
+  const latestMemoryReviewItem = useMemo<QuinnMemoryHygieneReviewItem | null>(() => {
+    for (const run of recentRuns) {
+      const kind = getQuinnIntakeFormKindFromPacketText(run.packetText || '');
+
+      if (kind?.id !== 'memory-hygiene-review') {
+        continue;
+      }
+
+      const resultPreview = getQuinnMemoryHygieneReviewResultPreview(run.writtenResult || '');
+
+      if (!resultPreview) {
+        continue;
+      }
+
+      return {
+        id: String(run.id || run.timestamp || 'memory-hygiene-review'),
+        timestamp: String(run.timestamp || ''),
+        resultPreview,
+      };
+    }
+
+    return null;
+  }, [recentRuns]);
+
+  function handleLoadMemoryReviewNextAction(nextAction: string) {
+    const cleanNextAction = String(nextAction || '').trim();
+
+    if (!cleanNextAction) {
+      return;
+    }
+
+    clearThreadContinuity({
+      clearVisibleResponse: true,
+    });
+    setPacketTitle('Memory Review next action');
+    setPacketText(cleanNextAction);
+    setRunError('');
+    setScreen('QuinnConversation');
+
+    pushNotification({
+      title: 'Memory next action staged',
+      body: 'The latest Memory Review next action moved into Quinn.',
+      target: 'QuinnConversation',
+      tone: 'gold',
+    });
+  }
 
   let content = null;
 
@@ -7626,6 +7680,8 @@ export default function App() {
         onBack={() => setScreen('SettingsHome')}
         onOpenCanvas={() => setScreen('QuinnConversation')}
         memories={memories}
+        latestMemoryReview={latestMemoryReviewItem}
+        onLoadMemoryReviewNextAction={handleLoadMemoryReviewNextAction}
         onLoadMemoryItem={handleLoadMemoryItem}
         onTogglePin={handleToggleMemoryPin}
         onDeleteMemoryItem={handleDeleteMemoryItem}

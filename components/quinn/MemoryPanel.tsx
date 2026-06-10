@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -9,12 +9,21 @@ import {
 import QuinnSurfaceShell from './QuinnSurfaceShell';
 import SectionCard from './SectionCard';
 import { SURFACE_THEME } from './quinnSurfaceTheme';
+import type { QuinnMemoryHygieneReviewResultPreview } from './quinnIntakeForms';
 import { MemoryItem } from './quinnTypes';
+
+type LatestMemoryReviewPanelItem = {
+  id: string;
+  timestamp: string;
+  resultPreview: QuinnMemoryHygieneReviewResultPreview;
+};
 
 type MemoryPanelProps = {
   onBack: () => void;
   onOpenCanvas: () => void;
   memories: MemoryItem[];
+  latestMemoryReview?: LatestMemoryReviewPanelItem | null;
+  onLoadMemoryReviewNextAction: (nextAction: string) => void;
   onLoadMemoryItem: (item: MemoryItem) => void;
   onTogglePin: (id: string) => void;
   onDeleteMemoryItem: (id: string) => void;
@@ -44,10 +53,13 @@ export default function MemoryPanel({
   onBack,
   onOpenCanvas,
   memories,
+  latestMemoryReview,
+  onLoadMemoryReviewNextAction,
   onLoadMemoryItem,
   onTogglePin,
   onDeleteMemoryItem,
 }: MemoryPanelProps) {
+  const [showMemoryReviewDetails, setShowMemoryReviewDetails] = useState(false);
   const { orderedMemories, pinnedCount } = useMemo(() => {
     const safeMemories = Array.isArray(memories) ? memories : [];
     const nextOrderedMemories = [...safeMemories].sort((a, b) => {
@@ -65,6 +77,25 @@ export default function MemoryPanel({
       pinnedCount: nextOrderedMemories.filter((item) => item.pinned).length,
     };
   }, [memories]);
+  const latestMemoryReviewResult = latestMemoryReview?.resultPreview || null;
+  const memoryReviewSections = useMemo(
+    () =>
+      latestMemoryReviewResult
+        ? [
+            ['MEMORY SHELF READ', latestMemoryReviewResult.memoryShelfRead],
+            ['DURABLE SIGNALS', latestMemoryReviewResult.durableSignals],
+            ['TRANSIENT / TEST NOISE', latestMemoryReviewResult.transientTestNoise],
+            ['DUPLICATES / STALE CONTEXT', latestMemoryReviewResult.duplicatesStaleContext],
+            [
+              'DO NOT TREAT AS IDENTITY TRUTH',
+              latestMemoryReviewResult.doNotTreatAsIdentityTruth,
+            ],
+            ['NEXT MANUAL MEMORY ACTION', latestMemoryReviewResult.nextManualMemoryAction],
+          ]
+        : [],
+    [latestMemoryReviewResult]
+  );
+  const nextManualMemoryAction = latestMemoryReviewResult?.nextManualMemoryAction?.trim() || '';
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -92,6 +123,73 @@ export default function MemoryPanel({
           </Pressable>
         </View>
       </SectionCard>
+
+      {latestMemoryReviewResult ? (
+        <View style={styles.memoryReviewPanel}>
+          <View style={styles.memoryReviewHeader}>
+            <View style={styles.memoryReviewTitleStack}>
+              <Text style={styles.memoryReviewEyebrow}>LATEST MEMORY REVIEW</Text>
+              <Text style={styles.memoryReviewTitle}>Review only</Text>
+              {latestMemoryReview?.timestamp ? (
+                <Text style={styles.memoryReviewMeta}>
+                  {formatTimestamp(latestMemoryReview.timestamp)}
+                </Text>
+              ) : null}
+            </View>
+
+            <Pressable
+              style={styles.memoryReviewToggle}
+              onPress={() => setShowMemoryReviewDetails((current) => !current)}
+            >
+              <Text style={styles.memoryReviewToggleText}>
+                {showMemoryReviewDetails ? 'Hide' : 'View'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.memoryReviewHelper}>
+            Review only. No memory changes happen from this panel.
+          </Text>
+
+          {showMemoryReviewDetails ? (
+            memoryReviewSections.map(([label, value]) => (
+              <View key={label} style={styles.memoryReviewSection}>
+                <Text style={styles.memoryReviewSectionLabel}>{label}</Text>
+                <Text style={styles.memoryReviewBody}>{value || 'No text captured.'}</Text>
+              </View>
+            ))
+          ) : (
+            <>
+              <View style={styles.memoryReviewSection}>
+                <Text style={styles.memoryReviewSectionLabel}>MEMORY SHELF READ</Text>
+                <Text style={styles.memoryReviewBody} numberOfLines={2}>
+                  {latestMemoryReviewResult.memoryShelfRead || 'No shelf read captured.'}
+                </Text>
+              </View>
+
+              <View style={styles.memoryReviewSection}>
+                <Text style={styles.memoryReviewSectionLabel}>NEXT MANUAL MEMORY ACTION</Text>
+                <Text style={styles.memoryReviewBody} numberOfLines={2}>
+                  {nextManualMemoryAction || 'No next action captured.'}
+                </Text>
+              </View>
+            </>
+          )}
+
+          <View style={styles.rowWrap}>
+            <Pressable
+              style={[
+                styles.primaryButton,
+                !nextManualMemoryAction && styles.disabledButton,
+              ]}
+              disabled={!nextManualMemoryAction}
+              onPress={() => onLoadMemoryReviewNextAction(nextManualMemoryAction)}
+            >
+              <Text style={styles.primaryButtonText}>Load next action</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {orderedMemories.length ? (
         orderedMemories.map((item) => (
@@ -187,6 +285,93 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 16,
     marginBottom: 12,
+  },
+
+  memoryReviewPanel: {
+    backgroundColor: SURFACE_THEME.panelAlt,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 12,
+  },
+
+  memoryReviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+
+  memoryReviewTitleStack: {
+    flex: 1,
+    marginRight: 12,
+  },
+
+  memoryReviewEyebrow: {
+    color: SURFACE_THEME.gold,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+
+  memoryReviewTitle: {
+    color: SURFACE_THEME.text,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '900',
+  },
+
+  memoryReviewMeta: {
+    color: SURFACE_THEME.textSoft,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+
+  memoryReviewToggle: {
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  memoryReviewToggleText: {
+    color: SURFACE_THEME.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  memoryReviewHelper: {
+    color: SURFACE_THEME.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+
+  memoryReviewSection: {
+    marginTop: 8,
+  },
+
+  memoryReviewSectionLabel: {
+    color: SURFACE_THEME.gold,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    marginBottom: 3,
+  },
+
+  memoryReviewBody: {
+    color: SURFACE_THEME.text,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '600',
   },
 
   memoryHeader: {
@@ -293,6 +478,10 @@ const styles = StyleSheet.create({
     color: '#FFD6E1',
     fontSize: 13,
     fontWeight: '900',
+  },
+
+  disabledButton: {
+    opacity: 0.45,
   },
 
   bodyLine: {

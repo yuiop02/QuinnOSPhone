@@ -317,6 +317,15 @@ export type QuinnMemoryHygieneReviewSource = {
   notifications?: QuinnMemoryHygieneReviewSampleItem[];
 };
 
+export type QuinnMemoryHygieneReviewResultPreview = {
+  memoryShelfRead: string;
+  durableSignals: string;
+  transientTestNoise: string;
+  duplicatesStaleContext: string;
+  doNotTreatAsIdentityTruth: string;
+  nextManualMemoryAction: string;
+};
+
 const QUINN_OUTCOME_LOG_MARKER = 'QUINNOS OUTCOME LOG';
 const QUINN_DRAFT_PATTERN_CARD_MARKER = 'QUINNOS DRAFT PATTERN CARD';
 const QUINN_PATTERN_CARD_SAVE_INTENT_MARKER = 'QUINNOS PATTERN CARD SAVE INTENT';
@@ -928,6 +937,53 @@ export function getMissingQuinnMemoryHygieneReviewResultHeadings(responseText: s
 
     return !pattern.test(text);
   });
+}
+
+function cleanQuinnMemoryHygieneReviewResultValue(value: string) {
+  const clean = String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (!clean || /^\[[\s\S]*\]$/.test(clean)) {
+    return '';
+  }
+
+  return clean;
+}
+
+export function getQuinnMemoryHygieneReviewResultPreview(
+  responseText: string
+): QuinnMemoryHygieneReviewResultPreview | null {
+  const text = String(responseText || '');
+
+  if (getMissingQuinnMemoryHygieneReviewResultHeadings(text).length) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+
+  return {
+    memoryShelfRead: cleanQuinnMemoryHygieneReviewResultValue(
+      getQuinnPacketSectionValue(lines, 'MEMORY SHELF READ:')
+    ),
+    durableSignals: cleanQuinnMemoryHygieneReviewResultValue(
+      getQuinnPacketSectionValue(lines, 'DURABLE SIGNALS:')
+    ),
+    transientTestNoise: cleanQuinnMemoryHygieneReviewResultValue(
+      getQuinnPacketSectionValue(lines, 'TRANSIENT / TEST NOISE:')
+    ),
+    duplicatesStaleContext: cleanQuinnMemoryHygieneReviewResultValue(
+      getQuinnPacketSectionValue(lines, 'DUPLICATES / STALE CONTEXT:')
+    ),
+    doNotTreatAsIdentityTruth: cleanQuinnMemoryHygieneReviewResultValue(
+      getQuinnPacketSectionValue(lines, 'DO NOT TREAT AS IDENTITY TRUTH:')
+    ),
+    nextManualMemoryAction: cleanQuinnMemoryHygieneReviewResultValue(
+      getQuinnPacketSectionValue(lines, 'NEXT MANUAL MEMORY ACTION:')
+    ),
+  };
 }
 
 export function buildQuinnDraftPatternCardPacket(candidate: QuinnDraftPatternCardSource) {
