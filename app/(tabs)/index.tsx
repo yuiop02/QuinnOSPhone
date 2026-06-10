@@ -122,6 +122,7 @@ import {
   getQuinnDraftPatternCardHistoryPreview,
   getQuinnDraftPatternCardResultPreview,
   getQuinnIntakeFormKindFromPacketText,
+  getMissingQuinnMemoryHygieneReviewResultHeadings,
   getQuinnOutcomeLogHistoryPreview,
   getQuinnOutcomeLogMinimumCaptureStatus,
   getQuinnPatternCardApplicationPacketPreview,
@@ -3862,24 +3863,24 @@ function QuinnConversationSurface({
           title: sessionArc?.title || '',
           latestSummary: latestThreadBeat?.summary || compressedSummary || '',
         },
-        memoryResonance: memoryResonance.slice(0, 3).map((item) => ({
+        memoryResonance: memoryResonance.slice(0, 2).map((item) => ({
           label: item.label,
           preview: item.preview,
         })),
-        recentRuns: recentRunSamples.slice(0, 3).map((run) => ({
+        recentRuns: recentRunSamples.slice(0, 2).map((run) => ({
           title: run.packetTitle,
           summary: run.compressedSummary || run.writtenResult,
           timestamp: run.timestamp,
           source: run.sessionArcTitle || run.lensId || '',
         })),
-        memories: memorySamples.slice(0, 3).map((memory) => ({
+        memories: memorySamples.slice(0, 2).map((memory) => ({
           label: memory.label,
           body: memory.body,
           timestamp: memory.timestamp,
           source: memory.source,
           pinned: memory.pinned,
         })),
-        notifications: notifications.slice(0, 2).map((notification) => ({
+        notifications: notifications.slice(0, 1).map((notification) => ({
           title: notification.title,
           body: notification.body,
           timestamp: notification.timestamp,
@@ -7033,6 +7034,27 @@ export default function App() {
       }
 
       const cleanWrittenResult = sanitizeQuinnVisibleReplyText(result.written);
+      const completedPacketKind = getQuinnIntakeFormKindFromPacketText(nextText);
+      const missingMemoryReviewHeadings =
+        completedPacketKind?.id === 'memory-hygiene-review'
+          ? getMissingQuinnMemoryHygieneReviewResultHeadings(cleanWrittenResult)
+          : [];
+
+      if (missingMemoryReviewHeadings.length) {
+        const message =
+          'Memory Review returned an incomplete reply. The draft was preserved. Try again later or reduce context.';
+
+        setRunError(message);
+        pushNotification({
+          title: 'Run failed',
+          body: message,
+          target: 'QuinnConversation',
+          tone: 'alert',
+        });
+
+        return null;
+      }
+
       const shortSummary = buildSpokenSummary(result.summary, cleanWrittenResult);
       const cleanCompressedSummary =
         sanitizeQuinnVisibleReplyText(shortSummary) ||

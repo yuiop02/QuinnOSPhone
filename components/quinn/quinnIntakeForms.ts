@@ -801,12 +801,12 @@ function buildQuinnMemoryHygieneResonanceList(
     const label = formatQuinnShelfReviewValue(
       String(item.label || item.title || ''),
       'Untitled resonance signal',
-      40
+      32
     );
     const preview = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no preview captured',
-      72
+      52
     );
 
     return `${index + 1}. ${label}: ${preview}`;
@@ -829,12 +829,12 @@ function buildQuinnMemoryHygieneRunList(
     const title = formatQuinnShelfReviewValue(
       String(item.title || item.label || ''),
       'Untitled run',
-      40
+      32
     );
     const summary = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no summary captured',
-      72
+      52
     );
 
     return `${index + 1}. ${title}: ${summary}`;
@@ -857,12 +857,12 @@ function buildQuinnMemoryHygieneMemoryList(
     const label = formatQuinnShelfReviewValue(
       String(item.label || item.title || ''),
       'Untitled memory',
-      40
+      32
     );
     const body = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no body captured',
-      72
+      52
     );
     const pinned = item.pinned ? 'pinned' : '';
 
@@ -886,12 +886,12 @@ function buildQuinnMemoryHygieneNotificationList(
     const title = formatQuinnShelfReviewValue(
       String(item.title || item.label || ''),
       'Untitled notification',
-      40
+      32
     );
     const body = formatQuinnShelfReviewValue(
       getQuinnMemoryHygieneSampleText(item),
       'no body captured',
-      64
+      48
     );
     const readState = item.read ? 'read' : 'unread';
 
@@ -899,6 +899,35 @@ function buildQuinnMemoryHygieneNotificationList(
   });
 
   return lines;
+}
+
+const QUINN_MEMORY_HYGIENE_REVIEW_RESULT_HEADINGS = [
+  'MEMORY SHELF READ:',
+  'DURABLE SIGNALS:',
+  'TRANSIENT / TEST NOISE:',
+  'DUPLICATES / STALE CONTEXT:',
+  'DO NOT TREAT AS IDENTITY TRUTH:',
+  'NEXT MANUAL MEMORY ACTION:',
+];
+
+function escapeQuinnMemoryHygieneHeadingForRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function getMissingQuinnMemoryHygieneReviewResultHeadings(responseText: string) {
+  const text = String(responseText || '');
+
+  return QUINN_MEMORY_HYGIENE_REVIEW_RESULT_HEADINGS.filter((heading) => {
+    const label = heading.replace(/:$/, '');
+    const pattern = new RegExp(
+      `(^|\\n)\\s*(?:[-*]\\s*)?(?:\\*\\*)?${escapeQuinnMemoryHygieneHeadingForRegex(
+        label
+      )}(?:\\*\\*)?\\s*:`,
+      'i'
+    );
+
+    return !pattern.test(text);
+  });
 }
 
 export function buildQuinnDraftPatternCardPacket(candidate: QuinnDraftPatternCardSource) {
@@ -1638,34 +1667,29 @@ export function buildQuinnMemoryHygieneReviewPacket(
     `Active thread: ${formatQuinnShelfReviewValue(
       activeThread.title || '',
       '(none)',
-      64
+      48
     )}`,
     `Latest summary: ${formatQuinnShelfReviewValue(
       activeThread.latestSummary || '',
       '(none)',
-      96
+      64
     )}`,
-    ...buildQuinnMemoryHygieneResonanceList(input.memoryResonance || [], 3),
+    ...buildQuinnMemoryHygieneResonanceList(input.memoryResonance || [], 2),
     '',
     'RECENT SIGNAL SAMPLE:',
-    ...buildQuinnMemoryHygieneRunList(input.recentRuns || [], 3),
+    ...buildQuinnMemoryHygieneRunList(input.recentRuns || [], 2),
     '',
     'MEMORY SAMPLE:',
-    ...buildQuinnMemoryHygieneMemoryList(input.memories || [], 3),
+    ...buildQuinnMemoryHygieneMemoryList(input.memories || [], 2),
     '',
     'NOTIFICATION NOISE SAMPLE:',
-    ...buildQuinnMemoryHygieneNotificationList(input.notifications || [], 2),
+    ...buildQuinnMemoryHygieneNotificationList(input.notifications || [], 1),
     '',
     'OUTPUT LIMIT:',
-    'Max 2 bullets per heading. Short bullets. If evidence is thin, say "Evidence is thin."',
+    'Max 1 bullet per heading. Very short bullets. Finish all six headings. If evidence is thin, say "Evidence is thin."',
     '',
     'OUTPUT SHAPE:',
-    'MEMORY SHELF READ:',
-    'DURABLE SIGNALS:',
-    'TRANSIENT / TEST NOISE:',
-    'DUPLICATES / STALE CONTEXT:',
-    'DO NOT TREAT AS IDENTITY TRUTH:',
-    'NEXT MANUAL MEMORY ACTION:',
+    ...QUINN_MEMORY_HYGIENE_REVIEW_RESULT_HEADINGS,
   ].join('\n');
 }
 
