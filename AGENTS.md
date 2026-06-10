@@ -71,11 +71,23 @@ Do not replace specific Quinn-coded patterns with generic UX copy.
 
 Do not over-engineer the final dream before the calibration loop exists.
 
+## QuinnOSPhone project notes
+
+QuinnOSPhone is an Expo / React Native mobile app using Expo Router.
+
+This repo is the phone app, not the backend.
+
+Backend base URL is controlled by `EXPO_PUBLIC_QUINN_BACKEND_BASE_URL` and otherwise defaults to production Railway.
+
+EAS build profiles exist for development, preview, and production Android.
+
+Codex cloud should not be treated as a full phone/dev-client emulator.
+
 ## Development workflow
 
 Use small patches.
 
-Use one branch per patch.
+Use one branch per patch unless Quinn explicitly asks to repair or finalize directly on `master`.
 
 Inspect before editing.
 
@@ -83,17 +95,29 @@ Prefer surgical edits over broad rewrites.
 
 Run checks before commit.
 
+Default install:
+
+```sh
+npm ci --no-audit --no-fund
+```
+
 For app code changes, run:
 
-npx tsc --noEmit
+```sh
+npm run check
+npm test
+```
 
-If npx is unavailable in the current Codex environment, use the local TypeScript executable instead:
+The primary verification commands are:
 
-.\node_modules\.bin\tsc.cmd --noEmit
+```sh
+npm run typecheck
+npm run lint
+npm run check
+npm test
+```
 
-When package scripts are relevant, run:
-
-npm run check --if-present
+If `npx` or global npm wrappers are unavailable in the current Codex environment, use repo-local executables where appropriate.
 
 For UI changes, Quinn must phone-test before the patch becomes trusted baseline.
 
@@ -134,13 +158,15 @@ Ask before modifying environment files.
 
 Never print secrets.
 
-Never expose .env values.
+Never expose `.env` values.
 
 It is okay to list env key names only.
 
 Publishing commands like EAS updates should be treated as approval-gated actions.
 
 Git push should be approval-gated unless Quinn explicitly asks for it.
+
+Do not run EAS builds or updates unless Quinn explicitly asks.
 
 ## Current app facts
 

@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "node -r sucrase/register tests/runQuinnTests.js",
+    "test": "node tests/runQuinnTests.js",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint",
