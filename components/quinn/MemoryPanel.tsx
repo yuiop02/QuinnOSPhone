@@ -151,6 +151,13 @@ export default function MemoryPanel({
             Review only. No memory changes happen from this panel.
           </Text>
 
+          {nextManualMemoryAction ? (
+            <View style={styles.memoryReviewSpotlight}>
+              <Text style={styles.memoryReviewSpotlightLabel}>Next manual action</Text>
+              <Text style={styles.memoryReviewSpotlightBody}>{nextManualMemoryAction}</Text>
+            </View>
+          ) : null}
+
           {showMemoryReviewDetails ? (
             memoryReviewSections.map(([label, value]) => (
               <View key={label} style={styles.memoryReviewSection}>
@@ -352,6 +359,31 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontWeight: '700',
     marginBottom: 10,
+  },
+
+  memoryReviewSpotlight: {
+    backgroundColor: SURFACE_THEME.goldSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 10,
+  },
+
+  memoryReviewSpotlightLabel: {
+    color: SURFACE_THEME.gold,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+
+  memoryReviewSpotlightBody: {
+    color: SURFACE_THEME.text,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '800',
   },
 
   memoryReviewSection: {
