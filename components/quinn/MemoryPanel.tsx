@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -60,6 +61,7 @@ export default function MemoryPanel({
   onDeleteMemoryItem,
 }: MemoryPanelProps) {
   const [showMemoryReviewDetails, setShowMemoryReviewDetails] = useState(false);
+  const [memoryReviewCopyStatus, setMemoryReviewCopyStatus] = useState('');
   const { orderedMemories, pinnedCount } = useMemo(() => {
     const safeMemories = Array.isArray(memories) ? memories : [];
     const nextOrderedMemories = [...safeMemories].sort((a, b) => {
@@ -96,6 +98,23 @@ export default function MemoryPanel({
     [latestMemoryReviewResult]
   );
   const nextManualMemoryAction = latestMemoryReviewResult?.nextManualMemoryAction?.trim() || '';
+
+  useEffect(() => {
+    setMemoryReviewCopyStatus('');
+  }, [nextManualMemoryAction]);
+
+  async function handleCopyMemoryReviewNextAction() {
+    if (!nextManualMemoryAction) {
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(nextManualMemoryAction);
+      setMemoryReviewCopyStatus('Copied');
+    } catch {
+      setMemoryReviewCopyStatus('Copy failed');
+    }
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -154,7 +173,20 @@ export default function MemoryPanel({
           {nextManualMemoryAction ? (
             <View style={styles.memoryReviewSpotlight}>
               <Text style={styles.memoryReviewSpotlightLabel}>Next manual action</Text>
-              <Text style={styles.memoryReviewSpotlightBody}>{nextManualMemoryAction}</Text>
+              <Text style={styles.memoryReviewSpotlightBody} selectable>
+                {nextManualMemoryAction}
+              </Text>
+              <View style={styles.memoryReviewSpotlightActions}>
+                <Pressable
+                  style={styles.memoryReviewCopyButton}
+                  onPress={handleCopyMemoryReviewNextAction}
+                >
+                  <Text style={styles.memoryReviewCopyButtonText}>Copy</Text>
+                </Pressable>
+                {memoryReviewCopyStatus ? (
+                  <Text style={styles.memoryReviewCopyStatus}>{memoryReviewCopyStatus}</Text>
+                ) : null}
+              </View>
             </View>
           ) : null}
 
@@ -384,6 +416,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     fontWeight: '800',
+  },
+
+  memoryReviewSpotlightActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+
+  memoryReviewCopyButton: {
+    backgroundColor: SURFACE_THEME.panelSoft,
+    borderWidth: 1,
+    borderColor: SURFACE_THEME.borderWarm,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginRight: 10,
+    marginBottom: 4,
+  },
+
+  memoryReviewCopyButtonText: {
+    color: SURFACE_THEME.gold,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+
+  memoryReviewCopyStatus: {
+    color: SURFACE_THEME.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+    marginBottom: 4,
   },
 
   memoryReviewSection: {
