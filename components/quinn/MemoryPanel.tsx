@@ -62,6 +62,7 @@ export default function MemoryPanel({
 }: MemoryPanelProps) {
   const [showMemoryReviewDetails, setShowMemoryReviewDetails] = useState(false);
   const [memoryReviewCopyStatus, setMemoryReviewCopyStatus] = useState('');
+  const [memoryReviewFullCopyStatus, setMemoryReviewFullCopyStatus] = useState('');
   const { orderedMemories, pinnedCount } = useMemo(() => {
     const safeMemories = Array.isArray(memories) ? memories : [];
     const nextOrderedMemories = [...safeMemories].sort((a, b) => {
@@ -97,11 +98,36 @@ export default function MemoryPanel({
         : [],
     [latestMemoryReviewResult]
   );
+  const fullMemoryReviewText = useMemo(
+    () =>
+      memoryReviewSections
+        .map(([label, value]) => `${label}:\n${String(value || 'No text captured.').trim()}`)
+        .join('\n\n')
+        .trim(),
+    [memoryReviewSections]
+  );
   const nextManualMemoryAction = latestMemoryReviewResult?.nextManualMemoryAction?.trim() || '';
 
   useEffect(() => {
     setMemoryReviewCopyStatus('');
   }, [nextManualMemoryAction]);
+
+  useEffect(() => {
+    setMemoryReviewFullCopyStatus('');
+  }, [fullMemoryReviewText]);
+
+  async function handleCopyFullMemoryReview() {
+    if (!fullMemoryReviewText) {
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(fullMemoryReviewText);
+      setMemoryReviewFullCopyStatus('Copied');
+    } catch {
+      setMemoryReviewFullCopyStatus('Copy failed');
+    }
+  }
 
   async function handleCopyMemoryReviewNextAction() {
     if (!nextManualMemoryAction) {
@@ -169,6 +195,18 @@ export default function MemoryPanel({
           <Text style={styles.memoryReviewHelper}>
             Review only. No memory changes happen from this panel.
           </Text>
+
+          <View style={styles.memoryReviewPanelActions}>
+            <Pressable
+              style={styles.memoryReviewCopyButton}
+              onPress={handleCopyFullMemoryReview}
+            >
+              <Text style={styles.memoryReviewCopyButtonText}>Copy full review</Text>
+            </Pressable>
+            {memoryReviewFullCopyStatus ? (
+              <Text style={styles.memoryReviewCopyStatus}>{memoryReviewFullCopyStatus}</Text>
+            ) : null}
+          </View>
 
           {nextManualMemoryAction ? (
             <View style={styles.memoryReviewSpotlight}>
@@ -423,6 +461,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     marginTop: 10,
+  },
+
+  memoryReviewPanelActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginBottom: 6,
   },
 
   memoryReviewCopyButton: {
