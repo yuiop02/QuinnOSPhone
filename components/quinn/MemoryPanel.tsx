@@ -175,11 +175,14 @@ export default function MemoryPanel({
             <View style={styles.memoryReviewTitleStack}>
               <Text style={styles.memoryReviewEyebrow}>LATEST MEMORY REVIEW</Text>
               <Text style={styles.memoryReviewTitle}>Review only</Text>
-              {latestMemoryReview?.timestamp ? (
-                <Text style={styles.memoryReviewMeta}>
-                  {formatTimestamp(latestMemoryReview.timestamp)}
-                </Text>
-              ) : null}
+              <Text style={styles.memoryReviewMeta}>
+                Latest review from recent runs.
+              </Text>
+              <Text style={styles.memoryReviewMeta}>
+                {latestMemoryReview?.timestamp
+                  ? `Last updated: ${formatTimestamp(latestMemoryReview.timestamp)}`
+                  : 'Last updated: current app timestamp unavailable.'}
+              </Text>
             </View>
 
             <Pressable
