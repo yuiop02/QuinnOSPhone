@@ -13,6 +13,11 @@ import { SURFACE_THEME } from './quinnSurfaceTheme';
 import type { QuinnMemoryHygieneReviewResultPreview } from './quinnIntakeForms';
 import { MemoryItem } from './quinnTypes';
 
+const MEMORY_REVIEW_COPY_TITLE = 'Latest Memory Review';
+const MEMORY_REVIEW_PROVENANCE_LINE = 'Latest review from recent runs.';
+const MEMORY_REVIEW_TIMESTAMP_UNAVAILABLE_LINE =
+  'Last updated: current app timestamp unavailable.';
+
 type LatestMemoryReviewPanelItem = {
   id: string;
   timestamp: string;
@@ -81,6 +86,9 @@ export default function MemoryPanel({
     };
   }, [memories]);
   const latestMemoryReviewResult = latestMemoryReview?.resultPreview || null;
+  const memoryReviewUpdatedLine = latestMemoryReview?.timestamp
+    ? `Last updated: ${formatTimestamp(latestMemoryReview.timestamp)}`
+    : MEMORY_REVIEW_TIMESTAMP_UNAVAILABLE_LINE;
   const memoryReviewSections = useMemo(
     () =>
       latestMemoryReviewResult
@@ -99,12 +107,23 @@ export default function MemoryPanel({
     [latestMemoryReviewResult]
   );
   const fullMemoryReviewText = useMemo(
-    () =>
-      memoryReviewSections
+    () => {
+      const renderedSectionsText = memoryReviewSections
         .map(([label, value]) => `${label}:\n${String(value || 'No text captured.').trim()}`)
         .join('\n\n')
-        .trim(),
-    [memoryReviewSections]
+        .trim();
+
+      return [
+        MEMORY_REVIEW_COPY_TITLE,
+        MEMORY_REVIEW_PROVENANCE_LINE,
+        memoryReviewUpdatedLine,
+        '',
+        renderedSectionsText,
+      ]
+        .join('\n')
+        .trim();
+    },
+    [memoryReviewSections, memoryReviewUpdatedLine]
   );
   const nextManualMemoryAction = latestMemoryReviewResult?.nextManualMemoryAction?.trim() || '';
 
@@ -176,12 +195,10 @@ export default function MemoryPanel({
               <Text style={styles.memoryReviewEyebrow}>LATEST MEMORY REVIEW</Text>
               <Text style={styles.memoryReviewTitle}>Review only</Text>
               <Text style={styles.memoryReviewMeta}>
-                Latest review from recent runs.
+                {MEMORY_REVIEW_PROVENANCE_LINE}
               </Text>
               <Text style={styles.memoryReviewMeta}>
-                {latestMemoryReview?.timestamp
-                  ? `Last updated: ${formatTimestamp(latestMemoryReview.timestamp)}`
-                  : 'Last updated: current app timestamp unavailable.'}
+                {memoryReviewUpdatedLine}
               </Text>
             </View>
 
