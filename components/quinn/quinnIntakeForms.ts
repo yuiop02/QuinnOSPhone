@@ -953,17 +953,24 @@ function cleanQuinnMemoryHygieneReviewResultValue(value: string) {
   return clean;
 }
 
-export function getQuinnMemoryHygieneReviewResultPreview(
-  responseText: string
-): QuinnMemoryHygieneReviewResultPreview | null {
-  const text = String(responseText || '');
+const QUINN_MEMORY_HYGIENE_REVIEW_BLANK_VALUES = new Set([
+  'no text captured',
+  'no shelf read captured',
+  'no next action captured',
+]);
 
-  if (getMissingQuinnMemoryHygieneReviewResultHeadings(text).length) {
-    return null;
-  }
+function isMeaningfulQuinnMemoryHygieneReviewResultValue(value: string) {
+  const clean = cleanQuinnMemoryHygieneReviewResultValue(value)
+    .replace(/\s+/g, ' ')
+    .trim();
+  const normalized = clean.toLowerCase().replace(/[.!?]+$/, '');
 
-  const lines = text.split(/\r?\n/);
+  return Boolean(clean && !QUINN_MEMORY_HYGIENE_REVIEW_BLANK_VALUES.has(normalized));
+}
 
+function getQuinnMemoryHygieneReviewResultPreviewFromLines(
+  lines: string[]
+): QuinnMemoryHygieneReviewResultPreview {
   return {
     memoryShelfRead: cleanQuinnMemoryHygieneReviewResultValue(
       getQuinnPacketSectionValue(lines, 'MEMORY SHELF READ:')
@@ -984,6 +991,50 @@ export function getQuinnMemoryHygieneReviewResultPreview(
       getQuinnPacketSectionValue(lines, 'NEXT MANUAL MEMORY ACTION:')
     ),
   };
+}
+
+function getBlankQuinnMemoryHygieneReviewResultHeadingsFromPreview(
+  preview: QuinnMemoryHygieneReviewResultPreview
+) {
+  return [
+    ['MEMORY SHELF READ:', preview.memoryShelfRead],
+    ['DURABLE SIGNALS:', preview.durableSignals],
+    ['TRANSIENT / TEST NOISE:', preview.transientTestNoise],
+    ['DUPLICATES / STALE CONTEXT:', preview.duplicatesStaleContext],
+    ['DO NOT TREAT AS IDENTITY TRUTH:', preview.doNotTreatAsIdentityTruth],
+    ['NEXT MANUAL MEMORY ACTION:', preview.nextManualMemoryAction],
+  ]
+    .filter(([, value]) => !isMeaningfulQuinnMemoryHygieneReviewResultValue(value))
+    .map(([heading]) => heading);
+}
+
+export function getBlankQuinnMemoryHygieneReviewResultHeadings(responseText: string) {
+  const text = String(responseText || '');
+
+  if (getMissingQuinnMemoryHygieneReviewResultHeadings(text).length) {
+    return [];
+  }
+
+  return getBlankQuinnMemoryHygieneReviewResultHeadingsFromPreview(
+    getQuinnMemoryHygieneReviewResultPreviewFromLines(text.split(/\r?\n/))
+  );
+}
+
+export function getQuinnMemoryHygieneReviewResultPreview(
+  responseText: string
+): QuinnMemoryHygieneReviewResultPreview | null {
+  const text = String(responseText || '');
+
+  if (getMissingQuinnMemoryHygieneReviewResultHeadings(text).length) {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/);
+  const resultPreview = getQuinnMemoryHygieneReviewResultPreviewFromLines(lines);
+
+  return getBlankQuinnMemoryHygieneReviewResultHeadingsFromPreview(resultPreview).length
+    ? null
+    : resultPreview;
 }
 
 export function buildQuinnDraftPatternCardPacket(candidate: QuinnDraftPatternCardSource) {

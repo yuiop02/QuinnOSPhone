@@ -119,6 +119,7 @@ import {
   buildQuinnReleaseReadinessAuditPacket,
   buildQuinnSavedCardShelfReviewPacket,
   buildQuinnSavedPatternCardReviewPacket,
+  getBlankQuinnMemoryHygieneReviewResultHeadings,
   getQuinnDraftPatternCardHistoryPreview,
   getQuinnDraftPatternCardResultPreview,
   getQuinnIntakeFormKindFromPacketText,
@@ -7043,14 +7044,35 @@ export default function App() {
 
       const cleanWrittenResult = sanitizeQuinnVisibleReplyText(result.written);
       const completedPacketKind = getQuinnIntakeFormKindFromPacketText(nextText);
+      const isMemoryReviewCompletion = completedPacketKind?.id === 'memory-hygiene-review';
       const missingMemoryReviewHeadings =
-        completedPacketKind?.id === 'memory-hygiene-review'
+        isMemoryReviewCompletion
           ? getMissingQuinnMemoryHygieneReviewResultHeadings(cleanWrittenResult)
           : [];
 
       if (missingMemoryReviewHeadings.length) {
         const message =
           'Memory Review returned an incomplete reply. The draft was preserved. Try again later or reduce context.';
+
+        setRunError(message);
+        pushNotification({
+          title: 'Run failed',
+          body: message,
+          target: 'QuinnConversation',
+          tone: 'alert',
+        });
+
+        return null;
+      }
+
+      const blankMemoryReviewHeadings =
+        isMemoryReviewCompletion
+          ? getBlankQuinnMemoryHygieneReviewResultHeadings(cleanWrittenResult)
+          : [];
+
+      if (blankMemoryReviewHeadings.length) {
+        const message =
+          'Memory Review returned blank sections. The draft was preserved. Try again later or reduce context.';
 
         setRunError(message);
         pushNotification({
