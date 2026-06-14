@@ -286,7 +286,24 @@ export default function MemoryPanel({
             </Pressable>
           </View>
         </View>
-      ) : null}
+      ) : (
+        <View style={styles.memoryReviewPanel}>
+          <View style={styles.memoryReviewHeader}>
+            <View style={styles.memoryReviewTitleStack}>
+              <Text style={styles.memoryReviewEyebrow}>MEMORY REVIEW</Text>
+              <Text style={styles.memoryReviewTitle}>Latest Memory Review</Text>
+              <Text style={styles.memoryReviewMeta}>
+                No completed Memory Review yet.
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.memoryReviewHelper}>
+            Run Memory Review to generate one. Completed reviews will appear here
+            with provenance and the next manual memory action.
+          </Text>
+        </View>
+      )}
 
       {orderedMemories.length ? (
         orderedMemories.map((item) => (
