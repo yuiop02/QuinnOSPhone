@@ -16,7 +16,7 @@ import { MemoryItem } from './quinnTypes';
 const MEMORY_REVIEW_COPY_TITLE = 'Latest Memory Review';
 const MEMORY_REVIEW_PROVENANCE_LINE = 'Latest review from recent runs.';
 const MEMORY_REVIEW_TIMESTAMP_UNAVAILABLE_LINE =
-  'Last updated: current app timestamp unavailable.';
+  'Last updated: Not available for this review.';
 
 type LatestMemoryReviewPanelItem = {
   id: string;
@@ -41,6 +41,22 @@ function formatTimestamp(value: string) {
   } catch {
     return value;
   }
+}
+
+function formatMemoryReviewUpdatedLine(value?: string | null) {
+  const normalizedValue = value?.trim();
+
+  if (!normalizedValue) {
+    return MEMORY_REVIEW_TIMESTAMP_UNAVAILABLE_LINE;
+  }
+
+  const timestamp = new Date(normalizedValue);
+
+  if (Number.isNaN(timestamp.getTime())) {
+    return MEMORY_REVIEW_TIMESTAMP_UNAVAILABLE_LINE;
+  }
+
+  return `Last updated: ${timestamp.toLocaleString()}`;
 }
 
 function formatSource(source: MemoryItem['source']) {
@@ -86,9 +102,7 @@ export default function MemoryPanel({
     };
   }, [memories]);
   const latestMemoryReviewResult = latestMemoryReview?.resultPreview || null;
-  const memoryReviewUpdatedLine = latestMemoryReview?.timestamp
-    ? `Last updated: ${formatTimestamp(latestMemoryReview.timestamp)}`
-    : MEMORY_REVIEW_TIMESTAMP_UNAVAILABLE_LINE;
+  const memoryReviewUpdatedLine = formatMemoryReviewUpdatedLine(latestMemoryReview?.timestamp);
   const memoryReviewSections = useMemo(
     () =>
       latestMemoryReviewResult
