@@ -22,6 +22,7 @@ import {
   View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as Updates from 'expo-updates';
 import * as SafeAreaContext from 'react-native-safe-area-context';
 import Svg, {
   Circle,
@@ -295,6 +296,10 @@ type VisibleReplySource = {
   lensId: QuinnLensId;
 };
 
+type ReleaseDiagnosticRow = {
+  label: string;
+  value: string;
+};
 
 const FADE_WALL_HEIGHT = 324;
 const WINDOW_WIDTH = Dimensions.get('window').width;
@@ -432,6 +437,60 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessa
 
 function buildThreadContinuityId() {
   return `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatReleaseDiagnosticDate(value: Date | null) {
+  if (!value) {
+    return 'Not available';
+  }
+
+  const timestamp = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(timestamp.getTime())) {
+    return 'Not available';
+  }
+
+  return timestamp.toLocaleString();
+}
+
+function buildReleaseDiagnosticsRows(): ReleaseDiagnosticRow[] {
+  const rows: ReleaseDiagnosticRow[] = [
+    {
+      label: 'Update ID',
+      value: Updates.updateId || 'Not available',
+    },
+    {
+      label: 'Runtime',
+      value: Updates.runtimeVersion || 'Not available',
+    },
+    {
+      label: 'Channel',
+      value: Updates.channel || 'Not available for this build',
+    },
+    {
+      label: 'Created',
+      value: formatReleaseDiagnosticDate(Updates.createdAt),
+    },
+    {
+      label: 'Embedded launch',
+      value: Updates.isEmbeddedLaunch ? 'Yes' : 'No',
+    },
+    {
+      label: 'Emergency launch',
+      value: Updates.isEmergencyLaunch ? 'Yes' : 'No',
+    },
+  ];
+
+  const emergencyReason = String(Updates.emergencyLaunchReason || '').trim();
+
+  if (emergencyReason) {
+    rows.push({
+      label: 'Emergency reason',
+      value: emergencyReason,
+    });
+  }
+
+  return rows;
 }
 
 function getQuinnPacketWorkflowRunTitle(packetText: string) {
@@ -7659,6 +7718,22 @@ export default function App() {
             })}
           </View>
         ) : null}
+
+        <View style={styles.releaseDiagnosticsCard}>
+          <Text style={styles.releaseDiagnosticsEyebrow}>RELEASE DIAGNOSTICS</Text>
+          <Text style={styles.releaseDiagnosticsTitle}>Running app state</Text>
+
+          <View style={styles.releaseDiagnosticsList}>
+            {buildReleaseDiagnosticsRows().map((item) => (
+              <View key={item.label} style={styles.releaseDiagnosticsRow}>
+                <Text style={styles.releaseDiagnosticsLabel}>{item.label}</Text>
+                <Text style={styles.releaseDiagnosticsValue} selectable>
+                  {item.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
       </ScrollView>
     );
   } else if (screen === 'HomeTileGrid') {
@@ -8716,6 +8791,57 @@ headerVersionShine: {
     lineHeight: 16,
     fontWeight: '500',
     marginTop: 2,
+  },
+
+  releaseDiagnosticsCard: {
+    marginTop: 14,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.028)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+
+  releaseDiagnosticsEyebrow: {
+    color: 'rgba(210, 216, 235, 0.40)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
+
+  releaseDiagnosticsTitle: {
+    color: 'rgba(250, 250, 252, 0.74)',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+
+  releaseDiagnosticsList: {
+    marginTop: 10,
+  },
+
+  releaseDiagnosticsRow: {
+    paddingTop: 8,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.045)',
+  },
+
+  releaseDiagnosticsLabel: {
+    color: 'rgba(210, 216, 235, 0.42)',
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+
+  releaseDiagnosticsValue: {
+    color: 'rgba(245, 248, 255, 0.70)',
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '600',
   },
 
   cardFloatWrap: {
